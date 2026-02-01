@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { Search, ShoppingCart, Menu, Phone, ArrowUp, Package } from "lucide-react";
+import { Search, ShoppingCart, Menu, Phone, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { useCartCount } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
+import { Logo } from "./Logo";
 
 const HEADER_PHONE = "07597783584";
 
@@ -131,22 +132,10 @@ export default function SiteLayout({
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 md:px-6 lg:px-8 md:flex-row md:items-center md:justify-between md:gap-6 md:py-4">
           <div className="flex items-center justify-between gap-4 md:justify-start">
-            <Link href="/">
-              <a
-                data-testid="link-home"
-                className="flex items-center gap-3 group shrink-0"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm group-hover:shadow-md transition-shadow">
-                  <Package className="h-5 w-5" strokeWidth={2} />
-                </div>
-                <div className="hidden sm:block">
-                  <div className="font-[var(--font-serif)] text-lg font-bold tracking-tight text-foreground">
-                    Smoke City Supplies
-                  </div>
-                  <div className="text-xs text-muted-foreground font-medium">
-                    Motorcycle Parts · UK
-                  </div>
-                </div>
+            <Link href="/" data-testid="link-home" className="group shrink-0 transition-opacity hover:opacity-80">
+              <a>
+                <span className="hidden sm:inline-flex"><Logo size="md" showText /></span>
+                <span className="sm:hidden inline-flex"><Logo size="sm" showText={false} /></span>
               </a>
             </Link>
 
@@ -259,7 +248,7 @@ export default function SiteLayout({
         <Button
           variant="outline"
           size="icon"
-          className="fixed bottom-20 right-4 z-30 h-11 w-11 rounded-full shadow-md md:bottom-20 md:right-6"
+          className="fixed bottom-20 right-6 z-30 h-11 w-11 rounded-full shadow-md md:bottom-6 md:right-24"
           aria-label="Back to top"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         >
@@ -270,21 +259,22 @@ export default function SiteLayout({
       <footer className="border-t bg-muted/30 mt-20">
         <div className="mx-auto grid max-w-7xl gap-12 px-4 py-12 md:grid-cols-4 md:px-6 lg:px-8">
           <div className="md:col-span-2">
-            <div className="font-[var(--font-serif)] text-lg font-bold tracking-tight mb-2">
-              Smoke City Supplies
-            </div>
-            <p className="text-sm text-muted-foreground max-w-md mb-3">
-              Your trusted online source for motorcycle parts in the UK. Genuine parts and expert advice.
+            <Logo size="md" />
+            <p className="text-sm text-muted-foreground max-w-md mt-4 mb-3">
+              Your trusted online source for motorcycle parts in the UK. Genuine parts from quality brands with expert support.
             </p>
             <p className="text-xs text-muted-foreground">
               UK delivery only. All prices in GBP (£).
             </p>
-            <div className="mt-3 text-sm text-muted-foreground">
-              <div className="font-medium text-foreground mb-1">Online only</div>
-              <div>UK delivery — no physical store</div>
-            </div>
-            <div className="mt-4 text-sm text-muted-foreground">
-              Newsletter signup coming soon. Follow us on social for updates.
+            <div className="mt-5 grid grid-cols-2 gap-4 text-sm text-muted-foreground max-w-xs">
+              <div>
+                <div className="font-medium text-foreground mb-1">Online only</div>
+                <div>UK delivery — no physical store</div>
+              </div>
+              <div>
+                <div className="font-medium text-foreground mb-1">Delivery</div>
+                <div>UK-wide shipping</div>
+              </div>
             </div>
           </div>
 

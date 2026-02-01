@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Package, Shield, Truck, Headphones, ArrowRight } from "lucide-react";
+import { Settings, Shield, Truck, Phone, ArrowRight, Package } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import SiteLayout from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
@@ -21,107 +21,148 @@ export default function Home() {
   });
   const featuredProducts = products.slice(0, 5);
   usePageMeta({
-    title: "Smoke City Supplies",
+    title: "Smoke City Supplies | Motorcycle Parts UK",
     description: "Genuine motorcycle parts, UK delivery. Online only — shop brakes, engine, suspension, exhaust and more. Expert advice and support.",
   });
   return (
     <SiteLayout>
-      <div className="flex flex-col">
+      <div className="flex flex-col gap-8">
         {/* Hero */}
-        <section className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-primary/10 via-background to-muted/30 px-6 py-16 md:px-12 md:py-24 lg:py-28">
-          <div className="relative z-10 mx-auto max-w-3xl text-center">
-            <h1 className="font-[var(--font-serif)] text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
-              Smoke City Supplies
+        <section className="grid lg:grid-cols-2 gap-8 items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 border border-accent bg-accent/10 px-3 py-1 text-sm font-medium text-accent mb-4">
+              <Package className="h-4 w-4" />
+              UK Motorcycle Parts Specialist
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl lg:text-5xl leading-tight">
+              Quality Parts for
+              <span className="text-primary"> Every Bike</span>
             </h1>
-            <p className="mt-4 text-lg text-muted-foreground md:text-xl">
-              Genuine motorcycle parts, delivered across the UK. Online only — no physical store, just great parts and support.
+            <p className="mt-4 text-muted-foreground md:text-lg max-w-lg">
+              From brakes to exhausts, we stock genuine OEM and aftermarket parts for all major motorcycle brands. Fast UK delivery with expert support.
             </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-              <Link href="/store">
-                <Button size="lg" className="gap-2 text-base" asChild>
-                  <a data-testid="link-shop-parts">
-                    Shop Parts
-                    <ArrowRight className="h-4 w-4" />
-                  </a>
-                </Button>
-              </Link>
-              <Link href="/contact">
-                <Button variant="outline" size="lg" asChild>
-                  <a>Contact</a>
-                </Button>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button size="lg" className="gap-2 font-semibold" asChild>
+                <Link href="/store" data-testid="link-shop-parts">
+                  Browse Catalogue
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button variant="outline" size="lg" asChild>
+                <Link href="/contact">Contact Us</Link>
+              </Button>
+            </div>
+          </div>
+          <div className="hidden lg:block">
+            <div className="bg-muted border p-8 space-y-4">
+              <h3 className="font-bold text-lg">Quick Links</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <Link href="/store?category=Brakes" className="border bg-card p-4 hover:border-primary transition-colors block">
+                  <span className="font-medium">Brakes</span>
+                </Link>
+                <Link href="/store?category=Engine" className="border bg-card p-4 hover:border-primary transition-colors block">
+                  <span className="font-medium">Engine</span>
+                </Link>
+                <Link href="/store?category=Exhaust" className="border bg-card p-4 hover:border-primary transition-colors block">
+                  <span className="font-medium">Exhaust</span>
+                </Link>
+                <Link href="/store?category=Suspension" className="border bg-card p-4 hover:border-primary transition-colors block">
+                  <span className="font-medium">Suspension</span>
+                </Link>
+              </div>
+              <Link href="/store" className="text-primary text-sm font-medium hover:underline inline-flex items-center gap-1">
+                View all categories <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
           </div>
         </section>
 
         {/* Trust strip */}
-        <section className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex items-start gap-4 rounded-lg border border-border/50 bg-card p-6">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Package className="h-5 w-5" />
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 border-t border-b py-6 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary text-primary-foreground">
+              <Settings className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">Genuine parts</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Quality parts from trusted brands. Filter by bike model and category.
-              </p>
+              <h3 className="font-semibold text-sm">Genuine Parts</h3>
+              <p className="text-xs text-muted-foreground">OEM & quality aftermarket</p>
             </div>
           </div>
-          <Link href="/shipping">
-            <a className="flex items-start gap-4 rounded-lg border border-border/50 bg-card p-6 hover:border-primary/50 hover:bg-card/80 transition-colors cursor-pointer">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Truck className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">UK delivery</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  We ship across the UK. Click to see delivery options.
-                </p>
-              </div>
-            </a>
-          </Link>
-          <div className="flex items-start gap-4 rounded-lg border border-border/50 bg-card p-6">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary text-primary-foreground">
+              <Truck className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm">UK Delivery</h3>
+              <p className="text-xs text-muted-foreground">Fast nationwide shipping</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary text-primary-foreground">
               <Shield className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">Secure checkout</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Safe payment powered by Stripe.
-              </p>
+              <h3 className="font-semibold text-sm">Secure Checkout</h3>
+              <p className="text-xs text-muted-foreground">Safe payment processing</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => contactModal?.open()}
-            className="flex items-start gap-4 rounded-lg border border-border/50 bg-card p-6 hover:border-primary/50 hover:bg-card/80 transition-colors cursor-pointer text-left w-full"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Headphones className="h-5 w-5" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary text-primary-foreground">
+              <Phone className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">Support</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Need help? Click here to contact us.
-              </p>
+              <h3 className="font-semibold text-sm">Expert Support</h3>
+              <p className="text-xs text-muted-foreground">Call or email for help</p>
             </div>
-          </button>
+          </div>
         </section>
 
-        {/* Featured Products */}
-        <section className="mt-16">
+        {/* Info section */}
+        <section className="grid md:grid-cols-3 gap-6">
+          <div className="border bg-card p-6">
+            <h3 className="font-bold text-lg mb-2">Wide Selection</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Browse thousands of parts for motorcycles and scooters from leading manufacturers including Brembo, Ohlins, Akrapovic, and more.
+            </p>
+            <Link href="/store" className="text-primary text-sm font-medium hover:underline">
+              Shop all parts
+            </Link>
+          </div>
+          <div className="border bg-card p-6">
+            <h3 className="font-bold text-lg mb-2">Fast Delivery</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              We dispatch orders quickly with tracked delivery across the UK. Most in-stock items ship same or next business day.
+            </p>
+            <Link href="/shipping" className="text-primary text-sm font-medium hover:underline">
+              Delivery information
+            </Link>
+          </div>
+          <div className="border bg-card p-6">
+            <h3 className="font-bold text-lg mb-2">Need Help?</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Not sure which part you need? Our team can help you find the right components for your specific bike model.
+            </p>
+            <button
+              type="button"
+              onClick={() => contactModal?.open()}
+              className="text-primary text-sm font-medium hover:underline text-left"
+            >
+              Get in touch
+            </button>
+          </div>
+        </section>
+
+        {/* Available Parts (from API) */}
+        <section>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="font-[var(--font-serif)] text-2xl font-bold text-foreground md:text-3xl">
+            <h2 className="text-2xl font-bold text-foreground md:text-3xl">
               Available Parts
             </h2>
-            <Link href="/store">
-              <Button variant="outline" className="gap-2" asChild>
-                <a>
-                  Browse all
-                  <ArrowRight className="h-4 w-4" />
-                </a>
-              </Button>
-            </Link>
+            <Button variant="outline" className="gap-2" asChild>
+              <Link href="/store">
+                Browse all <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {isLoading
@@ -136,15 +177,26 @@ export default function Home() {
             </div>
           )}
           <div className="mt-8 text-center">
-            <Link href="/store">
-              <Button size="lg" className="gap-2" asChild>
-                <a>
-                  Browse all parts
-                  <ArrowRight className="h-4 w-4" />
-                </a>
-              </Button>
-            </Link>
+            <Button size="lg" className="gap-2" asChild>
+              <Link href="/store">Browse all parts <ArrowRight className="h-4 w-4" /></Link>
+            </Button>
           </div>
+        </section>
+
+        {/* CTA */}
+        <section className="border bg-foreground text-background px-6 py-10 text-center md:py-12">
+          <h2 className="text-xl font-bold md:text-2xl">
+            Ready to find your part?
+          </h2>
+          <p className="mt-2 text-background/70 text-sm md:text-base">
+            Search by model, category, or part number.
+          </p>
+          <Button variant="secondary" className="mt-5 gap-2 bg-background text-foreground hover:bg-background/90" asChild>
+            <Link href="/store">
+              Browse Parts
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
         </section>
       </div>
     </SiteLayout>
