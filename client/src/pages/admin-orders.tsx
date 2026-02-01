@@ -2,6 +2,7 @@ import React from "react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -91,6 +92,7 @@ function OrderStatusSelect({
 }
 
 export default function AdminOrders() {
+  usePageMeta({ title: "Orders", description: "Track and manage orders." });
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
     queryFn: fetchOrders,

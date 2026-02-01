@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { FolderTree, Plus, Pencil, Trash2 } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   useCategoriesQuery,
   useCreateCategory,
@@ -39,6 +40,7 @@ function slugify(s: string): string {
 }
 
 export default function AdminCategories() {
+  usePageMeta({ title: "Categories", description: "Organize product categories." });
   const { data: categories, isLoading } = useCategoriesQuery();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();

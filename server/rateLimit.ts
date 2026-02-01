@@ -20,7 +20,7 @@ export function createRateLimiter(options: RateLimitOptions) {
     // Clean up old entries periodically
     if (Math.random() < 0.01) {
       // 1% chance to clean up
-      for (const [k, v] of rateLimitStore.entries()) {
+      for (const [k, v] of Array.from(rateLimitStore.entries())) {
         if (v.resetTime < now) {
           rateLimitStore.delete(k);
         }

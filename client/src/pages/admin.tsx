@@ -1,6 +1,7 @@
 import { Link } from "wouter";
-import { Boxes, FolderTree, ImagePlus, LayoutGrid, Package, Plus } from "lucide-react";
+import { FolderTree, ImagePlus, LayoutGrid, Package, Plus } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ function AdminTile({
 }
 
 export default function AdminDashboard() {
+  usePageMeta({ title: "Admin", description: "Store management dashboard." });
   return (
     <SiteLayout>
       <div className="flex flex-col gap-8">
@@ -63,7 +65,7 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <AdminTile
             testId="tile-admin-parts"
             title="Products"

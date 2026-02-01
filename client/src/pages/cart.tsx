@@ -28,6 +28,12 @@ export default function CartPage() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [city, setCity] = useState("");
+  const [county, setCounty] = useState("");
+  const [postcode, setPostcode] = useState("");
+  const [sameAsBilling, setSameAsBilling] = useState(true);
 
   const total = state.items.reduce(
     (sum, i) => sum + i.priceEach * i.quantity,
@@ -81,7 +87,7 @@ export default function CartPage() {
           <p className="text-muted-foreground mb-6">
             Start shopping to add items to your cart
           </p>
-          <Link href="/catalog">
+          <Link href="/store">
             <Button size="lg" asChild>
               <a>Browse Products</a>
             </Button>
@@ -112,7 +118,7 @@ export default function CartPage() {
             Thank you for your order. We'll send you a confirmation email shortly and ship your items as soon as possible.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/catalog">
+            <Link href="/store">
               <Button variant="outline" size="lg" asChild>
                 <a>Continue Shopping</a>
               </Button>
@@ -140,7 +146,7 @@ export default function CartPage() {
               Review your items and proceed to checkout
             </p>
           </div>
-          <BackButton fallback="/catalog" />
+          <BackButton fallback="/store" />
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -169,7 +175,7 @@ export default function CartPage() {
                         </a>
                       </Link>
                       <p className="text-sm text-muted-foreground">
-                        ${item.priceEach.toFixed(2)} each
+                        £{item.priceEach.toFixed(2)} each
                       </p>
                     </div>
                   </div>
@@ -206,7 +212,7 @@ export default function CartPage() {
                       <div className="text-right">
                         <div className="text-sm text-muted-foreground">Subtotal</div>
                         <div className="text-lg font-bold tabular-nums">
-                          ${(item.priceEach * item.quantity).toFixed(2)}
+                          £{(item.priceEach * item.quantity).toFixed(2)}
                         </div>
                       </div>
                       <Button
@@ -233,17 +239,17 @@ export default function CartPage() {
                   Subtotal ({state.items.reduce((s, i) => s + i.quantity, 0)} {state.items.reduce((s, i) => s + i.quantity, 0) === 1 ? "item" : "items"})
                 </span>
                 <span className="font-medium tabular-nums">
-                  ${total.toFixed(2)}
+                  £{total.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Shipping</span>
+                <span className="text-muted-foreground">Shipping (UK)</span>
                 <span className="font-medium">Calculated at checkout</span>
               </div>
               <div className="border-t pt-4 flex justify-between">
                 <span className="font-semibold">Total</span>
                 <span className="text-xl font-bold tabular-nums">
-                  ${total.toFixed(2)}
+                  £{total.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -254,7 +260,7 @@ export default function CartPage() {
             >
               Proceed to Checkout
             </Button>
-            <Link href="/catalog">
+            <Link href="/store">
               <Button variant="outline" className="mt-3 w-full" asChild>
                 <a>Continue Shopping</a>
               </Button>
@@ -264,39 +270,110 @@ export default function CartPage() {
       </div>
 
       <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Checkout</DialogTitle>
             <DialogDescription>
-              Enter your information to complete your order
+              Enter your UK delivery details. Payment integration coming soon.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="checkout-email">Email</Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="checkout-name">Full name</Label>
+                <Input
+                  id="checkout-name"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="checkout-email">Email</Label>
+                <Input
+                  id="checkout-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="checkout-address1">Address line 1</Label>
               <Input
-                id="checkout-email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="checkout-address1"
+                placeholder="House number and street"
+                value={addressLine1}
+                onChange={(e) => setAddressLine1(e.target.value)}
                 className="rounded-lg"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="checkout-name">Name</Label>
+            <div className="space-y-2">
+              <Label htmlFor="checkout-address2">Address line 2 (optional)</Label>
               <Input
-                id="checkout-name"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                id="checkout-address2"
+                placeholder="Flat, building, etc."
+                value={addressLine2}
+                onChange={(e) => setAddressLine2(e.target.value)}
                 className="rounded-lg"
               />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="checkout-city">City</Label>
+                <Input
+                  id="checkout-city"
+                  placeholder="City"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="checkout-county">County</Label>
+                <Input
+                  id="checkout-county"
+                  placeholder="County"
+                  value={county}
+                  onChange={(e) => setCounty(e.target.value)}
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="checkout-postcode">Postcode</Label>
+              <Input
+                id="checkout-postcode"
+                placeholder="e.g. M1 1AA"
+                value={postcode}
+                onChange={(e) => setPostcode(e.target.value)}
+                className="rounded-lg max-w-[140px]"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sameAsBilling}
+                onChange={(e) => setSameAsBilling(e.target.checked)}
+                className="rounded border-border"
+              />
+              <span className="text-sm">Billing address same as delivery</span>
+            </label>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Payment integration coming soon
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                You can place an order to reserve items. We will contact you to arrange payment and delivery.
+              </p>
             </div>
             <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Order Total</span>
-                <span className="font-semibold">${total.toFixed(2)}</span>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Order total</span>
+                <span className="font-semibold">£{total.toFixed(2)}</span>
               </div>
             </div>
           </div>

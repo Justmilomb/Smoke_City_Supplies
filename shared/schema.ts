@@ -43,9 +43,12 @@ export type ProductSpec = z.infer<typeof productSpecSchema>;
 export const products = pgTable("products", {
   id: varchar("id").primaryKey(),
   name: text("name").notNull(),
-  vehicle: varchar("vehicle", { length: 20 }).notNull(),
+  partNumber: text("part_number"),
+  vehicle: varchar("vehicle", { length: 40 }).notNull(),
   category: text("category").notNull(),
-  price: integer("price").notNull(), // store as pence/cents to avoid float
+  subcategory: text("subcategory"),
+  brand: text("brand"),
+  price: integer("price").notNull(), // store as pence (GBP)
   rating: integer("rating").notNull(), // e.g. 47 for 4.7
   reviewCount: integer("review_count").notNull(),
   stock: varchar("stock", { length: 20 }).notNull(),
@@ -56,12 +59,16 @@ export const products = pgTable("products", {
   image: text("image").notNull(),
   description: text("description").notNull(),
   specs: jsonb("specs").$type<ProductSpec[]>().notNull(),
+  features: jsonb("features").$type<string[]>(),
 });
 
 export const insertProductSchema = z.object({
   name: z.string().min(1),
-  vehicle: z.enum(["bike", "scooter"]),
+  partNumber: z.string().optional(),
+  vehicle: z.string().min(1),
   category: z.string().min(1),
+  subcategory: z.string().optional(),
+  brand: z.string().optional(),
   price: z.number().positive(),
   rating: z.number(),
   reviewCount: z.number(),
@@ -73,6 +80,7 @@ export const insertProductSchema = z.object({
   image: z.string(),
   description: z.string(),
   specs: z.array(productSpecSchema),
+  features: z.array(z.string()).optional(),
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
@@ -113,8 +121,11 @@ export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type ApiProduct = {
   id: string;
   name: string;
+  partNumber?: string;
   vehicle: string;
   category: string;
+  subcategory?: string;
+  brand?: string;
   price: number;
   rating: number;
   reviewCount: number;
@@ -126,6 +137,7 @@ export type ApiProduct = {
   image: string;
   description: string;
   specs: ProductSpec[];
+  features?: string[];
 };
 
 export type ApiOrderItem = {

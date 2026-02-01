@@ -1,12 +1,14 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ImagePlus, Sparkles } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
+import AdminImageUpload from "@/components/admin/AdminImageUpload";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { useCategories } from "@/lib/store";
 import { useCreateProduct } from "@/lib/products";
 import type { PartCategory, VehicleType } from "@/lib/mockData";
@@ -16,13 +18,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const schema = z.object({
   name: z.string().min(3, "Name is too short"),
-  vehicle: z.enum(["bike", "scooter"]),
+  vehicle: z.enum(["motorcycle", "bike", "scooter"]),
   category: z.string().min(1, "Pick a category"),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
   deliveryEta: z.string().min(2, "Add a delivery time"),
@@ -40,13 +41,12 @@ export default function AdminNewPart() {
   const [, setLoc] = useLocation();
 
   const [preview, setPreview] = React.useState<string>("");
-  const [uploading, setUploading] = React.useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: "",
-      vehicle: "bike",
+      vehicle: "motorcycle",
       category: cats[0] ?? "Brakes",
       price: 0,
       deliveryEta: "Next-day delivery",
@@ -97,29 +97,6 @@ export default function AdminNewPart() {
     );
   };
 
-  const onFile = async (file?: File | null) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Upload failed");
-      }
-      const { url } = await res.json();
-      setPreview(url);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
-
   return (
     <SiteLayout>
       <div className="flex flex-col gap-6">
@@ -139,47 +116,15 @@ export default function AdminNewPart() {
           <Card className="border-border/50 overflow-hidden rounded-lg lg:col-span-5">
             <div className="border-b border-border/60 p-5">
               <div className="flex items-center gap-2">
-                <ImagePlus className="h-4 w-4 text-[hsl(var(--primary))]" />
+                <ImagePlus className="h-4 w-4 text-primary" />
                 <div className="text-sm font-semibold">Image</div>
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                Images are uploaded to the server. Use camera on mobile for product photos.
+                Take a photo on mobile or drag-and-drop on desktop. JPEG, PNG, GIF, WebP up to 10MB.
               </div>
             </div>
-
             <div className="p-5">
-              <div className="aspect-square rounded-lg bg-[hsl(var(--muted))]">
-                {preview ? (
-                  <img
-                    data-testid="img-admin-preview"
-                    src={preview}
-                    alt="Preview"
-                    className="h-full w-full object-contain p-4"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                    {uploading ? "Uploading…" : "Take a photo or choose an image"}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 flex flex-col gap-2">
-                <input
-                  data-testid="input-admin-image"
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-primary-foreground hover:file:opacity-90"
-                  onChange={(e) => {
-                    onFile(e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                  disabled={uploading}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Use camera on phone/tablet or pick a file. JPEG, PNG, GIF, WebP up to 10MB.
-                </p>
-              </div>
+              <AdminImageUpload value={preview} onChange={setPreview} data-testid="admin-image-upload" />
             </div>
           </Card>
 
@@ -214,6 +159,7 @@ export default function AdminNewPart() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
+                            <SelectItem data-testid="option-part-vehicle-motorcycle" value="motorcycle">Motorcycle</SelectItem>
                             <SelectItem data-testid="option-part-vehicle-bike" value="bike">Bike</SelectItem>
                             <SelectItem data-testid="option-part-vehicle-scooter" value="scooter">Scooter</SelectItem>
                           </SelectContent>

@@ -45,8 +45,11 @@ async function createProduct(input: CreateProductInput): Promise<Part> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: input.name,
+      partNumber: input.partNumber,
       vehicle: input.vehicle,
       category: input.category,
+      subcategory: input.subcategory,
+      brand: input.brand,
       price: input.price,
       rating: input.rating,
       reviewCount: input.reviewCount,
@@ -58,6 +61,7 @@ async function createProduct(input: CreateProductInput): Promise<Part> {
       image: input.image,
       description: input.description,
       specs: input.specs,
+      features: input.features,
     }),
   });
   if (!res.ok) {

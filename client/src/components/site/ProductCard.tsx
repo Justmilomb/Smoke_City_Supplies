@@ -4,17 +4,15 @@ import { Card } from "@/components/ui/card";
 import { Star, Truck, Sparkles } from "lucide-react";
 import { getProductImage, type Part } from "@/lib/mockData";
 
-function stockLabel(stock: Part["stock"]) {
-  if (stock === "in-stock")
-    return {
-      label: "In Stock",
-      tone: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    };
-  if (stock === "low")
-    return {
-      label: "Low Stock",
-      tone: "bg-amber-50 text-amber-700 border-amber-200",
-    };
+function stockLabel(stock: Part["stock"], quantity?: number): { label: string; tone: string } {
+  if (stock === "in-stock") {
+    const label = quantity != null && quantity <= 20 ? `${quantity} in stock` : "In Stock";
+    return { label, tone: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  }
+  if (stock === "low") {
+    const label = quantity != null && quantity > 0 ? `${quantity} left` : "Low Stock";
+    return { label, tone: "bg-amber-50 text-amber-700 border-amber-200" };
+  }
   return {
     label: "Out of Stock",
     tone: "bg-rose-50 text-rose-700 border-rose-200",
@@ -22,7 +20,7 @@ function stockLabel(stock: Part["stock"]) {
 }
 
 export default function ProductCard({ part }: { part: Part }) {
-  const s = stockLabel(part.stock);
+  const s = stockLabel(part.stock, part.quantity);
 
   return (
     <Link href={`/product/${part.id}`}>
@@ -60,6 +58,9 @@ export default function ProductCard({ part }: { part: Part }) {
 
           <div className="p-6">
             <div className="mb-3">
+              {part.brand && (
+                <div className="mb-0.5 text-xs font-medium text-primary">{part.brand}</div>
+              )}
               <div
                 data-testid={`text-product-name-${part.id}`}
                 className="mb-1 line-clamp-2 text-base font-semibold leading-snug text-foreground group-hover:text-primary transition-colors"
@@ -67,7 +68,10 @@ export default function ProductCard({ part }: { part: Part }) {
                 {part.name}
               </div>
               <div className="text-xs font-medium text-muted-foreground">
-                {part.vehicle === "bike" ? "Bike" : "Scooter"} · {part.category}
+                {part.vehicle === "motorcycle" ? "Motorcycle" : part.vehicle === "bike" ? "Bike" : "Scooter"} · {part.category}
+                {part.partNumber && (
+                  <span className="ml-1 font-mono">· {part.partNumber}</span>
+                )}
               </div>
             </div>
 
@@ -90,7 +94,7 @@ export default function ProductCard({ part }: { part: Part }) {
                 data-testid={`text-product-price-${part.id}`}
                 className="text-lg font-bold tabular-nums text-foreground"
               >
-                ${part.price.toFixed(2)}
+                £{part.price.toFixed(2)}
               </div>
             </div>
 

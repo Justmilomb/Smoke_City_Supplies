@@ -4,8 +4,13 @@ import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 export default function ShippingPage() {
+  usePageMeta({
+    title: "Shipping & Delivery",
+    description: "UK delivery for motorcycle parts. Fast shipping options and delivery times. Smoke City Supplies — online motorcycle parts.",
+  });
   return (
     <SiteLayout>
       <div className="mx-auto max-w-4xl">
@@ -16,6 +21,9 @@ export default function ShippingPage() {
             </h1>
             <p className="mt-2 text-muted-foreground">
               Fast, reliable shipping to get your parts to you quickly
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground max-w-2xl">
+              We ship motorcycle parts across the UK. Delivery times and options depend on your location and the items you order. All prices include UK delivery unless stated otherwise.
             </p>
           </div>
           <BackButton fallback="/" />

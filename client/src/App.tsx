@@ -6,7 +6,9 @@ import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CartProvider } from "@/lib/cart";
 import { withAdminGuard } from "@/components/admin/AdminGuard";
+import { ContactModalProvider } from "@/components/site/ContactModal";
 import NotFound from "@/pages/not-found";
+import Home from "@/pages/home";
 import StoreHome from "@/pages/store-home";
 import CatalogPage from "@/pages/catalog";
 import ProductPage from "@/pages/product";
@@ -25,7 +27,8 @@ import AdminEditPart from "@/pages/admin-edit-part";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={StoreHome} />
+      <Route path="/" component={Home} />
+      <Route path="/store" component={StoreHome} />
       <Route path="/catalog" component={CatalogPage} />
       <Route path="/product/:id" component={ProductPage} />
       <Route path="/cart" component={CartPage} />
@@ -51,9 +54,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <CartProvider>
         <TooltipProvider>
-          <Toaster />
-          <SonnerToaster position="top-center" richColors />
-          <Router />
+          <ContactModalProvider>
+            <Toaster />
+            <SonnerToaster position="top-center" richColors />
+            <Router />
+          </ContactModalProvider>
         </TooltipProvider>
       </CartProvider>
     </QueryClientProvider>

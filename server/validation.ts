@@ -50,13 +50,19 @@ export function sanitizeProductInput(input: any) {
     name: sanitizeString(input.name),
     description: sanitizeString(input.description),
     category: sanitizeString(input.category),
-    vehicle: input.vehicle === "bike" || input.vehicle === "scooter" ? input.vehicle : undefined,
+    partNumber: input.partNumber != null ? sanitizeString(String(input.partNumber)) : undefined,
+    subcategory: input.subcategory != null ? sanitizeString(String(input.subcategory)) : undefined,
+    brand: input.brand != null ? sanitizeString(String(input.brand)) : undefined,
+    vehicle: typeof input.vehicle === "string" ? sanitizeString(input.vehicle) : undefined,
     compatibility: Array.isArray(input.compatibility)
       ? input.compatibility.map((c: any) => sanitizeString(c)).filter(Boolean)
       : [],
     tags: Array.isArray(input.tags)
       ? input.tags.map((t: any) => sanitizeString(t)).filter(Boolean)
       : [],
+    features: Array.isArray(input.features)
+      ? input.features.map((f: any) => sanitizeString(f)).filter(Boolean)
+      : undefined,
   };
 }
 

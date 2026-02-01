@@ -50,8 +50,11 @@ function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
   return {
     id: row.id,
     name: row.name,
+    partNumber: row.partNumber ?? undefined,
     vehicle: row.vehicle,
     category: row.category,
+    subcategory: row.subcategory ?? undefined,
+    brand: row.brand ?? undefined,
     price: row.price / 100,
     rating: row.rating / 10,
     reviewCount: row.reviewCount,
@@ -63,6 +66,7 @@ function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
     image: row.image,
     description: row.description,
     specs: row.specs,
+    features: row.features ?? undefined,
   };
 }
 
@@ -73,42 +77,50 @@ function stockFromQuantity(quantity: number): "in-stock" | "low" | "out" {
 }
 
 export class DbStorage implements IStorage {
+  private getDb() {
+    if (!db) throw new Error("Database not initialized");
+    return db;
+  }
+
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    const [user] = await this.getDb().select().from(users).where(eq(users.id, id)).limit(1);
     return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    const [user] = await this.getDb().select().from(users).where(eq(users.username, username)).limit(1);
     return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const [user] = await db.insert(users).values({ ...insertUser, id }).returning();
+    const [user] = await this.getDb().insert(users).values({ ...insertUser, id }).returning();
     if (!user) throw new Error("Failed to create user");
     return user;
   }
 
   async listProducts(): Promise<ApiProduct[]> {
-    const rows = await db.select().from(products);
+    const rows = await this.getDb().select().from(products);
     return rows.map(rowToApiProduct);
   }
 
   async getProduct(id: string): Promise<ApiProduct | undefined> {
-    const [row] = await db.select().from(products).where(eq(products.id, id)).limit(1);
+    const [row] = await this.getDb().select().from(products).where(eq(products.id, id)).limit(1);
     return row ? rowToApiProduct(row) : undefined;
   }
 
   async createProduct(input: InsertProduct): Promise<ApiProduct> {
     const id = `p_${Date.now().toString(36)}`;
-    const [row] = await db
+    const [row] = await this.getDb()
       .insert(products)
       .values({
         id,
         name: input.name,
+        partNumber: input.partNumber ?? null,
         vehicle: input.vehicle,
         category: input.category,
+        subcategory: input.subcategory ?? null,
+        brand: input.brand ?? null,
         price: Math.round(input.price * 100),
         rating: Math.round(input.rating * 10),
         reviewCount: input.reviewCount,
@@ -120,6 +132,7 @@ export class DbStorage implements IStorage {
         image: input.image,
         description: input.description,
         specs: input.specs,
+        features: input.features ?? null,
       })
       .returning();
     if (!row) throw new Error("Failed to create product");
@@ -134,20 +147,20 @@ export class DbStorage implements IStorage {
     if (patch.price !== undefined) dbPatch.price = Math.round(patch.price * 100);
     if (patch.rating !== undefined) dbPatch.rating = Math.round(patch.rating * 10);
 
-    const [row] = await db.update(products).set(dbPatch).where(eq(products.id, id)).returning();
+    const [row] = await this.getDb().update(products).set(dbPatch).where(eq(products.id, id)).returning();
     return row ? rowToApiProduct(row) : undefined;
   }
 
   async deleteProduct(id: string): Promise<boolean> {
     const existing = await this.getProduct(id);
     if (!existing) return false;
-    await db.delete(products).where(eq(products.id, id));
+    await this.getDb().delete(products).where(eq(products.id, id));
     return true;
   }
 
   async updateProductQuantity(id: string, quantity: number): Promise<ApiProduct | undefined> {
     const stock = stockFromQuantity(quantity);
-    const [row] = await db
+    const [row] = await this.getDb()
       .update(products)
       .set({ quantity, stock })
       .where(eq(products.id, id))
@@ -166,7 +179,7 @@ export class DbStorage implements IStorage {
       items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
     );
 
-    await db.insert(orders).values({
+    await this.getDb().insert(orders).values({
       id: orderId,
       createdAt: now,
       status: "pending",
@@ -183,7 +196,7 @@ export class DbStorage implements IStorage {
       quantity: i.quantity,
       priceEach: Math.round(i.priceEach * 100),
     }));
-    await db.insert(orderItems).values(orderItemsToInsert);
+    await this.getDb().insert(orderItems).values(orderItemsToInsert);
 
     for (const item of items) {
       const product = await this.getProduct(item.productId);
@@ -212,11 +225,11 @@ export class DbStorage implements IStorage {
   }
 
   async listOrders(): Promise<ApiOrder[]> {
-    const orderRows = await db.select().from(orders).orderBy(desc(orders.createdAt));
+    const orderRows = await this.getDb().select().from(orders).orderBy(desc(orders.createdAt));
     const result: ApiOrder[] = [];
 
     for (const order of orderRows) {
-      const itemRows = await db
+      const itemRows = await this.getDb()
         .select()
         .from(orderItems)
         .where(eq(orderItems.orderId, order.id));
@@ -242,10 +255,10 @@ export class DbStorage implements IStorage {
   }
 
   async getOrder(id: string): Promise<ApiOrder | undefined> {
-    const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+    const [order] = await this.getDb().select().from(orders).where(eq(orders.id, id)).limit(1);
     if (!order) return undefined;
 
-    const itemRows = await db.select().from(orderItems).where(eq(orderItems.orderId, id));
+    const itemRows = await this.getDb().select().from(orderItems).where(eq(orderItems.orderId, id));
     const items: ApiOrderItem[] = itemRows.map((row) => ({
       productId: row.productId,
       productName: row.productName,
@@ -265,7 +278,7 @@ export class DbStorage implements IStorage {
   }
 
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
-    const [updated] = await db
+    const [updated] = await this.getDb()
       .update(orders)
       .set({ status })
       .where(eq(orders.id, id))
@@ -275,11 +288,11 @@ export class DbStorage implements IStorage {
   }
 
   async listCategories(): Promise<Category[]> {
-    return db.select().from(categoriesTable).orderBy(categoriesTable.name);
+    return this.getDb().select().from(categoriesTable).orderBy(categoriesTable.name);
   }
 
   async getCategory(id: string): Promise<Category | undefined> {
-    const [row] = await db
+    const [row] = await this.getDb()
       .select()
       .from(categoriesTable)
       .where(eq(categoriesTable.id, id))
@@ -288,7 +301,7 @@ export class DbStorage implements IStorage {
   }
 
   async createCategory(input: InsertCategory): Promise<Category> {
-    const [row] = await db.insert(categoriesTable).values(input).returning();
+    const [row] = await this.getDb().insert(categoriesTable).values(input).returning();
     if (!row) throw new Error("Failed to create category");
     return row;
   }
@@ -297,7 +310,7 @@ export class DbStorage implements IStorage {
     id: string,
     patch: Partial<InsertCategory>
   ): Promise<Category | undefined> {
-    const [row] = await db
+    const [row] = await this.getDb()
       .update(categoriesTable)
       .set(patch)
       .where(eq(categoriesTable.id, id))
@@ -306,13 +319,13 @@ export class DbStorage implements IStorage {
   }
 
   async deleteCategory(id: string): Promise<boolean> {
-    const [existing] = await db
+    const [existing] = await this.getDb()
       .select()
       .from(categoriesTable)
       .where(eq(categoriesTable.id, id))
       .limit(1);
     if (!existing) return false;
-    await db.delete(categoriesTable).where(eq(categoriesTable.id, id));
+    await this.getDb().delete(categoriesTable).where(eq(categoriesTable.id, id));
     return true;
   }
 }
@@ -356,8 +369,11 @@ export class MemStorage implements IStorage {
     const product: ApiProduct = {
       id,
       name: input.name,
+      partNumber: input.partNumber,
       vehicle: input.vehicle,
       category: input.category,
+      subcategory: input.subcategory,
+      brand: input.brand,
       price: input.price,
       rating: input.rating,
       reviewCount: input.reviewCount,
@@ -369,6 +385,7 @@ export class MemStorage implements IStorage {
       image: input.image,
       description: input.description,
       specs: input.specs,
+      features: input.features,
     };
     this.products.set(id, product);
     return product;

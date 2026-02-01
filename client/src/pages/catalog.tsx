@@ -3,10 +3,12 @@ import { useLocation } from "wouter";
 import { BookOpen, Info, Sparkles } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { useCategories } from "@/lib/store";
 import { useProducts } from "@/lib/products";
 import FiltersBar, { type CatalogFilters } from "@/components/site/FiltersBar";
 import ProductCard from "@/components/site/ProductCard";
+import ProductCardSkeleton from "@/components/site/ProductCardSkeleton";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,8 +24,9 @@ function parseVehicle(loc: string): "all" | "bike" | "scooter" {
 }
 
 export default function CatalogPage() {
+  usePageMeta({ title: "Catalog", description: "Browse motorcycle and bike parts by category. UK delivery." });
   const cats = useCategories();
-  const { data: parts = [] } = useProducts();
+  const { data: parts = [], isLoading } = useProducts();
   const [loc] = useLocation();
 
   const [filters, setFilters] = React.useState<CatalogFilters>({
@@ -31,25 +34,36 @@ export default function CatalogPage() {
     vehicle: "all",
     category: "all",
     sort: "relevance",
+    model: "",
+    brands: [],
+    priceMin: "",
+    priceMax: "",
+    inStockOnly: false,
   });
 
   const visible = React.useMemo(() => {
     const q = filters.q.trim().toLowerCase();
-    let list = parts;
+    let list = [...parts];
 
     if (filters.vehicle !== "all") list = list.filter((p) => p.vehicle === filters.vehicle);
     if (filters.category !== "all") list = list.filter((p) => p.category === filters.category);
+    if (filters.model) list = list.filter((p) => p.compatibility?.includes(filters.model));
+    if (filters.brands.length > 0) list = list.filter((p) => p.brand && filters.brands.includes(p.brand));
+    if (filters.priceMin !== "") list = list.filter((p) => p.price >= (filters.priceMin as number));
+    if (filters.priceMax !== "") list = list.filter((p) => p.price <= (filters.priceMax as number));
+    if (filters.inStockOnly) list = list.filter((p) => p.stock === "in-stock");
 
     if (q) {
       list = list.filter((p) => {
-        const hay = `${p.name} ${p.category} ${p.vehicle} ${p.tags.join(" ")} ${p.compatibility.join(" ")}`.toLowerCase();
+        const hay = `${p.name} ${p.category} ${p.vehicle} ${p.partNumber ?? ""} ${p.brand ?? ""} ${p.tags?.join(" ") ?? ""} ${p.compatibility?.join(" ") ?? ""}`.toLowerCase();
         return hay.includes(q);
       });
     }
 
-    if (filters.sort === "price-asc") list = [...list].sort((a, b) => a.price - b.price);
-    if (filters.sort === "price-desc") list = [...list].sort((a, b) => b.price - a.price);
-    if (filters.sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
+    if (filters.sort === "price-asc") list.sort((a, b) => a.price - b.price);
+    if (filters.sort === "price-desc") list.sort((a, b) => b.price - a.price);
+    if (filters.sort === "rating") list.sort((a, b) => b.rating - a.rating);
+    if (filters.sort === "newest") list.reverse();
 
     return list;
   }, [filters, parts]);
@@ -141,9 +155,16 @@ export default function CatalogPage() {
           </div>
         </div>
 
-        {visible.length === 0 ? (
+        {isLoading ? (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : visible.length === 0 ? (
           <Card className="border-border/50 p-12 text-center">
             <p className="text-muted-foreground">No products found. Try adjusting your filters.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Clear filters or try a different search term.</p>
           </Card>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

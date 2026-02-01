@@ -7,9 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { toast } from "sonner";
 
 export default function ContactPage() {
+  usePageMeta({
+    title: "Contact",
+    description: "Contact Smoke City Supplies for motorcycle parts enquiries, support and orders. UK-based online store. Email and phone support.",
+  });
   const [submitting, setSubmitting] = React.useState(false);
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -56,6 +61,9 @@ export default function ContactPage() {
             </h1>
             <p className="mt-2 text-muted-foreground">
               Have a question? We're here to help. Send us a message and we'll respond as soon as possible.
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground max-w-2xl">
+              Contact Smoke City Supplies for motorcycle parts enquiries, compatibility questions, and order support. We're a UK-based online store — no physical location — and deliver across the UK. Use the form below or call us.
             </p>
           </div>
           <BackButton fallback="/" />

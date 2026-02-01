@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Lock } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import { useAuth } from "@/lib/auth";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export default function AdminLogin() {
+  usePageMeta({ title: "Admin Sign In", description: "Sign in to manage your store." });
   const [, setLocation] = useLocation();
   const { user, isLoading, login, isLoggingIn } = useAuth();
   const [username, setUsername] = React.useState("");
@@ -61,7 +63,7 @@ export default function AdminLogin() {
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="h-11 rounded-lg"
+                  className="h-11 min-h-[44px] rounded-lg touch-manipulation"
                   placeholder="admin"
                   disabled={isLoggingIn}
                 />
@@ -74,7 +76,7 @@ export default function AdminLogin() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 rounded-lg"
+                  className="h-11 min-h-[44px] rounded-lg touch-manipulation"
                   placeholder="••••••••"
                   disabled={isLoggingIn}
                 />
@@ -82,7 +84,7 @@ export default function AdminLogin() {
               <Button
                 type="submit"
                 size="lg"
-                className="w-full"
+                className="w-full min-h-[44px] touch-manipulation"
                 disabled={isLoggingIn}
               >
                 {isLoggingIn ? "Signing in…" : "Sign In"}

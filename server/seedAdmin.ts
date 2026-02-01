@@ -4,11 +4,13 @@ import { storage } from "./storage";
 const DEFAULT_ADMIN_PASSWORD = "admin";
 
 const DEFAULT_CATEGORIES = [
-  { name: "Brakes", slug: "brakes", vehicleType: "bike" as const },
-  { name: "Drivetrain", slug: "drivetrain", vehicleType: "bike" as const },
-  { name: "Wheels & Tires", slug: "wheels-tires", vehicleType: "all" as const },
+  { name: "Brakes", slug: "brakes", vehicleType: "all" as const },
+  { name: "Engine", slug: "engine", vehicleType: "all" as const },
+  { name: "Suspension", slug: "suspension", vehicleType: "all" as const },
+  { name: "Exhaust", slug: "exhaust", vehicleType: "all" as const },
   { name: "Electrical", slug: "electrical", vehicleType: "all" as const },
-  { name: "Frames & Steering", slug: "frames-steering", vehicleType: "bike" as const },
+  { name: "Body & Frame", slug: "body-frame", vehicleType: "all" as const },
+  { name: "Tires & Wheels", slug: "tires-wheels", vehicleType: "all" as const },
   { name: "Accessories", slug: "accessories", vehicleType: "all" as const },
 ];
 

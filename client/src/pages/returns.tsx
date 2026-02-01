@@ -4,8 +4,13 @@ import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 export default function ReturnsPage() {
+  usePageMeta({
+    title: "Returns Policy",
+    description: "Returns and refunds for motorcycle parts. UK returns policy. Smoke City Supplies — hassle-free returns.",
+  });
   return (
     <SiteLayout>
       <div className="mx-auto max-w-4xl">
@@ -16,6 +21,9 @@ export default function ReturnsPage() {
             </h1>
             <p className="mt-2 text-muted-foreground">
               Simple, hassle-free returns when you need them
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground max-w-2xl">
+              Our returns policy covers motorcycle parts ordered from Smoke City Supplies in the UK. If an item isn't right, you can return it within 30 days for a refund. See below for conditions and how to start a return.
             </p>
           </div>
           <BackButton fallback="/" />

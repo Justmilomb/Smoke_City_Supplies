@@ -13,7 +13,8 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "node -e \"if (!process.env.DATABASE_URL) { console.warn('Skipping db:push: DATABASE_URL not set (set it for local DB or it is set on Render)'); process.exit(0); }\" && drizzle-kit push"
+    "db:push": "node -e \"if (!process.env.DATABASE_URL) { console.warn('Skipping db:push: DATABASE_URL not set (set it for local DB or it is set on Render)'); process.exit(0); }\" && drizzle-kit push",
+    "seed:parts": "npx tsx server/seedParts.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

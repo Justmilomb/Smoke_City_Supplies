@@ -1,10 +1,12 @@
 import { useRoute, Link } from "wouter";
-import { CheckCircle2, Headphones, Shield, Star, Truck } from "lucide-react";
+import { CheckCircle2, Headphones, ChevronRight, Shield, Sparkles, Star, Truck } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
+import { useContactModal } from "@/components/site/ContactModal";
 import { useProduct } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { getProductImage } from "@/lib/mockData";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,13 @@ export default function ProductPage() {
   const [, params] = useRoute("/product/:id");
   const { data: part, isLoading } = useProduct(params?.id);
   const { actions: cartActions } = useCart();
+  const contactModal = useContactModal();
+
+  usePageMeta({
+    title: part?.name ?? "Product",
+    description: part?.description?.slice(0, 160).trim() ?? "Motorcycle part from Smoke City Supplies. UK delivery.",
+    image: part ? getProductImage(part) : undefined,
+  });
 
   if (isLoading) {
     return (
@@ -33,10 +42,10 @@ export default function ProductPage() {
           <div data-testid="text-product-missing" className="text-muted-foreground">
             Product not found.
           </div>
-          <Link href="/catalog">
+          <Link href="/store">
             <Button variant="outline" className="mt-4" asChild>
               <a data-testid="link-back-catalog">
-                Back to catalog
+                Back to parts
               </a>
             </Button>
           </Link>
@@ -46,12 +55,59 @@ export default function ProductPage() {
   }
 
   const imageUrl = getProductImage(part);
-  const stockStatus = part.stock === "in-stock" ? "In Stock" : part.stock === "low" ? "Low Stock" : "Out of Stock";
+  const absoluteImage =
+    typeof window !== "undefined" && imageUrl
+      ? imageUrl.startsWith("http")
+        ? imageUrl
+        : `${window.location.origin}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`
+      : undefined;
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: part.name,
+    description: part.description?.slice(0, 500) ?? part.name,
+    ...(absoluteImage && { image: absoluteImage }),
+    ...(part.brand && { brand: { "@type": "Brand", name: part.brand } }),
+    offers: {
+      "@type": "Offer",
+      price: part.price,
+      priceCurrency: "GBP",
+      availability:
+        part.stock === "out"
+          ? "https://schema.org/OutOfStock"
+          : "https://schema.org/InStock",
+    },
+  };
+  const stockStatus =
+    part.stock === "in-stock"
+      ? (part.quantity != null && part.quantity <= 20 ? `${part.quantity} in stock` : "In Stock")
+      : part.stock === "low"
+        ? (part.quantity != null && part.quantity > 0 ? `${part.quantity} left` : "Low Stock")
+        : "Out of Stock";
+
+  const vehicleLabel = part.vehicle === "motorcycle" ? "Motorcycle" : part.vehicle === "bike" ? "Bike" : "Scooter";
 
   return (
     <SiteLayout>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
       <div className="flex flex-col gap-6">
-        <BackButton fallback="/catalog" />
+        <BackButton fallback="/store" />
+
+        {/* Breadcrumbs */}
+        <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link href="/store">
+            <a className="hover:text-foreground">Parts</a>
+          </Link>
+          <ChevronRight className="h-4 w-4" />
+          <Link href={`/store?category=${encodeURIComponent(part.category)}`}>
+            <a className="hover:text-foreground">{part.category}</a>
+          </Link>
+          <ChevronRight className="h-4 w-4" />
+          <span className="text-foreground font-medium truncate max-w-[180px]">{part.name}</span>
+        </nav>
 
         <div className="grid gap-8 lg:grid-cols-2">
           <Card className="overflow-hidden border-border/50">
@@ -66,10 +122,23 @@ export default function ProductPage() {
           </Card>
 
           <div className="flex flex-col gap-6">
+            {part.partNumber && (
+              <div className="text-sm text-muted-foreground font-mono">
+                Part number: <span className="font-semibold text-foreground">{part.partNumber}</span>
+              </div>
+            )}
+            {part.brand && (
+              <div className="text-sm font-medium text-primary">{part.brand}</div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="rounded-md">
-                {part.vehicle === "bike" ? "Bike" : "Scooter"}
+                {vehicleLabel}
               </Badge>
+              {part.subcategory && (
+                <Badge variant="outline" className="rounded-md">
+                  {part.subcategory}
+                </Badge>
+              )}
               <Badge variant="outline" className="rounded-md">
                 {part.category}
               </Badge>
@@ -79,6 +148,12 @@ export default function ProductPage() {
               >
                 {stockStatus}
               </Badge>
+              {part.tags?.includes("Popular") && (
+                <Badge className="rounded-md border-0 bg-primary/10 text-primary">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  Popular
+                </Badge>
+              )}
             </div>
 
             <div>
@@ -106,7 +181,7 @@ export default function ProductPage() {
             <div>
               <div className="mb-1 text-sm text-muted-foreground">Price</div>
               <div data-testid="text-product-price" className="text-4xl font-bold tabular-nums">
-                ${part.price.toFixed(2)}
+                £{part.price.toFixed(2)}
               </div>
             </div>
 
@@ -129,11 +204,16 @@ export default function ProductPage() {
               >
                 Add to Cart
               </Button>
-              <Link href="/contact">
-                <Button data-testid="button-ask-support" variant="outline" size="lg" className="h-12" asChild>
-                  <a>Contact Support</a>
-                </Button>
-              </Link>
+              <Button
+                data-testid="button-ask-support"
+                variant="outline"
+                size="lg"
+                className="h-12 gap-2"
+                onClick={() => contactModal?.openWithPartNumber(part.partNumber ?? part.id)}
+              >
+                <Headphones className="h-5 w-5" />
+                Contact Support
+              </Button>
             </div>
 
             {part.compatibility.length > 0 && (
@@ -188,6 +268,20 @@ export default function ProductPage() {
                   {part.description}
                 </p>
               </div>
+
+              {part.features && part.features.length > 0 && (
+                <>
+                  <Separator className="my-6" />
+                  <div>
+                    <h3 className="mb-3 font-semibold">Features</h3>
+                    <ul className="list-disc list-inside space-y-1.5 text-sm text-muted-foreground">
+                      {part.features.map((f, idx) => (
+                        <li key={idx}>{f}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
 
               {part.specs.length > 0 && (
                 <>

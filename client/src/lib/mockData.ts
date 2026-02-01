@@ -2,22 +2,29 @@ import productChain from "@/assets/images/product-chain.png";
 import productRotor from "@/assets/images/product-rotor.png";
 import productTire from "@/assets/images/product-tire.png";
 
-export type VehicleType = "bike" | "scooter";
 export type StockStatus = "in-stock" | "low" | "out";
+
+/** Vehicle type for filters (motorcycle-focused shop) */
+export type VehicleType = "motorcycle" | "bike" | "scooter";
 
 export type PartCategory =
   | "Brakes"
-  | "Drivetrain"
-  | "Wheels & Tires"
+  | "Engine"
+  | "Suspension"
+  | "Exhaust"
   | "Electrical"
-  | "Frames & Steering"
+  | "Body & Frame"
+  | "Tires & Wheels"
   | "Accessories";
 
 export type Part = {
   id: string;
   name: string;
-  vehicle: VehicleType;
-  category: PartCategory;
+  partNumber?: string;
+  vehicle: string;
+  category: PartCategory | string;
+  subcategory?: string;
+  brand?: string;
   price: number;
   rating: number;
   reviewCount: number;
@@ -29,7 +36,74 @@ export type Part = {
   image: string;
   description: string;
   specs: { label: string; value: string }[];
+  features?: string[];
 };
+
+/** Motorcycle manufacturers for filter grouping */
+export const MOTORCYCLE_MANUFACTURERS = [
+  "Honda",
+  "Yamaha",
+  "Kawasaki",
+  "Suzuki",
+  "BMW",
+  "Ducati",
+  "Triumph",
+  "KTM",
+  "Harley-Davidson",
+] as const;
+
+/** Motorcycle models for filter (grouped by manufacturer) */
+export const MOTORCYCLE_MODELS = [
+  "Honda CB500X",
+  "Honda CB650R",
+  "Honda CBR650R",
+  "Honda Africa Twin",
+  "Honda NC750X",
+  "Yamaha MT-07",
+  "Yamaha MT-09",
+  "Yamaha Tracer 9",
+  "Yamaha Tenere 700",
+  "Yamaha R1",
+  "Kawasaki Ninja 650",
+  "Kawasaki Z650",
+  "Kawasaki Z900",
+  "Kawasaki Versys 650",
+  "Kawasaki Ninja 400",
+  "Suzuki SV650",
+  "Suzuki GSX-S750",
+  "Suzuki V-Strom 650",
+  "Suzuki GSX-R750",
+  "BMW F900R",
+  "BMW R1250GS",
+  "BMW S1000RR",
+  "BMW F850GS",
+  "Triumph Street Triple",
+  "Triumph Tiger 900",
+  "Triumph Speed Twin",
+  "Triumph Bonneville",
+  "KTM Duke 390",
+  "KTM 890 Adventure",
+  "KTM Duke 890",
+  "Ducati Monster",
+  "Ducati Multistrada",
+  "Ducati Panigale V2",
+  "Harley-Davidson Street 750",
+  "Harley-Davidson Sportster",
+] as const;
+
+/** Brands for parts filter */
+export const PART_BRANDS = [
+  "EBC",
+  "Brembo",
+  "Ohlins",
+  "Akrapovic",
+  "K&N",
+  "Motul",
+  "Michelin",
+  "Pirelli",
+  "Renthal",
+  "R&G",
+] as const;
 
 export const productImageFallbacks: Record<string, string> = {
   p1: productChain,
@@ -43,10 +117,12 @@ export function getProductImage(part: Part): string {
 
 export const categories: PartCategory[] = [
   "Brakes",
-  "Drivetrain",
-  "Wheels & Tires",
+  "Engine",
+  "Suspension",
+  "Exhaust",
   "Electrical",
-  "Frames & Steering",
+  "Body & Frame",
+  "Tires & Wheels",
   "Accessories",
 ];
 
@@ -73,14 +149,17 @@ export const initialParts: Part[] = [
   {
     id: "p1",
     name: "12-Speed Chain — Quick-Link",
-    vehicle: "bike",
-    category: "Drivetrain",
+    partNumber: "ENG-CH-001",
+    vehicle: "motorcycle",
+    category: "Engine",
+    subcategory: "Chain",
+    brand: "Renthal",
     price: 29.99,
     rating: 4.7,
     reviewCount: 184,
     stock: "in-stock",
     deliveryEta: "Next-day delivery",
-    compatibility: ["Road", "MTB"],
+    compatibility: ["Honda CB500X", "Yamaha MT-07", "Kawasaki Ninja 650"],
     tags: ["Fast shipping", "Popular"],
     image: productChain,
     description:
@@ -90,18 +169,22 @@ export const initialParts: Part[] = [
       { label: "Connector", value: "Quick-link included" },
       { label: "Finish", value: "Nickel plated" },
     ],
+    features: ["Durable plating", "Easy installation", "Quick-link included"],
   },
   {
     id: "p2",
     name: "160mm Disc Brake Rotor — Vent",
-    vehicle: "bike",
+    partNumber: "BRK-RO-001",
+    vehicle: "motorcycle",
     category: "Brakes",
+    subcategory: "Discs",
+    brand: "EBC",
     price: 24.5,
     rating: 4.6,
     reviewCount: 93,
     stock: "low",
     deliveryEta: "1–2 days",
-    compatibility: ["MTB", "Hybrid"],
+    compatibility: ["Suzuki SV650", "Yamaha MT-07"],
     tags: ["Heat control"],
     image: productRotor,
     description:
@@ -111,26 +194,31 @@ export const initialParts: Part[] = [
       { label: "Mount", value: "6-bolt" },
       { label: "Weight", value: "~120g" },
     ],
+    features: ["Vented design", "Better cooling", "Consistent performance"],
   },
   {
     id: "p3",
-    name: "10×2.5 Scooter Tire — Street",
-    vehicle: "scooter",
-    category: "Wheels & Tires",
-    price: 19.0,
+    name: "Sport Touring Tyre — Front",
+    partNumber: "TIR-F-001",
+    vehicle: "motorcycle",
+    category: "Tires & Wheels",
+    subcategory: "Tires",
+    brand: "Michelin",
+    price: 89.0,
     rating: 4.4,
     reviewCount: 71,
     stock: "in-stock",
     deliveryEta: "Next-day delivery",
-    compatibility: ["10 inch"],
+    compatibility: ["Honda CB500X", "Kawasaki Versys 650", "Suzuki V-Strom 650"],
     tags: ["Easy install"],
     image: productTire,
     description:
-      "A reliable street tire with a smooth center line for low rolling resistance and comfortable commuting.",
+      "A reliable sport touring tyre with excellent grip and longevity. Ideal for commuting and weekend rides.",
     specs: [
-      { label: "Size", value: "10×2.5" },
-      { label: "Type", value: "Street" },
-      { label: "Use", value: "Commuting" },
+      { label: "Size", value: "120/70ZR17" },
+      { label: "Type", value: "Sport Touring" },
+      { label: "Use", value: "Road" },
     ],
+    features: ["Long mileage", "Wet grip", "Stable handling"],
   },
 ];

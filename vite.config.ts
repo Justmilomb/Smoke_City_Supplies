@@ -1,3 +1,4 @@
+import type { PluginOption } from "vite";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -16,15 +17,9 @@ const isProduction = process.env.NODE_ENV === "production";
 const replitPlugins =
   !isProduction && isReplit
     ? [
-        (await import("@replit/vite-plugin-cartographer")).then((m) =>
-          m.cartographer(),
-        ),
-        (await import("@replit/vite-plugin-dev-banner")).then((m) =>
-          m.devBanner(),
-        ),
-        (await import("@replit/vite-plugin-runtime-error-modal")).then((m) =>
-          m.default(),
-        ),
+        import("@replit/vite-plugin-cartographer").then((m: { cartographer: () => PluginOption }) => m.cartographer()),
+        import("@replit/vite-plugin-dev-banner").then((m: { devBanner: () => PluginOption }) => m.devBanner()),
+        import("@replit/vite-plugin-runtime-error-modal").then((m: { default: () => PluginOption }) => m.default()),
       ]
     : [];
 

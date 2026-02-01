@@ -5,6 +5,7 @@ import BackButton from "@/components/site/BackButton";
 import { useProducts, useDeleteProduct, useUpdateProductQuantity } from "@/lib/products";
 import { getProductImage } from "@/lib/mockData";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ function stockTone(stock: string) {
 }
 
 export default function AdminParts() {
+  usePageMeta({ title: "Products", description: "Manage inventory and catalog." });
   const { data: parts = [], isLoading } = useProducts();
   const deleteProduct = useDeleteProduct();
   const updateQuantity = useUpdateProductQuantity();
@@ -110,12 +112,12 @@ export default function AdminParts() {
                       <div className="mt-2 text-sm font-medium tabular-nums">${p.price.toFixed(2)}</div>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-9 w-9 rounded-lg"
+                          className="h-11 min-h-[44px] w-11 min-w-[44px] rounded-lg touch-manipulation"
                           onClick={() => handleQuantityChange(p.id, Math.max(0, (p.quantity ?? 0) - 1))}
                         >
                           <Minus className="h-4 w-4" />
@@ -126,7 +128,7 @@ export default function AdminParts() {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-9 w-9 rounded-lg"
+                          className="h-11 min-h-[44px] w-11 min-w-[44px] rounded-lg touch-manipulation"
                           onClick={() => handleQuantityChange(p.id, (p.quantity ?? 0) + 1)}
                         >
                           <Plus className="h-4 w-4" />
@@ -139,7 +141,7 @@ export default function AdminParts() {
                             data-testid={`button-admin-edit-${p.id}`}
                             variant="outline"
                             size="sm"
-                            className="h-9 rounded-lg gap-2"
+                            className="h-11 min-h-[44px] rounded-lg gap-2 touch-manipulation"
                           >
                             <Edit3 className="h-4 w-4" />
                             <span className="hidden md:inline">Edit</span>
@@ -150,7 +152,7 @@ export default function AdminParts() {
                         data-testid={`button-admin-delete-${p.id}`}
                         variant="destructive"
                         size="sm"
-                        className="h-9 rounded-lg gap-2"
+                        className="h-11 min-h-[44px] rounded-lg gap-2 touch-manipulation"
                         onClick={() => handleDelete(p.id, p.name)}
                         disabled={deleteProduct.isPending}
                       >

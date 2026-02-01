@@ -1,10 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import {
-  Search,
-  ShoppingCart,
-  Menu,
-} from "lucide-react";
+import { Search, ShoppingCart, Menu, Phone, ArrowUp, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +14,8 @@ import {
 import { useCartCount } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 
+const HEADER_PHONE = "07597783584";
+
 function NavLink({
   href,
   label,
@@ -28,7 +26,8 @@ function NavLink({
   testId: string;
 }) {
   const [loc] = useLocation();
-  const active = loc === href || (href !== "/catalog" && loc.startsWith(href));
+  const path = loc.indexOf("?") >= 0 ? loc.slice(0, loc.indexOf("?")) : loc;
+  const active = path === href;
 
   return (
     <Link href={href}>
@@ -48,9 +47,9 @@ function NavLink({
 }
 
 const publicNavLinks = [
-  { href: "/catalog", label: "Shop", testId: "link-mobile-shop" },
-  { href: "/catalog?vehicle=bike", label: "Bike", testId: "link-mobile-bike" },
-  { href: "/catalog?vehicle=scooter", label: "Scooter", testId: "link-mobile-scooter" },
+  { href: "/", label: "Home", testId: "link-mobile-home" },
+  { href: "/store", label: "Parts", testId: "link-mobile-parts" },
+  { href: "/contact", label: "Contact", testId: "link-mobile-contact" },
 ];
 const adminNavLink = { href: "/admin", label: "Admin", testId: "link-mobile-admin" };
 
@@ -63,36 +62,94 @@ export default function SiteLayout({
 }) {
   const cartCount = useCartCount();
   const { user } = useAuth();
+  const [loc, setLoc] = useLocation();
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const [showBackToTop, setShowBackToTop] = React.useState(false);
   const mobileNavLinks = user ? [...publicNavLinks, adminNavLink] : publicNavLinks;
+
+  React.useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 400);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  React.useEffect(() => {
+    const search = loc.indexOf("?") >= 0 ? loc.slice(loc.indexOf("?")) : "";
+    const q = new URLSearchParams(search).get("q") ?? "";
+    setSearchQuery(q);
+  }, [loc]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const path = loc.indexOf("?") >= 0 ? loc.slice(0, loc.indexOf("?")) : loc;
+    const base = path === "/" ? "/store" : path || "/store";
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    setLoc(params.toString() ? `${base}?${params.toString()}` : base);
+  };
+
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${siteUrl}#organization`,
+        name: "Smoke City Supplies",
+        url: siteUrl,
+        description: "Your trusted online source for motorcycle parts in the UK. Genuine parts and expert advice.",
+        contactPoint: {
+          "@type": "ContactPoint",
+          telephone: "+44-7597-783584",
+          contactType: "customer service",
+          email: "support@smokecitysupplies.com",
+          areaServed: "GB",
+        },
+      },
+      {
+        "@type": "WebSite",
+        name: "Smoke City Supplies",
+        url: siteUrl,
+        description: "Genuine motorcycle parts, UK delivery. Shop brakes, engine, suspension, exhaust and more.",
+        publisher: { "@id": `${siteUrl}#organization` },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: { "@type": "EntryPoint", urlTemplate: `${siteUrl}/store?q={search_term_string}` },
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
 
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-4 md:px-6 lg:px-8">
-          <div className="flex items-center gap-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 md:px-6 lg:px-8 md:flex-row md:items-center md:justify-between md:gap-6 md:py-4">
+          <div className="flex items-center justify-between gap-4 md:justify-start">
             <Link href="/">
               <a
                 data-testid="link-home"
-                className="flex items-center gap-3 group"
+                className="flex items-center gap-3 group shrink-0"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm group-hover:shadow-md transition-shadow">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
+                  <Package className="h-5 w-5" strokeWidth={2} />
                 </div>
-                <div>
+                <div className="hidden sm:block">
                   <div className="font-[var(--font-serif)] text-lg font-bold tracking-tight text-foreground">
                     Smoke City Supplies
                   </div>
                   <div className="text-xs text-muted-foreground font-medium">
-                    Premium Parts & Accessories
+                    Motorcycle Parts · UK
                   </div>
                 </div>
               </a>
             </Link>
 
-            {/* Mobile hamburger menu */}
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
               <SheetTrigger asChild>
                 <Button
@@ -126,35 +183,41 @@ export default function SiteLayout({
             </Sheet>
 
             <nav className="hidden items-center gap-1 md:flex">
-              <NavLink href="/catalog" label="Shop" testId="link-shop" />
-              <NavLink
-                href="/catalog?vehicle=bike"
-                label="Bike"
-                testId="link-bike"
-              />
-              <NavLink
-                href="/catalog?vehicle=scooter"
-                label="Scooter"
-                testId="link-scooter"
-              />
+              <NavLink href="/" label="Home" testId="link-home-nav" />
+              <NavLink href="/store" label="Parts" testId="link-parts" />
+              <NavLink href="/contact" label="Contact" testId="link-contact" />
               {user && <NavLink href="/admin" label="Admin" testId="link-admin" />}
             </nav>
           </div>
 
-          <div className="flex flex-1 items-center justify-end gap-3">
-            <div className="hidden w-full max-w-sm lg:block">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  data-testid="input-search"
-                  placeholder="Search parts, brands, sizes…"
-                  className="h-9 w-full rounded-lg border bg-background pl-9 pr-4"
-                />
-              </div>
+          <form
+            onSubmit={handleSearchSubmit}
+            className="flex flex-1 w-full max-w-xl mx-auto md:mx-0 md:max-w-2xl"
+          >
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                data-testid="input-search"
+                type="search"
+                placeholder="Search parts, brands, part numbers…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 w-full rounded-lg border bg-background pl-10 pr-4 text-base md:h-10"
+                aria-label="Search parts"
+              />
             </div>
+          </form>
 
+          <div className="flex items-center justify-end gap-2 md:gap-3 shrink-0">
+            <a
+              href={`tel:${HEADER_PHONE.replace(/\s/g, "")}`}
+              className="hidden md:flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+              data-testid="link-phone"
+            >
+              <Phone className="h-4 w-4" />
+              <span>{HEADER_PHONE}</span>
+            </a>
             {right}
-
             <Link href="/cart">
               <Button
                 data-testid="button-cart"
@@ -171,7 +234,6 @@ export default function SiteLayout({
                 )}
               </Button>
             </Link>
-
             {user && (
               <Link href="/admin" className="md:hidden">
                 <Button
@@ -193,15 +255,42 @@ export default function SiteLayout({
 
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8 md:py-12">{children}</main>
 
+      {showBackToTop && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="fixed bottom-20 right-6 z-30 h-11 w-11 rounded-full shadow-md md:bottom-6 md:right-24"
+          aria-label="Back to top"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        >
+          <ArrowUp className="h-5 w-5" />
+        </Button>
+      )}
+
       <footer className="border-t bg-muted/30 mt-20">
         <div className="mx-auto grid max-w-7xl gap-12 px-4 py-12 md:grid-cols-4 md:px-6 lg:px-8">
           <div className="md:col-span-2">
             <div className="font-[var(--font-serif)] text-lg font-bold tracking-tight mb-2">
               Smoke City Supplies
             </div>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Your trusted source for premium bike and scooter parts. Fast shipping, expert support, and quality you can count on.
+            <p className="text-sm text-muted-foreground max-w-md mb-3">
+              Your trusted online source for motorcycle parts in the UK. Genuine parts and expert advice.
             </p>
+            <p className="text-xs text-muted-foreground">
+              UK delivery only. All prices in GBP (£).
+            </p>
+            <div className="mt-4 text-sm text-muted-foreground">
+              <div className="font-medium text-foreground mb-1">Opening hours</div>
+              <div>Mon–Sat 9am–6pm</div>
+              <div>Sun Closed</div>
+            </div>
+            <div className="mt-3 text-sm text-muted-foreground">
+              <div className="font-medium text-foreground mb-1">Online only</div>
+              <div>UK delivery — no physical store</div>
+            </div>
+            <div className="mt-4 text-sm text-muted-foreground">
+              Newsletter signup coming soon. Follow us on social for updates.
+            </div>
           </div>
 
           <div>
