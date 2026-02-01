@@ -17,6 +17,12 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// One-time seed flags so admin add/remove stays permanent (no re-seeding)
+export const seedState = pgTable("seed_state", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
+});
+
 // Categories for dynamic management
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -128,6 +134,9 @@ export const orders = pgTable("orders", {
   stripeSessionId: text("stripe_session_id"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("pending"), // "pending" | "paid" | "failed"
+  trackingNumber: text("tracking_number"),
+  shippedAt: text("shipped_at"), // ISO date string
+  deliveredAt: text("delivered_at"), // ISO date string
 });
 
 export const createOrderSchema = z.object({
@@ -198,4 +207,7 @@ export type ApiOrder = {
   stripeSessionId?: string;
   stripePaymentIntentId?: string;
   paymentStatus?: string;
+  trackingNumber?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
 };

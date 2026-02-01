@@ -12,8 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Printer } from "lucide-react";
 
 const API = "/api";
 
@@ -25,12 +27,12 @@ async function fetchOrders() {
   return res.json();
 }
 
-async function updateOrderStatus(orderId: string, status: string) {
+async function updateOrder(orderId: string, patch: { status?: string; trackingNumber?: string | null }) {
   const res = await fetch(`${API}/orders/${orderId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(patch),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -46,8 +48,31 @@ type Order = {
   status: string;
   customerEmail?: string;
   customerName?: string;
+  customerAddress?: string;
+  customerPostcode?: string;
   items: { productName: string; quantity: number }[];
+  trackingNumber?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
 };
+
+function ShipToAddress({ order }: { order: Order }) {
+  const has = order.customerName || order.customerAddress || order.customerPostcode;
+  if (!has) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="text-sm leading-tight">
+      {order.customerName && <div className="font-medium">{order.customerName}</div>}
+      {order.customerAddress && (
+        <div className="text-muted-foreground">
+          {order.customerAddress.split(",").map((line, i) => (
+            <div key={i}>{line.trim()}</div>
+          ))}
+        </div>
+      )}
+      {order.customerPostcode && <div className="font-medium">{order.customerPostcode}</div>}
+    </div>
+  );
+}
 
 function OrderStatusSelect({
   orderId,
@@ -63,7 +88,7 @@ function OrderStatusSelect({
 
   const handleChange = (newStatus: string) => {
     setValue(newStatus);
-    updateOrderStatus(orderId, newStatus)
+    updateOrder(orderId, { status: newStatus })
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["orders"] });
         onUpdated?.();
@@ -88,6 +113,49 @@ function OrderStatusSelect({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function OrderTrackingInput({
+  orderId,
+  currentTracking,
+  onUpdated,
+}: {
+  orderId: string;
+  currentTracking: string | null | undefined;
+  onUpdated: () => void;
+}) {
+  const [value, setValue] = React.useState(currentTracking ?? "");
+  const [saving, setSaving] = React.useState(false);
+  const queryClient = useQueryClient();
+
+  const save = () => {
+    const v = value.trim() || null;
+    if (v === (currentTracking ?? "")) return;
+    setSaving(true);
+    updateOrder(orderId, { trackingNumber: v })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        onUpdated?.();
+        toast.success("Tracking number saved");
+      })
+      .catch((err) => {
+        toast.error(err.message ?? "Failed to save");
+      })
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <input
+      type="text"
+      placeholder="Tracking number"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => e.key === "Enter" && save()}
+      className="h-9 w-full max-w-[180px] rounded-lg border border-input bg-background px-2 text-sm"
+      disabled={saving}
+    />
   );
 }
 
@@ -116,7 +184,7 @@ export default function AdminOrders() {
               Orders
             </h1>
             <p className="mt-2 text-muted-foreground">
-              View and manage customer orders. Update status to track fulfillment.
+              View and manage customer orders. Status and tracking are saved to the database and persist across restarts.
             </p>
           </div>
           <BackButton fallback="/admin" />
@@ -144,18 +212,41 @@ export default function AdminOrders() {
                   <div className="text-sm">
                     {new Date(order.createdAt).toLocaleDateString()}
                   </div>
-                  {(order.customerName || order.customerEmail) && (
-                    <div className="text-sm text-muted-foreground">
-                      {order.customerName && <span>{order.customerName}</span>}
-                      {order.customerName && order.customerEmail && " · "}
-                      {order.customerEmail && <span>{order.customerEmail}</span>}
+                  {(order.shippedAt || order.deliveredAt) && (
+                    <div className="text-xs text-muted-foreground">
+                      {order.shippedAt && <span>Shipped {new Date(order.shippedAt).toLocaleDateString()}</span>}
+                      {order.shippedAt && order.deliveredAt && " · "}
+                      {order.deliveredAt && <span>Delivered {new Date(order.deliveredAt).toLocaleDateString()}</span>}
                     </div>
                   )}
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Tracking</div>
+                    <OrderTrackingInput
+                      orderId={order.id}
+                      currentTracking={order.trackingNumber}
+                      onUpdated={() => {}}
+                    />
+                  </div>
+                  <div className="text-sm">
+                    <div className="text-xs text-muted-foreground mb-0.5">Ship to</div>
+                    <ShipToAddress order={order} />
+                  </div>
+                  {order.customerEmail && (
+                    <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
+                  )}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                      <a href={`/admin/orders/${order.id}/label`} target="_blank" rel="noopener noreferrer">
+                        <Printer className="h-3.5 w-3.5" />
+                        Print label
+                      </a>
+                    </Button>
+                  </div>
                   <div className="text-sm text-muted-foreground">
                     {order.items?.map((i) => `${i.productName} × ${i.quantity}`).join(", ") ?? "—"}
                   </div>
                   <div className="text-base font-medium tabular-nums">
-                    ${((order.totalPence ?? 0) / 100).toFixed(2)}
+                    £{((order.totalPence ?? 0) / 100).toFixed(2)}
                   </div>
                 </div>
               ))}
@@ -166,10 +257,12 @@ export default function AdminOrders() {
                 <TableRow>
                   <TableHead>Order ID</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Customer</TableHead>
+                  <TableHead>Ship to</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Tracking / Delivery</TableHead>
+                  <TableHead className="w-[100px]">Label</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -179,23 +272,17 @@ export default function AdminOrders() {
                     <TableCell className="text-sm">
                       {new Date(order.createdAt).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {order.customerName || order.customerEmail ? (
-                        <>
-                          {order.customerName && <div>{order.customerName}</div>}
-                          {order.customerEmail && (
-                            <div className="text-muted-foreground">{order.customerEmail}</div>
-                          )}
-                        </>
-                      ) : (
-                        "—"
+                    <TableCell className="text-sm max-w-[180px]">
+                      <ShipToAddress order={order} />
+                      {order.customerEmail && (
+                        <div className="text-xs text-muted-foreground mt-0.5">{order.customerEmail}</div>
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
                       {order.items?.map((i) => `${i.productName} × ${i.quantity}`).join(", ") ?? "—"}
                     </TableCell>
                     <TableCell className="tabular-nums font-medium">
-                      ${((order.totalPence ?? 0) / 100).toFixed(2)}
+                      £{((order.totalPence ?? 0) / 100).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <OrderStatusSelect
@@ -203,6 +290,30 @@ export default function AdminOrders() {
                         currentStatus={order.status ?? "pending"}
                         onUpdated={() => {}}
                       />
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <div className="space-y-1">
+                        <OrderTrackingInput
+                          orderId={order.id}
+                          currentTracking={order.trackingNumber}
+                          onUpdated={() => {}}
+                        />
+                        {(order.shippedAt || order.deliveredAt) && (
+                          <div className="text-xs text-muted-foreground">
+                            {order.shippedAt && <span>Shipped {new Date(order.shippedAt).toLocaleDateString()}</span>}
+                            {order.shippedAt && order.deliveredAt && " · "}
+                            {order.deliveredAt && <span>Delivered {new Date(order.deliveredAt).toLocaleDateString()}</span>}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                        <a href={`/admin/orders/${order.id}/label`} target="_blank" rel="noopener noreferrer">
+                          <Printer className="h-3.5 w-3.5" />
+                          Print
+                        </a>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

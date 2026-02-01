@@ -37,11 +37,19 @@ export const contactFormSchema = z.object({
   message: z.string().min(10, "Message must be at least 10 characters").max(5000, "Message too long").transform(sanitizeString),
 });
 
-// Order status schema
+// Order status schema (legacy, single field)
 export const orderStatusSchema = z.object({
   status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"], {
     errorMap: () => ({ message: "Invalid order status" }),
   }),
+});
+
+// Order patch schema for status + delivery tracking (all optional so PATCH can send only changed fields)
+export const orderPatchSchema = z.object({
+  status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"]).optional(),
+  trackingNumber: z.string().max(500).optional().nullable(),
+  shippedAt: z.string().max(50).optional().nullable(),
+  deliveredAt: z.string().max(50).optional().nullable(),
 });
 
 // Validate and sanitize product input (only include fields that are explicitly provided, for PATCH safety)

@@ -17,6 +17,7 @@ import {
   orders,
   pendingPayments as pendingPaymentsTable,
   products,
+  seedState as seedStateTable,
   users,
 } from "@shared/schema";
 import { desc, eq } from "drizzle-orm";
@@ -42,6 +43,7 @@ export interface IStorage {
   getOrderByStripeSessionId(sessionId: string): Promise<ApiOrder | undefined>;
   getOrderByStripePaymentIntentId(paymentIntentId: string): Promise<ApiOrder | undefined>;
   updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined>;
+  updateOrder(id: string, patch: Partial<Pick<ApiOrder, "status" | "trackingNumber" | "shippedAt" | "deliveredAt">>): Promise<ApiOrder | undefined>;
 
   listCategories(): Promise<Category[]>;
   getCategory(id: string): Promise<Category | undefined>;
@@ -56,6 +58,9 @@ export interface IStorage {
   createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void>;
   getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined>;
   deletePendingPayment(paymentIntentId: string): Promise<boolean>;
+
+  getSeedState(key: string): Promise<string | undefined>;
+  setSeedState(key: string, value: string): Promise<void>;
 }
 
 function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
@@ -274,6 +279,9 @@ export class DbStorage implements IStorage {
         stripeSessionId: order.stripeSessionId ?? undefined,
         stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
         paymentStatus: order.paymentStatus ?? undefined,
+        trackingNumber: order.trackingNumber ?? undefined,
+        shippedAt: order.shippedAt ?? undefined,
+        deliveredAt: order.deliveredAt ?? undefined,
       });
     }
 
@@ -306,6 +314,9 @@ export class DbStorage implements IStorage {
       stripeSessionId: order.stripeSessionId ?? undefined,
       stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
       paymentStatus: order.paymentStatus ?? undefined,
+      trackingNumber: order.trackingNumber ?? undefined,
+      shippedAt: order.shippedAt ?? undefined,
+      deliveredAt: order.deliveredAt ?? undefined,
     };
   }
 
@@ -390,10 +401,36 @@ export class DbStorage implements IStorage {
     return true;
   }
 
+  async getSeedState(key: string): Promise<string | undefined> {
+    const [row] = await this.getDb()
+      .select()
+      .from(seedStateTable)
+      .where(eq(seedStateTable.key, key))
+      .limit(1);
+    return row?.value ?? undefined;
+  }
+
+  async setSeedState(key: string, value: string): Promise<void> {
+    await this.getDb()
+      .insert(seedStateTable)
+      .values({ key, value })
+      .onConflictDoUpdate({ target: seedStateTable.key, set: { value } });
+  }
+
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
+    return this.updateOrder(id, { status });
+  }
+
+  async updateOrder(id: string, patch: Partial<Pick<ApiOrder, "status" | "trackingNumber" | "shippedAt" | "deliveredAt">>): Promise<ApiOrder | undefined> {
+    const set: Record<string, unknown> = {};
+    if (patch.status !== undefined) set.status = patch.status;
+    if (patch.trackingNumber !== undefined) set.trackingNumber = patch.trackingNumber ?? null;
+    if (patch.shippedAt !== undefined) set.shippedAt = patch.shippedAt ?? null;
+    if (patch.deliveredAt !== undefined) set.deliveredAt = patch.deliveredAt ?? null;
+    if (Object.keys(set).length === 0) return this.getOrder(id);
     const [updated] = await this.getDb()
       .update(orders)
-      .set({ status })
+      .set(set)
       .where(eq(orders.id, id))
       .returning();
     if (!updated) return undefined;
@@ -588,9 +625,13 @@ export class MemStorage implements IStorage {
   }
 
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
+    return this.updateOrder(id, { status });
+  }
+
+  async updateOrder(id: string, patch: Partial<Pick<ApiOrder, "status" | "trackingNumber" | "shippedAt" | "deliveredAt">>): Promise<ApiOrder | undefined> {
     const order = this.orders.get(id);
     if (!order) return undefined;
-    const updated = { ...order, status };
+    const updated: ApiOrder = { ...order, ...patch };
     this.orders.set(id, updated);
     return updated;
   }
@@ -663,6 +704,16 @@ export class MemStorage implements IStorage {
 
   async deletePendingPayment(paymentIntentId: string): Promise<boolean> {
     return this.pendingPayments.delete(paymentIntentId);
+  }
+
+  private seedState = new Map<string, string>();
+
+  async getSeedState(key: string): Promise<string | undefined> {
+    return this.seedState.get(key);
+  }
+
+  async setSeedState(key: string, value: string): Promise<void> {
+    this.seedState.set(key, value);
   }
 }
 

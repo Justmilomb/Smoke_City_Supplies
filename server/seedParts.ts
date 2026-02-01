@@ -269,11 +269,16 @@ const PARTS_DATA: (Partial<InsertProduct> & { name: string; category: string; su
 ];
 
 export async function runSeedParts(): Promise<number> {
-  const existing = await storage.listProducts();
-  if (existing.length >= 140) {
-    console.log("[seedParts] Already have 140+ parts, skipping seed.");
+  if ((await storage.getSeedState("parts_seeded")) === "1") {
     return 0;
   }
+
+  const existing = await storage.listProducts();
+  if (existing.length > 0) {
+    await storage.setSeedState("parts_seeded", "1");
+    return 0;
+  }
+
   partIdCounter = 1000;
   let created = 0;
   for (const data of PARTS_DATA) {
@@ -286,6 +291,7 @@ export async function runSeedParts(): Promise<number> {
       console.warn("[seedParts] Skip duplicate or error:", (err as Error).message);
     }
   }
+  await storage.setSeedState("parts_seeded", "1");
   console.log(`[seedParts] Done. Created ${created} parts.`);
   return created;
 }

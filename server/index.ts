@@ -37,6 +37,12 @@ app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 app.use(securityHeaders);
 app.use(corsConfig);
 
+// In production, require DATABASE_URL so orders, products, and sessions persist across restarts (e.g. Render)
+if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
+  console.error("[server] DATABASE_URL is required in production. Add a PostgreSQL database so orders, deliveries, and data persist when the server restarts.");
+  process.exit(1);
+}
+
 // Session (required for Passport) — use PostgreSQL when DATABASE_URL set, else in-memory for local dev
 const sessionSecret = process.env.SESSION_SECRET || "dev-session-secret-change-in-production";
 const sessionStore = pool

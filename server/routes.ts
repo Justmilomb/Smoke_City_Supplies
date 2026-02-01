@@ -31,6 +31,7 @@ import { runSeedParts } from "./seedParts";
 import passport from "passport";
 import {
   contactFormSchema,
+  orderPatchSchema,
   orderStatusSchema,
   sanitizeProductInput,
   sanitizeCategoryInput,
@@ -383,14 +384,22 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
 
   app.patch("/api/orders/:id", requireAuth, apiRateLimiter, async (req, res) => {
     const id = paramId(req);
-    const parsed = orderStatusSchema.safeParse(req.body);
+    const parsed = orderPatchSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
-        message: "Invalid order status",
+        message: "Invalid order update",
         errors: parsed.error.flatten().fieldErrors,
       });
     }
-    const updated = await storage.updateOrderStatus(id, parsed.data.status);
+    const patch = parsed.data;
+    const now = new Date().toISOString();
+    if (patch.status === "shipped" && patch.shippedAt === undefined) {
+      (patch as { shippedAt?: string }).shippedAt = now;
+    }
+    if (patch.status === "delivered" && patch.deliveredAt === undefined) {
+      (patch as { deliveredAt?: string }).deliveredAt = now;
+    }
+    const updated = await storage.updateOrder(id, patch);
     if (!updated) return res.status(404).json({ message: "Order not found" });
     return res.json(updated);
   });

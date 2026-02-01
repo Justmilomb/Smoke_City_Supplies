@@ -46,7 +46,7 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Shipping Costs</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Standard shipping: $5.99. Free shipping on orders over $75. Express options available at checkout.
+              Standard UK delivery: £4.99. Free delivery on orders over £50. Express and next-day options may be available at checkout for eligible items.
             </p>
           </Card>
 
@@ -56,7 +56,7 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Areas We Cover</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              We ship to the continental United States. Alaska, Hawaii, and international shipping may be available—contact us for a quote.
+              We ship across the United Kingdom—England, Scotland, Wales, and Northern Ireland. International shipping is not currently available; contact us if you have questions.
             </p>
           </Card>
 

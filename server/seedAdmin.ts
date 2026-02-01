@@ -25,11 +25,17 @@ export async function seedAdminIfNeeded(): Promise<void> {
 }
 
 export async function seedCategoriesIfNeeded(): Promise<void> {
+  if ((await storage.getSeedState("categories_seeded")) === "1") return;
+
   const list = await storage.listCategories();
-  if (list.length > 0) return;
+  if (list.length > 0) {
+    await storage.setSeedState("categories_seeded", "1");
+    return;
+  }
 
   for (const c of DEFAULT_CATEGORIES) {
     await storage.createCategory(c);
   }
+  await storage.setSeedState("categories_seeded", "1");
   console.log("[seedAdmin] Created default categories");
 }
