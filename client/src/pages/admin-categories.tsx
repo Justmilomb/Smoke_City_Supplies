@@ -145,9 +145,8 @@ export default function AdminCategories() {
                 setDialogOpen(true);
               }}
             >
-              <Plus className="mr-2 h-4 w-4" /> Add category
-            </Button>
-          </div>
+            <Plus className="mr-2 h-4 w-4" /> Add category
+          </Button>
         </div>
 
         <Card className="border-border/50 p-6">

@@ -2,11 +2,27 @@
 
 E-commerce site for bike and scooter parts. Run from this directory.
 
-## Local Setup
+## Local development (Mac)
 
-1. Set `DATABASE_URL` (PostgreSQL) and optionally `SESSION_SECRET`, `ADMIN_PASSWORD`.
-2. `npm install && npm run build && npm run db:push`
-3. `npm run start` (or `npm run dev` for development)
+You can run the app locally **without** PostgreSQL. The server uses in-memory storage and in-memory sessions when `DATABASE_URL` is not set.
+
+**Quick start (no database):**
+
+```bash
+npm install
+npm run dev
+```
+
+Then open **http://localhost:3000** in your browser. The dev server serves both the API and the frontend with hot reload.
+
+- **Port:** 3000 (default; avoids macOS AirPlay on 5000). If the port is in use, run `PORT=3001 npm run dev` (or another free port).
+- **Admin login:** username `admin`, password `admin` (change in production)
+- **Data:** In-memory (resets when you stop the server). Set `DATABASE_URL` if you want a local PostgreSQL database.
+
+**With a local PostgreSQL database (optional):**
+
+1. Set `DATABASE_URL` (e.g. `postgresql://user:pass@localhost:5432/smoke_city`) and optionally `SESSION_SECRET`, `ADMIN_PASSWORD`.
+2. `npm install && npm run db:push && npm run dev`
 
 ## Render Deployment
 

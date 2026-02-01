@@ -36,7 +36,15 @@ async function buildAll() {
   await rm("dist", { recursive: true, force: true });
 
   console.log("building client...");
-  await viteBuild();
+  try {
+    await viteBuild();
+  } catch (err) {
+    console.error("Vite build failed:", err);
+    if (err && typeof err === "object" && "message" in err) {
+      console.error((err as Error).message);
+    }
+    throw err;
+  }
 
   console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
@@ -46,19 +54,27 @@ async function buildAll() {
   ];
   const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
-  await esbuild({
-    entryPoints: ["server/index.ts"],
-    platform: "node",
-    bundle: true,
-    format: "cjs",
-    outfile: "dist/index.cjs",
-    define: {
-      "process.env.NODE_ENV": '"production"',
-    },
-    minify: true,
-    external: externals,
-    logLevel: "info",
-  });
+  try {
+    await esbuild({
+      entryPoints: ["server/index.ts"],
+      platform: "node",
+      bundle: true,
+      format: "cjs",
+      outfile: "dist/index.cjs",
+      define: {
+        "process.env.NODE_ENV": '"production"',
+      },
+      minify: true,
+      external: externals,
+      logLevel: "info",
+    });
+  } catch (err) {
+    console.error("esbuild failed:", err);
+    if (err && typeof err === "object" && "message" in err) {
+      console.error((err as Error).message);
+    }
+    throw err;
+  }
 }
 
 buildAll().catch((err) => {
