@@ -44,15 +44,26 @@ export function ContactModalProvider({ children }: { children: React.ReactNode }
     [openWithPartNumber, openModal]
   );
   const fab = (
-    <Button
-      data-testid="button-contact-fab"
-      size="icon"
-      className="fixed bottom-4 right-4 z-[100] h-14 w-14 rounded-full shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all md:bottom-6 md:right-6 md:h-12 md:w-12"
-      aria-label="Contact support"
-      onClick={openModal}
+    <div
+      className="fixed z-[100]"
+      style={{
+        position: "fixed",
+        left: "auto",
+        right: "1.5rem",
+        bottom: "1.5rem",
+        top: "auto",
+      }}
     >
-      <MessageSquare className="h-6 w-6 md:h-5 md:w-5" />
-    </Button>
+      <Button
+        data-testid="button-contact-fab"
+        size="icon"
+        className="h-14 w-14 rounded-full shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all md:h-12 md:w-12"
+        aria-label="Contact support"
+        onClick={openModal}
+      >
+        <MessageSquare className="h-6 w-6 md:h-5 md:w-5" />
+      </Button>
+    </div>
   );
 
   return (
