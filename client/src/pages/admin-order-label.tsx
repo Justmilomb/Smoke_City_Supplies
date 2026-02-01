@@ -3,6 +3,7 @@ import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Printer, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import AdminLayout from "@/components/admin/AdminLayout";
 
 const API = "/api";
 
@@ -52,43 +53,50 @@ export default function AdminOrderLabel() {
 
   if (!orderId) {
     return (
-      <div className="p-8">
-        <p className="text-muted-foreground">No order ID.</p>
-        <Link href="/admin/orders">
-          <Button variant="outline" className="mt-4" asChild>
-            <a>Back to orders</a>
-          </Button>
-        </Link>
-      </div>
+      <AdminLayout>
+        <div className="p-8">
+          <p className="text-muted-foreground">No order ID.</p>
+          <Link href="/admin/orders">
+            <Button variant="outline" className="mt-4" asChild>
+              <a>Back to orders</a>
+            </Button>
+          </Link>
+        </div>
+      </AdminLayout>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="p-8">
-        <p className="text-muted-foreground">Loading order…</p>
-      </div>
+      <AdminLayout>
+        <div className="p-8">
+          <p className="text-muted-foreground">Loading order…</p>
+        </div>
+      </AdminLayout>
     );
   }
 
   if (error || !order) {
     return (
-      <div className="p-8">
-        <p className="text-destructive">Order not found.</p>
-        <Link href="/admin/orders">
-          <Button variant="outline" className="mt-4" asChild>
-            <a>Back to orders</a>
-          </Button>
-        </Link>
-      </div>
+      <AdminLayout>
+        <div className="p-8">
+          <p className="text-destructive">Order not found.</p>
+          <Link href="/admin/orders">
+            <Button variant="outline" className="mt-4" asChild>
+              <a>Back to orders</a>
+            </Button>
+          </Link>
+        </div>
+      </AdminLayout>
     );
   }
 
   const hasAddress = order.customerName || order.customerAddress || order.customerPostcode;
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="no-print mx-auto max-w-2xl flex flex-wrap items-center justify-between gap-4 mb-6">
+    <AdminLayout>
+      <div className="p-6">
+        <div className="no-print mx-auto max-w-2xl flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <Link href="/admin/orders">
             <Button variant="ghost" size="sm" asChild>
@@ -106,7 +114,7 @@ export default function AdminOrderLabel() {
         <p className="text-sm text-muted-foreground">
           Use your browser&apos;s print dialog. Works with standard label sheets or thermal printers.
         </p>
-      </div>
+        </div>
 
       <div
         className="parcel-label-print mx-auto bg-white text-black rounded-lg border-2 border-black p-6 shadow-lg"
@@ -154,6 +162,7 @@ export default function AdminOrderLabel() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </AdminLayout>
   );
 }

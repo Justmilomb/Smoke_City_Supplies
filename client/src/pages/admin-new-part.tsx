@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import SiteLayout from "@/components/site/SiteLayout";
+import AdminLayout from "@/components/admin/AdminLayout";
 import BackButton from "@/components/site/BackButton";
 import AdminImageUpload from "@/components/admin/AdminImageUpload";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -98,7 +98,7 @@ export default function AdminNewPart() {
   };
 
   return (
-    <SiteLayout>
+    <AdminLayout>
       <div className="flex flex-col gap-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -314,6 +314,6 @@ export default function AdminNewPart() {
           </Card>
         </div>
       </div>
-    </SiteLayout>
+    </AdminLayout>
   );
 }

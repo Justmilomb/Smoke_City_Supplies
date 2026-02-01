@@ -24,6 +24,7 @@ import AdminDashboard from "@/pages/admin";
 import AdminNewPart from "@/pages/admin-new-part";
 import AdminParts from "@/pages/admin-parts";
 import AdminOrders from "@/pages/admin-orders";
+import AdminOrdersLabels from "@/pages/admin-orders-labels";
 import AdminOrderLabel from "@/pages/admin-order-label";
 import AdminCategories from "@/pages/admin-categories";
 import AdminEditPart from "@/pages/admin-edit-part";
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin" component={withAdminGuard(AdminDashboard)} />
       <Route path="/admin/parts" component={withAdminGuard(AdminParts)} />
+      <Route path="/admin/orders/labels" component={withAdminGuard(AdminOrdersLabels)} />
       <Route path="/admin/orders/:id/label" component={withAdminGuard(AdminOrderLabel)} />
       <Route path="/admin/orders" component={withAdminGuard(AdminOrders)} />
       <Route path="/admin/categories" component={withAdminGuard(AdminCategories)} />

@@ -1,5 +1,5 @@
 import React from "react";
-import SiteLayout from "@/components/site/SiteLayout";
+import AdminLayout from "@/components/admin/AdminLayout";
 import BackButton from "@/components/site/BackButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -159,6 +159,21 @@ function OrderTrackingInput({
   );
 }
 
+const STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "shipped", label: "Shipped" },
+  { value: "cancelled", label: "Cancelled" },
+] as const;
+
+function filterOrdersByStatus(orders: Order[], filter: string): Order[] {
+  if (filter === "all") return orders;
+  if (filter === "pending") return orders.filter((o) => o.status === "pending" || o.status === "processing");
+  if (filter === "shipped") return orders.filter((o) => o.status === "shipped" || o.status === "delivered");
+  if (filter === "cancelled") return orders.filter((o) => o.status === "cancelled");
+  return orders;
+}
+
 export default function AdminOrders() {
   usePageMeta({ title: "Orders", description: "Track and manage orders." });
   const { data: orders = [], isLoading } = useQuery({
@@ -166,17 +181,34 @@ export default function AdminOrders() {
     queryFn: fetchOrders,
   });
   const isMobile = useIsMobile();
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
+
+  const filteredOrders = filterOrdersByStatus(orders, statusFilter);
+  const pendingOrders = orders.filter((o: Order) => o.status === "pending" || o.status === "processing");
+
+  const handlePrintAllPendingLabels = () => {
+    if (pendingOrders.length === 0) {
+      toast.info("No pending orders to print");
+      return;
+    }
+    pendingOrders.forEach((order: Order, i: number) => {
+      setTimeout(() => {
+        window.open(`/admin/orders/${order.id}/label`, "_blank", "noopener,noreferrer");
+      }, i * 300);
+    });
+    toast.success(`Opening ${pendingOrders.length} label(s) in new tabs`);
+  };
 
   if (isLoading) {
     return (
-      <SiteLayout>
+      <AdminLayout>
         <div className="text-muted-foreground">Loading orders…</div>
-      </SiteLayout>
+      </AdminLayout>
     );
   }
 
   return (
-    <SiteLayout>
+    <AdminLayout>
       <div className="flex flex-col gap-8">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -190,14 +222,35 @@ export default function AdminOrders() {
           <BackButton fallback="/admin" />
         </div>
 
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-[140px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTER_OPTIONS.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {pendingOrders.length > 0 && (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={handlePrintAllPendingLabels}>
+              <Printer className="h-3.5 w-3.5" />
+              Print all labels for pending ({pendingOrders.length})
+            </Button>
+          )}
+        </div>
+
         <Card className="border-border/50 overflow-hidden">
-          {orders.length === 0 ? (
+          {filteredOrders.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              No orders yet.
+              {orders.length === 0 ? "No orders yet." : "No orders match this filter."}
             </div>
           ) : isMobile ? (
             <div className="divide-y divide-border/60">
-              {orders.map((order: Order) => (
+              {filteredOrders.map((order: Order) => (
                 <div key={order.id} className="flex flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-2">
                     <span className="font-mono text-xs text-muted-foreground">
@@ -266,7 +319,7 @@ export default function AdminOrders() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orders.map((order: Order) => (
+                {filteredOrders.map((order: Order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-mono text-xs">{order.id.slice(0, 8)}…</TableCell>
                     <TableCell className="text-sm">
@@ -322,6 +375,6 @@ export default function AdminOrders() {
           )}
         </Card>
       </div>
-    </SiteLayout>
+    </AdminLayout>
   );
 }

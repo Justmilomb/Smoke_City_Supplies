@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import SiteLayout from "@/components/site/SiteLayout";
+import AdminLayout from "@/components/admin/AdminLayout";
 import BackButton from "@/components/site/BackButton";
 import AdminImageUpload from "@/components/admin/AdminImageUpload";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -115,33 +115,33 @@ export default function AdminEditPart() {
 
   if (!id) {
     return (
-      <SiteLayout>
+      <AdminLayout>
         <div className="text-muted-foreground">Missing product ID</div>
-      </SiteLayout>
+      </AdminLayout>
     );
   }
 
   if (isLoading) {
     return (
-      <SiteLayout>
+      <AdminLayout>
         <div className="text-muted-foreground">Loading part…</div>
-      </SiteLayout>
+      </AdminLayout>
     );
   }
 
   if (!product) {
     return (
-      <SiteLayout>
+      <AdminLayout>
         <div className="text-muted-foreground">Part not found</div>
         <Link href="/admin/parts">
           <a className="text-primary hover:underline">Back to parts</a>
         </Link>
-      </SiteLayout>
+      </AdminLayout>
     );
   }
 
   return (
-    <SiteLayout>
+    <AdminLayout>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -346,6 +346,6 @@ export default function AdminEditPart() {
           </Card>
         </div>
       </div>
-    </SiteLayout>
+    </AdminLayout>
   );
 }
