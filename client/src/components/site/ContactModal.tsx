@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Phone, Mail, MessageSquare, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,18 +43,22 @@ export function ContactModalProvider({ children }: { children: React.ReactNode }
     () => ({ openWithPartNumber, open: openModal }),
     [openWithPartNumber, openModal]
   );
+  const fab = (
+    <Button
+      data-testid="button-contact-fab"
+      size="icon"
+      className="fixed bottom-4 right-4 z-[100] h-14 w-14 rounded-full shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all md:bottom-6 md:right-6 md:h-12 md:w-12"
+      aria-label="Contact support"
+      onClick={openModal}
+    >
+      <MessageSquare className="h-6 w-6 md:h-5 md:w-5" />
+    </Button>
+  );
+
   return (
     <ContactModalContext.Provider value={value}>
       {children}
-      <Button
-        data-testid="button-contact-fab"
-        size="icon"
-        className="fixed bottom-4 right-4 z-40 h-14 w-14 rounded-full shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all md:bottom-6 md:right-6 md:h-12 md:w-12"
-        aria-label="Contact support"
-        onClick={openModal}
-      >
-        <MessageSquare className="h-6 w-6 md:h-5 md:w-5" />
-      </Button>
+      {typeof document !== "undefined" && createPortal(fab, document.body)}
       <ContactModalContent
         open={open}
         onOpenChange={setOpen}
