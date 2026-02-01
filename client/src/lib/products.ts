@@ -43,6 +43,7 @@ async function createProduct(input: CreateProductInput): Promise<Part> {
   const res = await fetch(`${API}/products`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({
       name: input.name,
       partNumber: input.partNumber,
@@ -75,6 +76,7 @@ async function updateProduct(id: string, patch: Partial<Part>): Promise<Part> {
   const res = await fetch(`${API}/products/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(patch),
   });
   if (!res.ok) {
@@ -88,6 +90,7 @@ async function updateProductQuantity(id: string, quantity: number): Promise<Part
   const res = await fetch(`${API}/products/${id}/quantity`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ quantity }),
   });
   if (!res.ok) {
@@ -98,7 +101,10 @@ async function updateProductQuantity(id: string, quantity: number): Promise<Part
 }
 
 async function deleteProduct(id: string): Promise<void> {
-  const res = await fetch(`${API}/products/${id}`, { method: "DELETE" });
+  const res = await fetch(`${API}/products/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "Failed to delete product");

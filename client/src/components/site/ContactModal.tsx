@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, Mail, MessageSquare, MapPin, Clock } from "lucide-react";
+import { Phone, Mail, MessageSquare, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +14,6 @@ import { toast } from "sonner";
 
 const SUPPORT_PHONE = "07597783584";
 const SUPPORT_EMAIL = "support@smokecitysupplies.com";
-const OPENING_HOURS = "Mon–Sat 9am–6pm, Sun Closed";
 const ONLINE_ONLY = "Online only — UK delivery";
 
 export type ContactModalContextValue = {
@@ -144,10 +143,6 @@ function ContactModalContent({
             <div className="flex items-center gap-2 text-muted-foreground">
               <MessageSquare className="h-4 w-4" />
               <span>Live Chat — Coming soon</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>{OPENING_HOURS}</span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <MapPin className="h-4 w-4" />

@@ -14,6 +14,7 @@ import StoreHome from "@/pages/store-home";
 import CatalogPage from "@/pages/catalog";
 import ProductPage from "@/pages/product";
 import CartPage from "@/pages/cart";
+import CheckoutPage from "@/pages/checkout";
 import CheckoutSuccess from "@/pages/checkout-success";
 import ShippingPage from "@/pages/shipping";
 import ReturnsPage from "@/pages/returns";
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/catalog" component={CatalogPage} />
       <Route path="/product/:id" component={ProductPage} />
       <Route path="/cart" component={CartPage} />
+      <Route path="/checkout" component={CheckoutPage} />
       <Route path="/checkout/success" component={CheckoutSuccess} />
       <Route path="/shipping" component={ShippingPage} />
       <Route path="/returns" component={ReturnsPage} />

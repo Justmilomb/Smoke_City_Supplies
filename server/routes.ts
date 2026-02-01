@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import {
   createOrderSchema,
+  createOrderWithPaymentIntentSchema,
   createOrderWithSessionSchema,
   insertCategorySchema,
   insertProductSchema,
@@ -12,6 +13,12 @@ import {
 } from "@shared/schema";
 
 const updateProductSchema = insertProductSchema.partial();
+
+const createPaymentIntentSchema = createOrderSchema.pick({
+  items: true,
+  customerEmail: true,
+  customerName: true,
+});
 import multer from "multer";
 import { storage } from "./storage";
 import { stripe } from "./stripe";
@@ -214,56 +221,88 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     return res.status(204).send();
   });
 
-  // Checkout session (Stripe)
-  const checkoutSessionSchema = createOrderSchema.pick({
-    items: true,
-    customerEmail: true,
-  });
-  app.post("/api/checkout/session", orderRateLimiter, async (req, res) => {
+  // Create PaymentIntent for on-site checkout (Stripe API, your design)
+  app.post("/api/create-payment-intent", orderRateLimiter, async (req, res) => {
     if (!stripe) {
       return res.status(503).json({ message: "Stripe is not configured" });
     }
-    const parsed = checkoutSessionSchema.safeParse(req.body);
+    const parsed = createPaymentIntentSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "Invalid checkout data", errors: parsed.error.flatten() });
     }
-    const { items, customerEmail } = parsed.data;
+    const { items, customerEmail, customerName } = parsed.data;
     if (!items.length) {
       return res.status(400).json({ message: "Cart is empty" });
     }
-    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const totalPence = Math.round(
+      items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
+    );
+    if (totalPence < 50) {
+      return res.status(400).json({ message: "Minimum order is £0.50" });
+    }
     try {
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        line_items: items.map((i) => ({
-          price_data: {
-            currency: "gbp",
-            unit_amount: Math.round(i.priceEach * 100),
-            product_data: {
-              name: i.productName,
-              images: [],
-              metadata: { productId: i.productId },
-            },
-          },
-          quantity: i.quantity,
-        })),
-        success_url: `${base}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${base}/cart`,
-        customer_email: customerEmail ?? undefined,
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: totalPence,
+        currency: "gbp",
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          itemCount: String(items.length),
+        },
       });
-      const url = session.url;
-      if (!url) {
-        return res.status(500).json({ message: "Failed to create checkout session" });
-      }
-      return res.status(201).json({ sessionId: session.id, url });
+      await storage.createPendingPayment({
+        paymentIntentId: paymentIntent.id,
+        items,
+        totalPence,
+        customerEmail: customerEmail ?? undefined,
+        customerName: customerName ?? undefined,
+      });
+      return res.status(201).json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      });
     } catch (err) {
-      console.error("[checkout/session]", err);
-      return res.status(500).json({ message: "Checkout session failed" });
+      console.error("[create-payment-intent]", err);
+      return res.status(500).json({ message: "Could not create payment" });
     }
   });
 
-  // Orders (create with items, or with Stripe sessionId after payment)
+  // Orders (create with items, or with paymentIntentId/sessionId after payment)
   app.post("/api/orders", orderRateLimiter, async (req, res) => {
+    const withPaymentIntent = createOrderWithPaymentIntentSchema.safeParse(req.body);
+    if (withPaymentIntent.success) {
+      const { paymentIntentId } = withPaymentIntent.data;
+      if (!stripe) {
+        return res.status(503).json({ message: "Stripe is not configured" });
+      }
+      try {
+        const existing = await storage.getOrderByStripePaymentIntentId(paymentIntentId);
+        if (existing) {
+          return res.status(201).json(existing);
+        }
+        const pending = await storage.getPendingPayment(paymentIntentId);
+        if (!pending) {
+          return res.status(400).json({ message: "Invalid or expired payment" });
+        }
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (pi.status !== "succeeded") {
+          return res.status(400).json({ message: "Payment not completed" });
+        }
+        const input: CreateOrderInput = {
+          items: pending.items,
+          customerEmail: pending.customerEmail,
+          customerName: pending.customerName,
+          stripePaymentIntentId: paymentIntentId,
+          paymentStatus: "paid",
+        };
+        const order = await storage.createOrder(input);
+        await storage.deletePendingPayment(paymentIntentId);
+        return res.status(201).json(order);
+      } catch (err) {
+        console.error("[orders from payment intent]", err);
+        return res.status(400).json({ message: "Invalid or already used payment" });
+      }
+    }
+
     const withSession = createOrderWithSessionSchema.safeParse(req.body);
     if (withSession.success) {
       const { sessionId } = withSession.data;

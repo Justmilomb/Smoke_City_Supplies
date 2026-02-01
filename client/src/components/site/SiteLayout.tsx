@@ -279,11 +279,6 @@ export default function SiteLayout({
             <p className="text-xs text-muted-foreground">
               UK delivery only. All prices in GBP (£).
             </p>
-            <div className="mt-4 text-sm text-muted-foreground">
-              <div className="font-medium text-foreground mb-1">Opening hours</div>
-              <div>Mon–Sat 9am–6pm</div>
-              <div>Sun Closed</div>
-            </div>
             <div className="mt-3 text-sm text-muted-foreground">
               <div className="font-medium text-foreground mb-1">Online only</div>
               <div>UK delivery — no physical store</div>

@@ -94,6 +94,16 @@ export const images = pgTable("images", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Pending payment (PaymentIntent) — links PI to cart for on-site checkout
+export const pendingPayments = pgTable("pending_payments", {
+  paymentIntentId: varchar("payment_intent_id", { length: 255 }).primaryKey(),
+  items: jsonb("items").$type<{ productId: string; productName: string; quantity: number; priceEach: number }[]>().notNull(),
+  totalPence: integer("total_pence").notNull(),
+  customerEmail: text("customer_email"),
+  customerName: text("customer_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Orders for customer checkout
 export const orderItems = pgTable("order_items", {
   id: varchar("id").primaryKey(),
@@ -132,8 +142,12 @@ export const createOrderSchema = z.object({
 export const createOrderWithSessionSchema = z.object({
   sessionId: z.string().min(1),
 });
+export const createOrderWithPaymentIntentSchema = z.object({
+  paymentIntentId: z.string().min(1),
+});
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type CreateOrderWithSessionInput = z.infer<typeof createOrderWithSessionSchema>;
+export type CreateOrderWithPaymentIntentInput = z.infer<typeof createOrderWithPaymentIntentSchema>;
 
 // API shape for product (matches client Part + quantity)
 export type ApiProduct = {

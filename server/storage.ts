@@ -15,6 +15,7 @@ import {
   images as imagesTable,
   orderItems,
   orders,
+  pendingPayments as pendingPaymentsTable,
   products,
   users,
 } from "@shared/schema";
@@ -39,6 +40,7 @@ export interface IStorage {
   listOrders(): Promise<ApiOrder[]>;
   getOrder(id: string): Promise<ApiOrder | undefined>;
   getOrderByStripeSessionId(sessionId: string): Promise<ApiOrder | undefined>;
+  getOrderByStripePaymentIntentId(paymentIntentId: string): Promise<ApiOrder | undefined>;
   updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined>;
 
   listCategories(): Promise<Category[]>;
@@ -50,6 +52,10 @@ export interface IStorage {
   createImage(data: string, mimeType: string): Promise<string>;
   getImage(id: string): Promise<{ data: string; mimeType: string } | undefined>;
   deleteImage(id: string): Promise<boolean>;
+
+  createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string }): Promise<void>;
+  getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string } | undefined>;
+  deletePendingPayment(paymentIntentId: string): Promise<boolean>;
 }
 
 function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
@@ -305,6 +311,16 @@ export class DbStorage implements IStorage {
     return this.getOrder(order.id);
   }
 
+  async getOrderByStripePaymentIntentId(paymentIntentId: string): Promise<ApiOrder | undefined> {
+    const [order] = await this.getDb()
+      .select()
+      .from(orders)
+      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
+      .limit(1);
+    if (!order) return undefined;
+    return this.getOrder(order.id);
+  }
+
   async createImage(data: string, mimeType: string): Promise<string> {
     const id = `img_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`;
     await this.getDb()
@@ -327,6 +343,38 @@ export class DbStorage implements IStorage {
     const existing = await this.getImage(id);
     if (!existing) return false;
     await this.getDb().delete(imagesTable).where(eq(imagesTable.id, id));
+    return true;
+  }
+
+  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string }): Promise<void> {
+    await this.getDb().insert(pendingPaymentsTable).values({
+      paymentIntentId: data.paymentIntentId,
+      items: data.items,
+      totalPence: data.totalPence,
+      customerEmail: data.customerEmail ?? null,
+      customerName: data.customerName ?? null,
+    });
+  }
+
+  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string } | undefined> {
+    const [row] = await this.getDb()
+      .select()
+      .from(pendingPaymentsTable)
+      .where(eq(pendingPaymentsTable.paymentIntentId, paymentIntentId))
+      .limit(1);
+    if (!row) return undefined;
+    return {
+      items: row.items,
+      totalPence: row.totalPence,
+      customerEmail: row.customerEmail ?? undefined,
+      customerName: row.customerName ?? undefined,
+    };
+  }
+
+  async deletePendingPayment(paymentIntentId: string): Promise<boolean> {
+    const existing = await this.getPendingPayment(paymentIntentId);
+    if (!existing) return false;
+    await this.getDb().delete(pendingPaymentsTable).where(eq(pendingPaymentsTable.paymentIntentId, paymentIntentId));
     return true;
   }
 
@@ -390,6 +438,7 @@ export class MemStorage implements IStorage {
   private orders = new Map<string, ApiOrder>();
   private categories = new Map<string, Category>();
   private images = new Map<string, { data: string; mimeType: string }>();
+  private pendingPayments = new Map<string, { items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string }>();
 
   constructor() {
     seedProducts.forEach((p) => this.products.set(p.id, { ...p }));
@@ -520,6 +569,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.orders.values()).find((o) => o.stripeSessionId === sessionId);
   }
 
+  async getOrderByStripePaymentIntentId(paymentIntentId: string): Promise<ApiOrder | undefined> {
+    return Array.from(this.orders.values()).find((o) => o.stripePaymentIntentId === paymentIntentId);
+  }
+
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
     const order = this.orders.get(id);
     if (!order) return undefined;
@@ -577,6 +630,23 @@ export class MemStorage implements IStorage {
 
   async deleteImage(id: string): Promise<boolean> {
     return this.images.delete(id);
+  }
+
+  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string }): Promise<void> {
+    this.pendingPayments.set(data.paymentIntentId, {
+      items: data.items,
+      totalPence: data.totalPence,
+      customerEmail: data.customerEmail,
+      customerName: data.customerName,
+    });
+  }
+
+  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string } | undefined> {
+    return this.pendingPayments.get(paymentIntentId);
+  }
+
+  async deletePendingPayment(paymentIntentId: string): Promise<boolean> {
+    return this.pendingPayments.delete(paymentIntentId);
   }
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "wouter";
 import { Minus, Plus, ShoppingBag, Trash2, Lock } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
@@ -12,47 +12,18 @@ const API_BASE = "/api";
 
 export default function CartPage() {
   const { state, actions } = useCart();
-  const [redirecting, setRedirecting] = useState(false);
 
   const total = state.items.reduce(
     (sum, i) => sum + i.priceEach * i.quantity,
     0
   );
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (state.items.length === 0) {
       toast.error("Your cart is empty");
       return;
     }
-    setRedirecting(true);
-    try {
-      const res = await fetch(`${API_BASE}/checkout/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: state.items.map((i) => ({
-            productId: i.productId,
-            productName: i.productName,
-            quantity: i.quantity,
-            priceEach: i.priceEach,
-          })),
-          customerEmail: undefined,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Checkout failed");
-      }
-      const { url } = await res.json();
-      if (url) {
-        window.location.href = url;
-        return;
-      }
-      throw new Error("No checkout URL returned");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Checkout failed");
-      setRedirecting(false);
-    }
+    window.location.href = "/checkout";
   };
 
   if (state.items.length === 0) {
@@ -206,10 +177,10 @@ export default function CartPage() {
               className="w-full h-12 text-base bg-primary hover:bg-primary/90"
               size="lg"
               onClick={handleCheckout}
-              disabled={redirecting}
+              disabled={state.items.length === 0}
             >
               <Lock className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-              {redirecting ? "Redirecting…" : "Secure Checkout"}
+              Secure Checkout
             </Button>
             <p className="text-xs text-center text-muted-foreground mt-2">
               Payment secured by Stripe

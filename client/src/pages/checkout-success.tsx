@@ -23,9 +23,20 @@ export default function CheckoutSuccessPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const orderIdFromUrl = params.get("order_id");
     const sessionId = params.get("session_id");
+
+    // On-site checkout: order_id is set after payment, cart already cleared
+    if (orderIdFromUrl) {
+      setOrderId(orderIdFromUrl);
+      actions.clear();
+      setLoading(false);
+      return;
+    }
+
+    // Legacy Stripe Checkout redirect: create order from session_id
     if (!sessionId) {
-      setError("Missing session. If you just paid, your order may still be processing.");
+      setError("Missing order info. If you just paid, your order may still be processing.");
       setLoading(false);
       return;
     }
@@ -60,7 +71,6 @@ export default function CheckoutSuccessPage() {
     return () => {
       cancelled = true;
     };
-    // Run once on mount when session_id is present
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
