@@ -38,7 +38,7 @@ export function isEmailConfigured(): boolean {
   return getTransporter() !== null;
 }
 
-const VERIFY_TIMEOUT_MS = 5000;
+const VERIFY_TIMEOUT_MS = 15000;
 
 /** Verify SMTP connection (for admin diagnostics). Returns verified and optional error. */
 export async function verifyEmailConnection(): Promise<{ verified: boolean; error?: string }> {
