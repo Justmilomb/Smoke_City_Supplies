@@ -160,7 +160,7 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     return res.json(submission);
   });
 
-  // Admin: send reply (email customer and mark as replied)
+  // Admin: send reply (save to DB, send email in background so UI doesn't hang)
   app.post("/api/contact-submissions/:id/reply", requireAuth, apiRateLimiter, async (req, res) => {
     const id = paramId(req);
     const parsed = contactReplySchema.safeParse(req.body);
@@ -173,20 +173,22 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     const submission = await storage.getContactSubmission(id);
     if (!submission) return res.status(404).json({ message: "Enquiry not found" });
     const { replyBody } = parsed.data;
-    const sent = await sendReplyToCustomer(submission, replyBody);
     const now = new Date().toISOString();
     await storage.updateContactSubmission(id, {
       status: "replied",
       replyBody,
       repliedAt: now,
     });
-    if (!sent) {
-      return res.status(200).json({
-        ok: true,
-        message: "Reply saved. Email not sent (SMTP not configured). Reply from your email: " + submission.email,
-      });
-    }
-    return res.json({ ok: true, message: "Reply sent to " + submission.email });
+    // Send email in background so slow/hanging SMTP doesn't block the response
+    sendReplyToCustomer(submission, replyBody)
+      .then((sent) => {
+        if (!sent) console.warn("[contact] Reply email not sent (SMTP not configured or failed). Reply from:", submission.email);
+      })
+      .catch((err) => console.error("[contact] Reply email failed:", err));
+    return res.status(200).json({
+      ok: true,
+      message: "Reply saved. Email is being sent to " + submission.email + " (or reply from your own email if it doesn’t arrive).",
+    });
   });
 
   // Image upload (camera or file) – admin only; stored in DB as base64 for persistence on Render

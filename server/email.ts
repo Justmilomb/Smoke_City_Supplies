@@ -26,6 +26,9 @@ function getTransporter(): Transporter | null {
     port,
     secure,
     auth: { user, pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
   return transporter;
 }
@@ -33,6 +36,8 @@ function getTransporter(): Transporter | null {
 export function isEmailConfigured(): boolean {
   return getTransporter() !== null;
 }
+
+const EMAIL_TIMEOUT_MS = 15000;
 
 export async function sendEmail(options: {
   to: string;
@@ -45,14 +50,19 @@ export async function sendEmail(options: {
   if (!transport) return false;
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@smokecitysupplies.com";
   try {
-    await transport.sendMail({
-      from,
-      to: options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html ?? options.text.replace(/\n/g, "<br>"),
-      replyTo: options.replyTo,
-    });
+    await Promise.race([
+      transport.sendMail({
+        from,
+        to: options.to,
+        subject: options.subject,
+        text: options.text,
+        html: options.html ?? options.text.replace(/\n/g, "<br>"),
+        replyTo: options.replyTo,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Email send timeout")), EMAIL_TIMEOUT_MS)
+      ),
+    ]);
     return true;
   } catch (err) {
     console.error("[email] Send failed:", err);
