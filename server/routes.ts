@@ -22,6 +22,11 @@ export async function registerRoutes(
   await seedAdminIfNeeded();
   await seedCategoriesIfNeeded();
 
+  // Health check (for Render monitoring)
+  app.get("/health", (_req, res) => {
+    return res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // Auth (public)
   app.get("/api/auth/me", (req, res) => {
     if (req.isAuthenticated?.() && req.user) {
@@ -49,6 +54,21 @@ export async function registerRoutes(
         return res.json({ ok: true });
       });
     });
+  });
+
+  // Contact form (public)
+  app.post("/api/contact", (req, res) => {
+    const { name, email, subject, message } = req.body as {
+      name?: string;
+      email?: string;
+      subject?: string;
+      message?: string;
+    };
+    if (!name?.trim() || !email?.trim() || !message?.trim()) {
+      return res.status(400).json({ message: "Name, email, and message are required" });
+    }
+    console.log("[contact]", { name: name.trim(), email: email.trim(), subject: subject?.trim() ?? "(no subject)", message: message.trim() });
+    return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
   });
 
   // Image upload (camera or file) – admin only
@@ -125,6 +145,17 @@ export async function registerRoutes(
     const order = await storage.getOrder(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
     return res.json(order);
+  });
+
+  app.patch("/api/orders/:id", requireAuth, async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { status } = req.body as { status?: string };
+    if (!status || typeof status !== "string" || !status.trim()) {
+      return res.status(400).json({ message: "Status is required" });
+    }
+    const updated = await storage.updateOrderStatus(id, status.trim());
+    if (!updated) return res.status(404).json({ message: "Order not found" });
+    return res.json(updated);
   });
 
   // Categories

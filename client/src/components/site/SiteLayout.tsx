@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   Settings,
   Menu,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useCartCount } from "@/lib/cart";
+import { useAuth } from "@/lib/auth";
 
 function NavLink({
   href,
@@ -39,9 +39,9 @@ function NavLink({
       <a
         data-testid={testId}
         className={
-          "rounded-full px-3 py-2 text-sm transition hover:bg-[hsl(var(--muted))] " +
+          "rounded-full px-4 py-2.5 text-sm transition hover:bg-muted " +
           (active
-            ? "bg-[hsl(var(--muted))] text-foreground"
+            ? "bg-muted text-foreground"
             : "text-muted-foreground")
         }
       >
@@ -51,12 +51,12 @@ function NavLink({
   );
 }
 
-const mobileNavLinks = [
+const publicNavLinks = [
   { href: "/catalog", label: "Shop", testId: "link-mobile-shop" },
   { href: "/catalog?vehicle=bike", label: "Bike", testId: "link-mobile-bike" },
   { href: "/catalog?vehicle=scooter", label: "Scooter", testId: "link-mobile-scooter" },
-  { href: "/admin", label: "Admin", testId: "link-mobile-admin" },
 ];
+const adminNavLink = { href: "/admin", label: "Admin", testId: "link-mobile-admin" };
 
 export default function SiteLayout({
   children,
@@ -66,24 +66,26 @@ export default function SiteLayout({
   right?: React.ReactNode;
 }) {
   const cartCount = useCartCount();
+  const { user } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const mobileNavLinks = user ? [...publicNavLinks, adminNavLink] : publicNavLinks;
 
   return (
     <div className="min-h-screen app-surface">
-      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <div className="flex items-center gap-3">
             <Link href="/">
               <a
                 data-testid="link-home"
-                className="group flex items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-[hsl(var(--muted))]"
+                className="group flex items-center gap-2 rounded-xl px-2.5 py-2 transition hover:bg-muted"
               >
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--accent))] text-primary-foreground shadow-sm">
                   <Truck className="h-5 w-5" strokeWidth={2.2} />
                 </span>
                 <div className="leading-tight">
                   <div className="font-[var(--font-serif)] text-[15px] font-semibold tracking-tight">
-                    SwiftParts
+                    Smoke City Supplies
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Bike + Scooter parts
@@ -105,16 +107,16 @@ export default function SiteLayout({
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] rounded-r-2xl border-l">
+              <SheetContent side="left" className="w-[280px] rounded-r-2xl border-l border-border/60">
                 <SheetHeader className="sr-only">
                   <SheetTitle>Navigation</SheetTitle>
                 </SheetHeader>
-                <nav className="mt-6 flex flex-col gap-1">
+                <nav className="mt-8 flex flex-col gap-2">
                   {mobileNavLinks.map(({ href, label, testId }) => (
                     <Link key={href} href={href}>
                       <a
                         data-testid={testId}
-                        className="block rounded-xl px-4 py-3 text-base font-medium transition hover:bg-[hsl(var(--muted))]"
+                        className="block rounded-xl px-4 py-3.5 text-base font-medium transition hover:bg-muted"
                         onClick={() => setMobileNavOpen(false)}
                       >
                         {label}
@@ -137,7 +139,7 @@ export default function SiteLayout({
                 label="Scooter"
                 testId="link-scooter"
               />
-              <NavLink href="/admin" label="Admin" testId="link-admin" />
+              {user && <NavLink href="/admin" label="Admin" testId="link-admin" />}
             </nav>
           </div>
 
@@ -157,21 +159,21 @@ export default function SiteLayout({
               <Badge
                 data-testid="badge-promise"
                 variant="secondary"
-                className="rounded-full border border-border/60 bg-background/70"
+                className="rounded-full border border-border/60 bg-muted/50"
               >
                 <Truck className="mr-1 h-3.5 w-3.5" /> Next-day
               </Badge>
               <Badge
                 data-testid="badge-support"
                 variant="secondary"
-                className="rounded-full border border-border/60 bg-background/70"
+                className="rounded-full border border-border/60 bg-muted/50"
               >
                 <Headphones className="mr-1 h-3.5 w-3.5" /> Friendly support
               </Badge>
               <Badge
                 data-testid="badge-secure"
                 variant="secondary"
-                className="rounded-full border border-border/60 bg-background/70"
+                className="rounded-full border border-border/60 bg-muted/50"
               >
                 <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Secure checkout
               </Badge>
@@ -184,7 +186,7 @@ export default function SiteLayout({
                 data-testid="button-cart"
                 variant="secondary"
                 asChild
-                className="relative h-10 rounded-full border border-border/60 bg-background/70 hover:bg-[hsl(var(--muted))]"
+                className="relative h-10 rounded-full border border-border/60 bg-muted/50 hover:bg-muted"
               >
                 <a>
                   <ShoppingCart className="h-4 w-4" />
@@ -198,70 +200,76 @@ export default function SiteLayout({
               </Button>
             </Link>
 
-            <Link href="/admin" className="md:hidden">
-              <a>
-                <Button
-                  data-testid="button-admin"
-                  variant="secondary"
-                  className="h-10 w-10 rounded-full border border-border/60 bg-background/70 hover:bg-[hsl(var(--muted))]"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </a>
-            </Link>
+            {user && (
+              <Link href="/admin" className="md:hidden">
+                <a>
+                  <Button
+                    data-testid="button-admin"
+                    variant="secondary"
+                    className="h-10 w-10 rounded-full border border-border/60 bg-muted/50 hover:bg-muted"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </a>
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-10 md:px-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-12 md:px-6 md:py-16">{children}</main>
 
-      <footer className="border-t border-border/70 bg-background/70 backdrop-blur">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-3 md:px-6">
+      <footer className="border-t border-border/60 bg-muted/30">
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-3 md:px-6 md:py-16">
           <div>
             <div className="font-[var(--font-serif)] text-base font-semibold tracking-tight">
-              SwiftParts
+              Smoke City Supplies
             </div>
-            <div className="mt-1 text-sm text-muted-foreground">
+            <div className="mt-2 text-sm text-muted-foreground">
               Fast delivery, clear categories, and support that actually answers.
             </div>
           </div>
 
           <div className="text-sm">
-            <div className="font-medium">Help</div>
-            <ul className="mt-2 space-y-1 text-muted-foreground">
+            <div className="font-medium text-foreground">Help</div>
+            <ul className="mt-3 space-y-2 text-muted-foreground">
               <li>
-                <a
-                  data-testid="link-help-shipping"
-                  className="hover:text-foreground"
-                  href="#"
-                >
-                  Shipping & Delivery
-                </a>
+                <Link href="/shipping">
+                  <a
+                    data-testid="link-help-shipping"
+                    className="hover:text-foreground"
+                  >
+                    Shipping & Delivery
+                  </a>
+                </Link>
               </li>
               <li>
-                <a
-                  data-testid="link-help-returns"
-                  className="hover:text-foreground"
-                  href="#"
-                >
-                  Returns
-                </a>
+                <Link href="/returns">
+                  <a
+                    data-testid="link-help-returns"
+                    className="hover:text-foreground"
+                  >
+                    Returns
+                  </a>
+                </Link>
               </li>
               <li>
-                <a
-                  data-testid="link-help-support"
-                  className="hover:text-foreground"
-                  href="#"
-                >
-                  Contact Support
-                </a>
+                <Link href="/contact">
+                  <a
+                    data-testid="link-help-support"
+                    className="hover:text-foreground"
+                  >
+                    Contact Support
+                  </a>
+                </Link>
               </li>
             </ul>
           </div>
 
+          {user && (
           <div className="text-sm">
-            <div className="font-medium">Business</div>
-            <ul className="mt-2 space-y-1 text-muted-foreground">
+            <div className="font-medium text-foreground">Business</div>
+            <ul className="mt-3 space-y-2 text-muted-foreground">
               <li>
                 <Link href="/admin">
                   <a
@@ -288,6 +296,7 @@ export default function SiteLayout({
               </li>
             </ul>
           </div>
+        )}
         </div>
       </footer>
     </div>

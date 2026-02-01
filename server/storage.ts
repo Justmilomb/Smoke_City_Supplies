@@ -37,6 +37,7 @@ export interface IStorage {
   createOrder(input: CreateOrderInput): Promise<ApiOrder>;
   listOrders(): Promise<ApiOrder[]>;
   getOrder(id: string): Promise<ApiOrder | undefined>;
+  updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined>;
 
   listCategories(): Promise<Category[]>;
   getCategory(id: string): Promise<Category | undefined>;
@@ -263,6 +264,16 @@ export class DbStorage implements IStorage {
     };
   }
 
+  async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
+    const [updated] = await db
+      .update(orders)
+      .set({ status })
+      .where(eq(orders.id, id))
+      .returning();
+    if (!updated) return undefined;
+    return this.getOrder(id);
+  }
+
   async listCategories(): Promise<Category[]> {
     return db.select().from(categoriesTable).orderBy(categoriesTable.name);
   }
@@ -429,6 +440,14 @@ export class MemStorage implements IStorage {
 
   async getOrder(id: string): Promise<ApiOrder | undefined> {
     return this.orders.get(id);
+  }
+
+  async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    const updated = { ...order, status };
+    this.orders.set(id, updated);
+    return updated;
   }
 
   async listCategories(): Promise<Category[]> {

@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: smoke-city-supplies
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build && npm run db:push
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smoke-city-supplies-db
+          property: connectionString
+    healthCheckPath: /health
+
+databases:
+  - name: smoke-city-supplies-db
+    plan: free
+    databaseName: smoke_city_supplies
+    user: smoke_city_supplies_user

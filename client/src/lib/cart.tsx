@@ -19,7 +19,7 @@ type CartActions = {
   clear: () => void;
 };
 
-const CART_KEY = "swiftparts-cart";
+const CART_KEY = "smoke-city-supplies-cart";
 
 function loadCart(): CartItem[] {
   try {

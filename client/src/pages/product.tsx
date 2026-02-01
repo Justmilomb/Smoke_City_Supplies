@@ -96,7 +96,7 @@ export default function ProductPage() {
               </div>
 
               <div data-testid="text-product-price" className="text-2xl font-semibold tabular-nums">
-                £{part.price.toFixed(2)}
+                ${part.price.toFixed(2)}
               </div>
 
               <div className="mt-1 flex flex-col gap-2 sm:flex-row">

@@ -30,13 +30,13 @@ export default function ProductCard({ part }: { part: Part }) {
         data-testid={`card-product-${part.id}`}
         className="group block rounded-2xl focus-visible:outline-none"
       >
-        <Card className="glass overflow-hidden rounded-2xl border-border/70 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-md">
-          <div className="relative aspect-square bg-[hsl(var(--muted))]">
+        <Card className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-shadow duration-200 group-hover:shadow-md">
+          <div className="relative aspect-square bg-muted/40">
             <img
               data-testid={`img-product-${part.id}`}
               src={getProductImage(part)}
               alt={part.name}
-              className="h-full w-full object-contain p-6 transition-transform duration-300 group-hover:scale-[1.03]"
+              className="h-full w-full object-contain p-6 transition-transform duration-300 group-hover:scale-[1.02]"
             />
             <div className="absolute left-3 top-3 flex gap-2">
               <Badge
@@ -56,7 +56,7 @@ export default function ProductCard({ part }: { part: Part }) {
             </div>
           </div>
 
-          <div className="p-5">
+          <div className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div
@@ -73,7 +73,7 @@ export default function ProductCard({ part }: { part: Part }) {
                 data-testid={`text-product-price-${part.id}`}
                 className="text-sm font-semibold tabular-nums"
               >
-                £{part.price.toFixed(2)}
+                ${part.price.toFixed(2)}
               </div>
             </div>
 

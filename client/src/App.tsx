@@ -11,6 +11,9 @@ import StoreHome from "@/pages/store-home";
 import CatalogPage from "@/pages/catalog";
 import ProductPage from "@/pages/product";
 import CartPage from "@/pages/cart";
+import ShippingPage from "@/pages/shipping";
+import ReturnsPage from "@/pages/returns";
+import ContactPage from "@/pages/contact";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin";
 import AdminNewPart from "@/pages/admin-new-part";
@@ -26,6 +29,9 @@ function Router() {
       <Route path="/catalog" component={CatalogPage} />
       <Route path="/product/:id" component={ProductPage} />
       <Route path="/cart" component={CartPage} />
+      <Route path="/shipping" component={ShippingPage} />
+      <Route path="/returns" component={ReturnsPage} />
+      <Route path="/contact" component={ContactPage} />
 
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin" component={withAdminGuard(AdminDashboard)} />

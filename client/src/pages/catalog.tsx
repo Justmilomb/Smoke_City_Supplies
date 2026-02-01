@@ -56,19 +56,19 @@ export default function CatalogPage() {
 
   return (
     <SiteLayout>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-10">
         <div>
           <h1 data-testid="text-catalog-title" className="font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
             Shop parts
           </h1>
-          <p data-testid="text-catalog-subtitle" className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          <p data-testid="text-catalog-subtitle" className="mt-3 text-sm leading-relaxed text-muted-foreground">
             Filter by vehicle and category. If you’re not sure what something means, check the mini-dictionary.
           </p>
         </div>
 
         <FiltersBar categories={cats} value={filters} onChange={setFilters} />
 
-        <Card className="glass rounded-3xl p-6">
+        <Card className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -133,13 +133,13 @@ export default function CatalogPage() {
           </div>
         </Card>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-2">
           <div data-testid="text-results-count" className="text-sm text-muted-foreground">
             Showing <span className="font-medium text-foreground">{visible.length}</span> items
           </div>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((p) => (
             <ProductCard key={p.id} part={p} />
           ))}

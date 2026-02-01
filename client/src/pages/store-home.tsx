@@ -23,7 +23,7 @@ export default function StoreHome() {
 
   return (
     <SiteLayout>
-      <section className="relative overflow-hidden rounded-[28px] border border-border/70 bg-[hsl(var(--card))] shadow-sm">
+      <section className="relative overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
         <img
           data-testid="img-hero"
           src={heroBg}
@@ -37,7 +37,7 @@ export default function StoreHome() {
               "linear-gradient(90deg, rgba(5,10,20,.85) 0%, rgba(5,10,20,.62) 40%, rgba(5,10,20,.08) 78%, rgba(5,10,20,0) 100%)",
           }}
         />
-        <div className="relative grid gap-10 p-8 md:grid-cols-12 md:p-12">
+        <div className="relative grid gap-12 p-8 md:grid-cols-12 md:p-12 lg:p-16">
           <div className="md:col-span-7">
             <Badge
               data-testid="badge-hero"
@@ -81,42 +81,42 @@ export default function StoreHome() {
               </Link>
             </div>
 
-            <div className="mt-7 grid gap-3 sm:grid-cols-3">
-              <div className="glass rounded-2xl border-white/10 bg-white/5 p-4 text-white">
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur-sm">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Truck className="h-4 w-4" /> Fast delivery
                 </div>
-                <div className="mt-1 text-xs text-white/70">
+                <div className="mt-2 text-xs text-white/70">
                   Next-day on best sellers
                 </div>
               </div>
-              <div className="glass rounded-2xl border-white/10 bg-white/5 p-4 text-white">
+              <div className="rounded-2xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur-sm">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Headphones className="h-4 w-4" /> Great support
                 </div>
-                <div className="mt-1 text-xs text-white/70">Chat-style help pages</div>
+                <div className="mt-2 text-xs text-white/70">Chat-style help pages</div>
               </div>
-              <div className="glass rounded-2xl border-white/10 bg-white/5 p-4 text-white">
+              <div className="rounded-2xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur-sm">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <PackageCheck className="h-4 w-4" /> Easy returns
                 </div>
-                <div className="mt-1 text-xs text-white/70">Simple, no stress</div>
+                <div className="mt-2 text-xs text-white/70">Simple, no stress</div>
               </div>
             </div>
           </div>
 
           <div className="md:col-span-5">
-            <Card className="glass overflow-hidden rounded-3xl">
-              <div className="border-b border-border/60 p-5">
+            <Card className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
+              <div className="border-b border-border/60 p-6">
                 <div className="text-sm font-semibold">Shop by vehicle</div>
-                <div className="mt-1 text-xs text-muted-foreground">
+                <div className="mt-2 text-xs text-muted-foreground">
                   Start simple—pick what you ride.
                 </div>
               </div>
-              <div className="grid gap-3 p-5">
+              <div className="grid gap-4 p-6">
                 <Link href="/catalog?vehicle=bike">
                   <a data-testid="link-shop-bike" className="block">
-                    <div className="group flex items-center justify-between rounded-2xl border border-border/70 bg-background/70 p-4 transition hover:bg-[hsl(var(--muted))]">
+                    <div className="group flex items-center justify-between rounded-2xl border border-border/60 bg-muted/30 p-4 transition hover:bg-muted/50">
                       <div className="flex items-center gap-3">
                         <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
                           <Bike className="h-5 w-5" />
@@ -135,7 +135,7 @@ export default function StoreHome() {
 
                 <Link href="/catalog?vehicle=scooter">
                   <a data-testid="link-shop-scooter" className="block">
-                    <div className="group flex items-center justify-between rounded-2xl border border-border/70 bg-background/70 p-4 transition hover:bg-[hsl(var(--muted))]">
+                    <div className="group flex items-center justify-between rounded-2xl border border-border/60 bg-muted/30 p-4 transition hover:bg-muted/50">
                       <div className="flex items-center gap-3">
                         <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[hsl(var(--accent))]/12 text-[hsl(var(--accent))]">
                           <Gauge className="h-5 w-5" />
@@ -157,7 +157,7 @@ export default function StoreHome() {
         </div>
       </section>
 
-      <section className="mt-12">
+      <section className="mt-16">
         <div className="flex items-end justify-between gap-4">
           <div>
             <h2
@@ -168,7 +168,7 @@ export default function StoreHome() {
             </h2>
             <p
               data-testid="text-featured-subtitle"
-              className="mt-1 text-sm text-muted-foreground"
+              className="mt-2 text-sm text-muted-foreground"
             >
               Popular items that ship quickly.
             </p>
@@ -183,7 +183,7 @@ export default function StoreHome() {
           </Link>
         </div>
 
-        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {featured.map((p) => (
             <ProductCard key={p.id} part={p} />
           ))}

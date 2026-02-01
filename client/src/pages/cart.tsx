@@ -74,7 +74,7 @@ export default function CartPage() {
   if (state.items.length === 0 && !orderPlaced) {
     return (
       <SiteLayout>
-        <Card className="glass rounded-3xl p-12 text-center">
+        <Card className="rounded-2xl border border-border/60 bg-card p-12 text-center shadow-sm">
           <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground" />
           <h2 className="mt-4 font-[var(--font-serif)] text-xl font-semibold">
             Your cart is empty
@@ -95,7 +95,7 @@ export default function CartPage() {
   if (orderPlaced) {
     return (
       <SiteLayout>
-        <Card className="glass rounded-3xl p-8 text-center">
+        <Card className="rounded-2xl border border-border/60 bg-card p-8 text-center shadow-sm">
           <h2 className="font-[var(--font-serif)] text-2xl font-semibold text-emerald-600">
             Order confirmed
           </h2>
@@ -126,20 +126,20 @@ export default function CartPage() {
 
   return (
     <SiteLayout>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         <h1 className="font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
           Your cart
         </h1>
 
-        <div className="grid gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid gap-10 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-8">
             {state.items.map((item) => (
               <Card
                 key={item.productId}
-                className="glass rounded-2xl p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6"
+                className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6"
               >
                 <div className="flex flex-1 items-start gap-4 sm:min-w-0">
-                  <div className="h-20 w-20 shrink-0 rounded-xl bg-[hsl(var(--muted))] overflow-hidden sm:h-16 sm:w-16">
+                  <div className="h-20 w-20 shrink-0 rounded-xl bg-muted/50 overflow-hidden sm:h-16 sm:w-16">
                     {item.image ? (
                       <img
                         src={item.image}
@@ -159,7 +159,7 @@ export default function CartPage() {
                       </a>
                     </Link>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      £{item.priceEach.toFixed(2)} each
+                      ${item.priceEach.toFixed(2)} each
                     </p>
                   </div>
                 </div>
@@ -194,7 +194,7 @@ export default function CartPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-semibold tabular-nums">
-                      £{(item.priceEach * item.quantity).toFixed(2)}
+                      ${(item.priceEach * item.quantity).toFixed(2)}
                     </span>
                     <Button
                       variant="ghost"
@@ -211,17 +211,17 @@ export default function CartPage() {
             ))}
           </div>
 
-          <Card className="glass rounded-3xl p-6 h-fit">
+          <Card className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm h-fit">
             <div className="text-base font-semibold">Summary</div>
-            <div className="mt-4 flex justify-between text-sm text-muted-foreground">
+            <div className="mt-5 flex justify-between text-sm text-muted-foreground">
               <span>Subtotal ({state.items.reduce((s, i) => s + i.quantity, 0)} items)</span>
               <span className="tabular-nums font-medium text-foreground">
-                £{total.toFixed(2)}
+                ${total.toFixed(2)}
               </span>
             </div>
-            <div className="mt-4 pt-4 border-t border-border/70 flex justify-between font-semibold text-base">
+            <div className="mt-4 pt-4 border-t border-border/60 flex justify-between font-semibold text-base">
               <span>Total</span>
-              <span className="tabular-nums">£{total.toFixed(2)}</span>
+              <span className="tabular-nums">${total.toFixed(2)}</span>
             </div>
             <Button
               className="mt-6 w-full h-12 rounded-2xl"
@@ -269,7 +269,7 @@ export default function CartPage() {
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              Total: <span className="font-semibold text-foreground">£{total.toFixed(2)}</span>
+              Total: <span className="font-semibold text-foreground">${total.toFixed(2)}</span>
             </div>
           </div>
           <DialogFooter>

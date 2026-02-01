@@ -173,7 +173,7 @@ export default function FiltersBar({
   );
 
   return (
-    <div className="glass rounded-2xl p-4 md:p-3">
+    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm md:p-5">
       <div className="md:hidden">
         <Collapsible>
           <CollapsibleTrigger asChild>

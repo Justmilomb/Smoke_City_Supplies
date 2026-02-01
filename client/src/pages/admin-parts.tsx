@@ -104,7 +104,7 @@ export default function AdminParts() {
                           {p.stock}
                         </Badge>
                       </div>
-                      <div className="mt-2 text-sm font-medium tabular-nums">£{p.price.toFixed(2)}</div>
+                      <div className="mt-2 text-sm font-medium tabular-nums">${p.price.toFixed(2)}</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-4">
@@ -193,7 +193,7 @@ export default function AdminParts() {
                     </TableCell>
                     <TableCell className="text-sm">{p.vehicle}</TableCell>
                     <TableCell className="text-sm">{p.category}</TableCell>
-                    <TableCell className="text-sm tabular-nums">£{p.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm tabular-nums">${p.price.toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge data-testid={`badge-admin-stock-${p.id}`} className={`rounded-full border-0 ${stockTone(p.stock)}`}>
                         {p.stock}
