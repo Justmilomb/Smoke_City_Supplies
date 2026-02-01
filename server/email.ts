@@ -14,7 +14,7 @@ function getTransporter(): Transporter | null {
   if (transporter !== null) return transporter;
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const pass = (process.env.SMTP_PASS ?? "").trim();
   if (!host || !user || !pass) {
     console.warn("[email] SMTP not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS to send emails from admin)");
     return null;
@@ -30,11 +30,34 @@ function getTransporter(): Transporter | null {
     greetingTimeout: 10000,
     socketTimeout: 15000,
   });
+  console.log("[email] SMTP configured for", user);
   return transporter;
 }
 
 export function isEmailConfigured(): boolean {
   return getTransporter() !== null;
+}
+
+const VERIFY_TIMEOUT_MS = 5000;
+
+/** Verify SMTP connection (for admin diagnostics). Returns verified and optional error. */
+export async function verifyEmailConnection(): Promise<{ verified: boolean; error?: string }> {
+  const transport = getTransporter();
+  if (!transport) {
+    return { verified: false, error: "SMTP not configured" };
+  }
+  try {
+    await Promise.race([
+      transport.verify(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Verify timeout")), VERIFY_TIMEOUT_MS)
+      ),
+    ]);
+    return { verified: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { verified: false, error: message };
+  }
 }
 
 const EMAIL_TIMEOUT_MS = 15000;
@@ -47,7 +70,10 @@ export async function sendEmail(options: {
   replyTo?: string;
 }): Promise<boolean> {
   const transport = getTransporter();
-  if (!transport) return false;
+  if (!transport) {
+    console.warn("[email] Email skipped: SMTP not configured.");
+    return false;
+  }
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@smokecitysupplies.com";
   try {
     await Promise.race([
@@ -64,8 +90,10 @@ export async function sendEmail(options: {
       ),
     ]);
     return true;
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("[email] Send failed:", err);
+    const res = err && typeof err === "object" && "response" in err ? (err as { response?: string }).response : undefined;
+    if (res) console.error("[email] Server response:", res);
     return false;
   }
 }

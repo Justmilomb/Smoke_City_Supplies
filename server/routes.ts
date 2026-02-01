@@ -37,7 +37,7 @@ import {
   sanitizeProductInput,
   sanitizeCategoryInput,
 } from "./validation";
-import { sendReplyToCustomer, sendNewEnquiryNotificationToSeller } from "./email";
+import { sendReplyToCustomer, sendNewEnquiryNotificationToSeller, isEmailConfigured, verifyEmailConnection } from "./email";
 import {
   authRateLimiter,
   contactRateLimiter,
@@ -131,13 +131,31 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
         message,
       });
       // Notify seller in background so a slow/hanging SMTP doesn't block the response
-      sendNewEnquiryNotificationToSeller(submission).catch((err) =>
-        console.error("[contact] Notification email failed:", err)
-      );
+      sendNewEnquiryNotificationToSeller(submission)
+        .then((sent) => {
+          if (!sent) console.warn("[contact] Notification email not sent (SMTP not configured or send failed).");
+        })
+        .catch((err) => console.error("[contact] Notification email failed:", err));
       return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
     } catch (err) {
       console.error("[contact]", err);
       return res.status(500).json({ message: "Failed to save your message. Please try again or email us directly." });
+    }
+  });
+
+  // Admin: email status (configured + optional verify)
+  app.get("/api/email-status", requireAuth, async (_req, res) => {
+    try {
+      const configured = isEmailConfigured();
+      const result = await verifyEmailConnection();
+      return res.json({
+        configured,
+        verified: result.verified,
+        ...(result.error && { error: result.error }),
+      });
+    } catch (err) {
+      console.error("[email-status]", err);
+      return res.status(500).json({ message: "Failed to check email status" });
     }
   });
 
