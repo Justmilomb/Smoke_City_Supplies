@@ -37,6 +37,7 @@ export interface IStorage {
   createOrder(input: CreateOrderInput): Promise<ApiOrder>;
   listOrders(): Promise<ApiOrder[]>;
   getOrder(id: string): Promise<ApiOrder | undefined>;
+  getOrderByStripeSessionId(sessionId: string): Promise<ApiOrder | undefined>;
   updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined>;
 
   listCategories(): Promise<Category[]>;
@@ -171,7 +172,7 @@ export class DbStorage implements IStorage {
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid order");
-    const { items, customerEmail, customerName } = parsed.data;
+    const { items, customerEmail, customerName, stripeSessionId, stripePaymentIntentId, paymentStatus } = parsed.data;
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
@@ -186,6 +187,9 @@ export class DbStorage implements IStorage {
       totalPence,
       customerEmail: customerEmail ?? null,
       customerName: customerName ?? null,
+      stripeSessionId: stripeSessionId ?? null,
+      stripePaymentIntentId: stripePaymentIntentId ?? null,
+      paymentStatus: paymentStatus ?? "pending",
     });
 
     const orderItemsToInsert = items.map((i) => ({
@@ -221,6 +225,9 @@ export class DbStorage implements IStorage {
       items: apiItems,
       customerEmail,
       customerName,
+      stripeSessionId: stripeSessionId ?? undefined,
+      stripePaymentIntentId: stripePaymentIntentId ?? undefined,
+      paymentStatus: paymentStatus ?? "pending",
     };
   }
 
@@ -247,6 +254,9 @@ export class DbStorage implements IStorage {
         items,
         customerEmail: order.customerEmail ?? undefined,
         customerName: order.customerName ?? undefined,
+        stripeSessionId: order.stripeSessionId ?? undefined,
+        stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
+        paymentStatus: order.paymentStatus ?? undefined,
       });
     }
 
@@ -274,7 +284,20 @@ export class DbStorage implements IStorage {
       items,
       customerEmail: order.customerEmail ?? undefined,
       customerName: order.customerName ?? undefined,
+      stripeSessionId: order.stripeSessionId ?? undefined,
+      stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
+      paymentStatus: order.paymentStatus ?? undefined,
     };
+  }
+
+  async getOrderByStripeSessionId(sessionId: string): Promise<ApiOrder | undefined> {
+    const [order] = await this.getDb()
+      .select()
+      .from(orders)
+      .where(eq(orders.stripeSessionId, sessionId))
+      .limit(1);
+    if (!order) return undefined;
+    return this.getOrder(order.id);
   }
 
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
@@ -415,7 +438,7 @@ export class MemStorage implements IStorage {
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid order");
-    const { items, customerEmail, customerName } = parsed.data;
+    const { items, customerEmail, customerName, stripeSessionId, stripePaymentIntentId, paymentStatus } = parsed.data;
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
@@ -436,6 +459,9 @@ export class MemStorage implements IStorage {
       items: apiItems,
       customerEmail,
       customerName,
+      stripeSessionId: stripeSessionId ?? undefined,
+      stripePaymentIntentId: stripePaymentIntentId ?? undefined,
+      paymentStatus: paymentStatus ?? "pending",
     };
 
     for (const item of items) {
@@ -457,6 +483,10 @@ export class MemStorage implements IStorage {
 
   async getOrder(id: string): Promise<ApiOrder | undefined> {
     return this.orders.get(id);
+  }
+
+  async getOrderByStripeSessionId(sessionId: string): Promise<ApiOrder | undefined> {
+    return Array.from(this.orders.values()).find((o) => o.stripeSessionId === sessionId);
   }
 
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {

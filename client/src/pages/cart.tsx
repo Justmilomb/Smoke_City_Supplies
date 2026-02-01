@@ -1,39 +1,18 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
-import { Minus, Plus, ShoppingBag, Trash2, CheckCircle2 } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Trash2, Lock } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 const API_BASE = "/api";
 
 export default function CartPage() {
   const { state, actions } = useCart();
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [placingOrder, setPlacingOrder] = useState(false);
-  const [orderPlaced, setOrderPlaced] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [addressLine1, setAddressLine1] = useState("");
-  const [addressLine2, setAddressLine2] = useState("");
-  const [city, setCity] = useState("");
-  const [county, setCounty] = useState("");
-  const [postcode, setPostcode] = useState("");
-  const [sameAsBilling, setSameAsBilling] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
 
   const total = state.items.reduce(
     (sum, i) => sum + i.priceEach * i.quantity,
@@ -45,9 +24,9 @@ export default function CartPage() {
       toast.error("Your cart is empty");
       return;
     }
-    setPlacingOrder(true);
+    setRedirecting(true);
     try {
-      const res = await fetch(`${API_BASE}/orders`, {
+      const res = await fetch(`${API_BASE}/checkout/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -57,28 +36,26 @@ export default function CartPage() {
             quantity: i.quantity,
             priceEach: i.priceEach,
           })),
-          customerEmail: email || undefined,
-          customerName: name || undefined,
+          customerEmail: undefined,
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || "Checkout failed");
       }
-      const order = await res.json();
-      setOrderId(order.id);
-      actions.clear();
-      setOrderPlaced(true);
-      setCheckoutOpen(false);
-      toast.success("Order placed successfully!");
+      const { url } = await res.json();
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      throw new Error("No checkout URL returned");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Checkout failed");
-    } finally {
-      setPlacingOrder(false);
+      setRedirecting(false);
     }
   };
 
-  if (state.items.length === 0 && !orderPlaced) {
+  if (state.items.length === 0) {
     return (
       <SiteLayout>
         <Card className="border-border/50 p-16 text-center">
@@ -92,43 +69,6 @@ export default function CartPage() {
               <a>Browse Products</a>
             </Button>
           </Link>
-        </Card>
-      </SiteLayout>
-    );
-  }
-
-  if (orderPlaced) {
-    return (
-      <SiteLayout>
-        <Card className="border-border/50 p-12 text-center max-w-2xl mx-auto">
-          <div className="mb-6 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              <CheckCircle2 className="h-8 w-8" />
-            </div>
-          </div>
-          <h2 className="text-3xl font-bold mb-2 text-emerald-600">
-            Order Confirmed!
-          </h2>
-          {orderId && (
-            <p className="text-muted-foreground mb-4">
-              Order ID: <span className="font-mono font-semibold">{orderId}</span>
-            </p>
-          )}
-          <p className="text-muted-foreground mb-8">
-            Thank you for your order. We'll send you a confirmation email shortly and ship your items as soon as possible.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/store">
-              <Button variant="outline" size="lg" asChild>
-                <a>Continue Shopping</a>
-              </Button>
-            </Link>
-            <Link href="/">
-              <Button size="lg" asChild>
-                <a>Back to Home</a>
-              </Button>
-            </Link>
-          </div>
         </Card>
       </SiteLayout>
     );
@@ -254,12 +194,17 @@ export default function CartPage() {
               </div>
             </div>
             <Button
-              className="w-full h-12 text-base"
+              className="w-full h-12 text-base bg-primary hover:bg-primary/90"
               size="lg"
-              onClick={() => setCheckoutOpen(true)}
+              onClick={handleCheckout}
+              disabled={redirecting}
             >
-              Proceed to Checkout
+              <Lock className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+              {redirecting ? "Redirecting…" : "Secure Checkout"}
             </Button>
+            <p className="text-xs text-center text-muted-foreground mt-2">
+              Payment secured by Stripe
+            </p>
             <Link href="/store">
               <Button variant="outline" className="mt-3 w-full" asChild>
                 <a>Continue Shopping</a>
@@ -268,133 +213,6 @@ export default function CartPage() {
           </Card>
         </div>
       </div>
-
-      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Checkout</DialogTitle>
-            <DialogDescription>
-              Enter your UK delivery details. Payment integration coming soon.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="checkout-name">Full name</Label>
-                <Input
-                  id="checkout-name"
-                  placeholder="Your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="rounded-lg"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="checkout-email">Email</Label>
-                <Input
-                  id="checkout-email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-lg"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="checkout-address1">Address line 1</Label>
-              <Input
-                id="checkout-address1"
-                placeholder="House number and street"
-                value={addressLine1}
-                onChange={(e) => setAddressLine1(e.target.value)}
-                className="rounded-lg"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="checkout-address2">Address line 2 (optional)</Label>
-              <Input
-                id="checkout-address2"
-                placeholder="Flat, building, etc."
-                value={addressLine2}
-                onChange={(e) => setAddressLine2(e.target.value)}
-                className="rounded-lg"
-              />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="checkout-city">City</Label>
-                <Input
-                  id="checkout-city"
-                  placeholder="City"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="rounded-lg"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="checkout-county">County</Label>
-                <Input
-                  id="checkout-county"
-                  placeholder="County"
-                  value={county}
-                  onChange={(e) => setCounty(e.target.value)}
-                  className="rounded-lg"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="checkout-postcode">Postcode</Label>
-              <Input
-                id="checkout-postcode"
-                placeholder="e.g. M1 1AA"
-                value={postcode}
-                onChange={(e) => setPostcode(e.target.value)}
-                className="rounded-lg max-w-[140px]"
-              />
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={sameAsBilling}
-                onChange={(e) => setSameAsBilling(e.target.checked)}
-                className="rounded border-border"
-              />
-              <span className="text-sm">Billing address same as delivery</span>
-            </label>
-            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                Payment integration coming soon
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                You can place an order to reserve items. We will contact you to arrange payment and delivery.
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Order total</span>
-                <span className="font-semibold">£{total.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setCheckoutOpen(false)}
-              className="rounded-lg"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="rounded-lg"
-              onClick={handleCheckout}
-              disabled={state.items.length === 0 || placingOrder}
-            >
-              {placingOrder ? "Processing…" : "Place Order"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </SiteLayout>
   );
 }

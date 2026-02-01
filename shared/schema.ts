@@ -103,6 +103,9 @@ export const orders = pgTable("orders", {
   totalPence: integer("total_pence").notNull(),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
+  stripeSessionId: text("stripe_session_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("pending"), // "pending" | "paid" | "failed"
 });
 
 export const createOrderSchema = z.object({
@@ -114,8 +117,15 @@ export const createOrderSchema = z.object({
   })),
   customerEmail: z.string().email().optional(),
   customerName: z.string().optional(),
+  stripeSessionId: z.string().optional(),
+  stripePaymentIntentId: z.string().optional(),
+  paymentStatus: z.enum(["pending", "paid", "failed"]).optional(),
+});
+export const createOrderWithSessionSchema = z.object({
+  sessionId: z.string().min(1),
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type CreateOrderWithSessionInput = z.infer<typeof createOrderWithSessionSchema>;
 
 // API shape for product (matches client Part + quantity)
 export type ApiProduct = {
@@ -155,4 +165,7 @@ export type ApiOrder = {
   items: ApiOrderItem[];
   customerEmail?: string;
   customerName?: string;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
+  paymentStatus?: string;
 };

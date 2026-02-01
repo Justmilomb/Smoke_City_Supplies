@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import {
   createOrderSchema,
+  createOrderWithSessionSchema,
   insertCategorySchema,
   insertProductSchema,
   type ApiProduct,
@@ -10,6 +11,7 @@ import {
   type InsertProduct,
 } from "@shared/schema";
 import { storage } from "./storage";
+import { stripe } from "./stripe";
 import { uploadMiddleware } from "./upload";
 import { requireAuth } from "./auth";
 import { seedAdminIfNeeded, seedCategoriesIfNeeded } from "./seedAdmin";
@@ -175,8 +177,110 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     return res.status(204).send();
   });
 
-  // Orders
+  // Checkout session (Stripe)
+  const checkoutSessionSchema = createOrderSchema.pick({
+    items: true,
+    customerEmail: true,
+  });
+  app.post("/api/checkout/session", orderRateLimiter, async (req, res) => {
+    if (!stripe) {
+      return res.status(503).json({ message: "Stripe is not configured" });
+    }
+    const parsed = checkoutSessionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid checkout data", errors: parsed.error.flatten() });
+    }
+    const { items, customerEmail } = parsed.data;
+    if (!items.length) {
+      return res.status(400).json({ message: "Cart is empty" });
+    }
+    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: items.map((i) => ({
+          price_data: {
+            currency: "gbp",
+            unit_amount: Math.round(i.priceEach * 100),
+            product_data: {
+              name: i.productName,
+              images: [],
+              metadata: { productId: i.productId },
+            },
+          },
+          quantity: i.quantity,
+        })),
+        success_url: `${base}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${base}/cart`,
+        customer_email: customerEmail ?? undefined,
+      });
+      const url = session.url;
+      if (!url) {
+        return res.status(500).json({ message: "Failed to create checkout session" });
+      }
+      return res.status(201).json({ sessionId: session.id, url });
+    } catch (err) {
+      console.error("[checkout/session]", err);
+      return res.status(500).json({ message: "Checkout session failed" });
+    }
+  });
+
+  // Orders (create with items, or with Stripe sessionId after payment)
   app.post("/api/orders", orderRateLimiter, async (req, res) => {
+    const withSession = createOrderWithSessionSchema.safeParse(req.body);
+    if (withSession.success) {
+      const { sessionId } = withSession.data;
+      if (!stripe) {
+        return res.status(503).json({ message: "Stripe is not configured" });
+      }
+      try {
+        const existing = await storage.getOrderByStripeSessionId(sessionId);
+        if (existing) {
+          return res.status(201).json(existing);
+        }
+        const session = await stripe.checkout.sessions.retrieve(sessionId, {
+          expand: ["line_items", "line_items.data.price.product"],
+        });
+        if (session.payment_status !== "paid") {
+          return res.status(400).json({ message: "Payment not completed" });
+        }
+        const lineItems = session.line_items?.data ?? [];
+        const items = lineItems
+          .filter((li) => li.price && li.quantity != null)
+          .map((li) => {
+            const product = li.price?.product;
+            const meta = product && typeof product === "object" && "metadata" in product
+              ? (product as { metadata?: { productId?: string } }).metadata
+              : undefined;
+            const productId = meta?.productId ?? (typeof product === "string" ? product : "") ?? "";
+            return {
+              productId,
+              productName: li.description ?? "Item",
+              quantity: li.quantity ?? 1,
+              priceEach: (li.price?.unit_amount ?? 0) / 100,
+            };
+          })
+          .filter((i) => i.productId.length > 0);
+        if (items.length === 0) {
+          return res.status(400).json({ message: "No line items in session" });
+        }
+        const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+        const input: CreateOrderInput = {
+          items,
+          customerEmail: session.customer_email ?? session.customer_details?.email ?? undefined,
+          customerName: session.customer_details?.name ?? undefined,
+          stripeSessionId: session.id,
+          stripePaymentIntentId: paymentIntentId ?? undefined,
+          paymentStatus: "paid",
+        };
+        const order = await storage.createOrder(input);
+        return res.status(201).json(order);
+      } catch (err) {
+        console.error("[orders from session]", err);
+        return res.status(400).json({ message: "Invalid or already used session" });
+      }
+    }
+
     const parsed = createOrderSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "Invalid order", errors: parsed.error.flatten() });

@@ -14,6 +14,10 @@ services:
         fromDatabase:
           name: smoke-city-supplies-db
           property: connectionString
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: VITE_STRIPE_PUBLISHABLE_KEY
+        sync: false
     healthCheckPath: /health
 
 databases:

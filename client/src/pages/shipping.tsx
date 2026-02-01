@@ -23,7 +23,7 @@ export default function ShippingPage() {
               Fast, reliable shipping to get your parts to you quickly
             </p>
             <p className="mt-3 text-sm text-muted-foreground max-w-2xl">
-              We ship motorcycle parts across the UK. Delivery times and options depend on your location and the items you order. All prices include UK delivery unless stated otherwise.
+              We ship motorcycle parts across the UK. Payment at checkout is secure and powered by Stripe. Delivery times and options depend on your location and the items you order. All prices include UK delivery unless stated otherwise.
             </p>
           </div>
           <BackButton fallback="/" />
