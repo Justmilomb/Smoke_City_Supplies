@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Package, FolderTree, Plus, ShoppingBag, Menu, Printer } from "lucide-react";
+import { LayoutDashboard, Package, FolderTree, Plus, ShoppingBag, Menu, Printer, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -14,6 +14,7 @@ const adminNavItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders & labels", icon: ShoppingBag },
   { href: "/admin/orders/labels", label: "Print labels", icon: Printer },
+  { href: "/admin/enquiries", label: "Enquiries", icon: Mail },
   { href: "/admin/parts", label: "Products", icon: Package },
   { href: "/admin/categories", label: "Categories", icon: FolderTree },
   { href: "/admin/new", label: "Add product", icon: Plus },

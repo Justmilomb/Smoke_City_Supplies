@@ -211,3 +211,33 @@ export type ApiOrder = {
   shippedAt?: string;
   deliveredAt?: string;
 };
+
+// Contact form submissions (enquiries) — saved to DB, admin can reply from panel or from their email
+export const contactSubmissions = pgTable("contact_submissions", {
+  id: varchar("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  subject: text("subject"),
+  partNumber: text("part_number"),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("new"), // "new" | "replied"
+  replyBody: text("reply_body"),
+  repliedAt: text("replied_at"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ContactSubmission = typeof contactSubmissions.$inferSelect;
+export type ApiContactSubmission = {
+  id: string;
+  name: string;
+  email: string;
+  subject?: string;
+  partNumber?: string;
+  message: string;
+  status: string;
+  replyBody?: string;
+  repliedAt?: string;
+  adminNotes?: string;
+  createdAt: string;
+};

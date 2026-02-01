@@ -31,11 +31,13 @@ import { runSeedParts } from "./seedParts";
 import passport from "passport";
 import {
   contactFormSchema,
+  contactReplySchema,
   orderPatchSchema,
   orderStatusSchema,
   sanitizeProductInput,
   sanitizeCategoryInput,
 } from "./validation";
+import { sendReplyToCustomer, sendNewEnquiryNotificationToSeller } from "./email";
 import {
   authRateLimiter,
   contactRateLimiter,
@@ -108,8 +110,8 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     });
   });
 
-  // Contact form (public) - with rate limiting and validation
-  app.post("/api/contact", contactRateLimiter, (req, res) => {
+  // Contact form (public) - save to DB, optional notify seller
+  app.post("/api/contact", contactRateLimiter, async (req, res) => {
     const parsed = contactFormSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -117,9 +119,70 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
         errors: parsed.error.flatten().fieldErrors,
       });
     }
-    const { name, email, subject, message } = parsed.data;
-    console.log("[contact]", { name, email, subject: subject ?? "(no subject)", message });
-    return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
+    const { name, email, subject, partNumber, message } = parsed.data;
+    try {
+      const submission = await storage.createContactSubmission({
+        name,
+        email,
+        subject: subject ?? undefined,
+        partNumber: partNumber ?? undefined,
+        message,
+      });
+      // Optional: email seller so they can reply from Gmail/Outlook
+      await sendNewEnquiryNotificationToSeller(submission).catch(() => {});
+      return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
+    } catch (err) {
+      console.error("[contact]", err);
+      return res.status(500).json({ message: "Failed to save your message. Please try again or email us directly." });
+    }
+  });
+
+  // Admin: list contact submissions (enquiries)
+  app.get("/api/contact-submissions", requireAuth, async (_req, res) => {
+    try {
+      const list = await storage.listContactSubmissions();
+      return res.json(list);
+    } catch (err) {
+      console.error("[contact-submissions]", err);
+      return res.status(500).json({ message: "Failed to load enquiries" });
+    }
+  });
+
+  // Admin: get one submission
+  app.get("/api/contact-submissions/:id", requireAuth, async (req, res) => {
+    const id = paramId(req);
+    const submission = await storage.getContactSubmission(id);
+    if (!submission) return res.status(404).json({ message: "Enquiry not found" });
+    return res.json(submission);
+  });
+
+  // Admin: send reply (email customer and mark as replied)
+  app.post("/api/contact-submissions/:id/reply", requireAuth, apiRateLimiter, async (req, res) => {
+    const id = paramId(req);
+    const parsed = contactReplySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Invalid reply",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+    }
+    const submission = await storage.getContactSubmission(id);
+    if (!submission) return res.status(404).json({ message: "Enquiry not found" });
+    const { replyBody } = parsed.data;
+    const sent = await sendReplyToCustomer(submission, replyBody);
+    const now = new Date().toISOString();
+    await storage.updateContactSubmission(id, {
+      status: "replied",
+      replyBody,
+      repliedAt: now,
+    });
+    if (!sent) {
+      return res.status(200).json({
+        ok: true,
+        message: "Reply saved. Email not sent (SMTP not configured). Reply from your email: " + submission.email,
+      });
+    }
+    return res.json({ ok: true, message: "Reply sent to " + submission.email });
   });
 
   // Image upload (camera or file) – admin only; stored in DB as base64 for persistence on Render

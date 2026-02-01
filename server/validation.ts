@@ -33,8 +33,14 @@ export function sanitizeUrl(input: string | undefined | null): string {
 export const contactFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name too long").transform(sanitizeString),
   email: z.string().email("Invalid email").transform(sanitizeEmail),
-  subject: z.string().max(200, "Subject too long").optional().transform((val) => sanitizeString(val)),
+  subject: z.string().max(200, "Subject too long").optional().transform((val) => sanitizeString(val ?? "")),
+  partNumber: z.string().max(100, "Part number too long").optional().transform((val) => sanitizeString(val ?? "")),
   message: z.string().min(10, "Message must be at least 10 characters").max(5000, "Message too long").transform(sanitizeString),
+});
+
+// Admin reply to contact submission
+export const contactReplySchema = z.object({
+  replyBody: z.string().min(1, "Reply is required").max(10000, "Reply too long").transform(sanitizeString),
 });
 
 // Order status schema (legacy, single field)

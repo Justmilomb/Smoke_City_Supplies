@@ -1,4 +1,5 @@
 import type {
+  ApiContactSubmission,
   ApiOrder,
   ApiOrderItem,
   ApiProduct,
@@ -11,6 +12,7 @@ import type {
 } from "@shared/schema";
 import {
   categories as categoriesTable,
+  contactSubmissions as contactSubmissionsTable,
   createOrderSchema,
   images as imagesTable,
   orderItems,
@@ -61,6 +63,11 @@ export interface IStorage {
 
   getSeedState(key: string): Promise<string | undefined>;
   setSeedState(key: string, value: string): Promise<void>;
+
+  createContactSubmission(data: { name: string; email: string; subject?: string; partNumber?: string; message: string }): Promise<ApiContactSubmission>;
+  listContactSubmissions(): Promise<ApiContactSubmission[]>;
+  getContactSubmission(id: string): Promise<ApiContactSubmission | undefined>;
+  updateContactSubmission(id: string, patch: { status?: string; replyBody?: string; repliedAt?: string; adminNotes?: string }): Promise<ApiContactSubmission | undefined>;
 }
 
 function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
@@ -478,6 +485,76 @@ export class DbStorage implements IStorage {
     await this.getDb().delete(categoriesTable).where(eq(categoriesTable.id, id));
     return true;
   }
+
+  private rowToApiContactSubmission(row: typeof contactSubmissionsTable.$inferSelect): ApiContactSubmission {
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      subject: row.subject ?? undefined,
+      partNumber: row.partNumber ?? undefined,
+      message: row.message,
+      status: row.status,
+      replyBody: row.replyBody ?? undefined,
+      repliedAt: row.repliedAt ?? undefined,
+      adminNotes: row.adminNotes ?? undefined,
+      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+    };
+  }
+
+  async createContactSubmission(data: { name: string; email: string; subject?: string; partNumber?: string; message: string }): Promise<ApiContactSubmission> {
+    const id = randomUUID();
+    const [row] = await this.getDb()
+      .insert(contactSubmissionsTable)
+      .values({
+        id,
+        name: data.name,
+        email: data.email,
+        subject: data.subject ?? null,
+        partNumber: data.partNumber ?? null,
+        message: data.message,
+      })
+      .returning();
+    if (!row) throw new Error("Failed to create contact submission");
+    return this.rowToApiContactSubmission(row);
+  }
+
+  async listContactSubmissions(): Promise<ApiContactSubmission[]> {
+    const rows = await this.getDb()
+      .select()
+      .from(contactSubmissionsTable)
+      .orderBy(desc(contactSubmissionsTable.createdAt));
+    return rows.map((r) => this.rowToApiContactSubmission(r));
+  }
+
+  async getContactSubmission(id: string): Promise<ApiContactSubmission | undefined> {
+    const [row] = await this.getDb()
+      .select()
+      .from(contactSubmissionsTable)
+      .where(eq(contactSubmissionsTable.id, id))
+      .limit(1);
+    if (!row) return undefined;
+    return this.rowToApiContactSubmission(row);
+  }
+
+  async updateContactSubmission(
+    id: string,
+    patch: { status?: string; replyBody?: string; repliedAt?: string; adminNotes?: string }
+  ): Promise<ApiContactSubmission | undefined> {
+    const set: Record<string, unknown> = {};
+    if (patch.status !== undefined) set.status = patch.status;
+    if (patch.replyBody !== undefined) set.replyBody = patch.replyBody ?? null;
+    if (patch.repliedAt !== undefined) set.repliedAt = patch.repliedAt ?? null;
+    if (patch.adminNotes !== undefined) set.adminNotes = patch.adminNotes ?? null;
+    if (Object.keys(set).length === 0) return this.getContactSubmission(id);
+    const [row] = await this.getDb()
+      .update(contactSubmissionsTable)
+      .set(set)
+      .where(eq(contactSubmissionsTable.id, id))
+      .returning();
+    if (!row) return undefined;
+    return this.rowToApiContactSubmission(row);
+  }
 }
 
 // In-memory storage for local dev when DATABASE_URL is not set
@@ -488,6 +565,7 @@ export class MemStorage implements IStorage {
   private categories = new Map<string, Category>();
   private images = new Map<string, { data: string; mimeType: string }>();
   private pendingPayments = new Map<string, { items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }>();
+  private contactSubmissions = new Map<string, ApiContactSubmission>();
 
   constructor() {
     seedProducts.forEach((p) => this.products.set(p.id, { ...p }));
@@ -714,6 +792,46 @@ export class MemStorage implements IStorage {
 
   async setSeedState(key: string, value: string): Promise<void> {
     this.seedState.set(key, value);
+  }
+
+  async createContactSubmission(data: { name: string; email: string; subject?: string; partNumber?: string; message: string }): Promise<ApiContactSubmission> {
+    const id = `cs_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`;
+    const submission: ApiContactSubmission = {
+      id,
+      name: data.name,
+      email: data.email,
+      subject: data.subject,
+      partNumber: data.partNumber,
+      message: data.message,
+      status: "new",
+      createdAt: new Date().toISOString(),
+    };
+    this.contactSubmissions.set(id, submission);
+    return submission;
+  }
+
+  async listContactSubmissions(): Promise<ApiContactSubmission[]> {
+    return Array.from(this.contactSubmissions.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  async getContactSubmission(id: string): Promise<ApiContactSubmission | undefined> {
+    return this.contactSubmissions.get(id);
+  }
+
+  async updateContactSubmission(
+    id: string,
+    patch: { status?: string; replyBody?: string; repliedAt?: string; adminNotes?: string }
+  ): Promise<ApiContactSubmission | undefined> {
+    const existing = this.contactSubmissions.get(id);
+    if (!existing) return undefined;
+    const updated: ApiContactSubmission = {
+      ...existing,
+      ...patch,
+    };
+    this.contactSubmissions.set(id, updated);
+    return updated;
   }
 }
 

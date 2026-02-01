@@ -28,6 +28,7 @@ import AdminOrdersLabels from "@/pages/admin-orders-labels";
 import AdminOrderLabel from "@/pages/admin-order-label";
 import AdminCategories from "@/pages/admin-categories";
 import AdminEditPart from "@/pages/admin-edit-part";
+import AdminEnquiries from "@/pages/admin-enquiries";
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -60,6 +61,7 @@ function Router() {
       <Route path="/admin/orders/:id/label" component={withAdminGuard(AdminOrderLabel)} />
       <Route path="/admin/orders" component={withAdminGuard(AdminOrders)} />
       <Route path="/admin/categories" component={withAdminGuard(AdminCategories)} />
+      <Route path="/admin/enquiries" component={withAdminGuard(AdminEnquiries)} />
       <Route path="/admin/new" component={withAdminGuard(AdminNewPart)} />
       <Route path="/admin/edit/:id" component={withAdminGuard(AdminEditPart)} />
 

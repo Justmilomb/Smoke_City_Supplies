@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { Phone, Mail, MessageSquare, MapPin } from "lucide-react";
+import { Phone, Mail, MapPin, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,12 @@ import { toast } from "sonner";
 const SUPPORT_PHONE = "07597783587";
 const SUPPORT_EMAIL = "support@smokecitysupplies.com";
 const ONLINE_ONLY = "Online only — UK delivery";
+const WHATSAPP_NUMBER = "447597783587";
+function whatsAppUrl(text = ""): string {
+  const base = `https://wa.me/${WHATSAPP_NUMBER}`;
+  if (!text.trim()) return base;
+  return `${base}?text=${encodeURIComponent(text.trim())}`;
+}
 
 export type ContactModalContextValue = {
   openWithPartNumber: (partNumber: string) => void;
@@ -46,18 +52,12 @@ export function ContactModalProvider({ children }: { children: React.ReactNode }
   const fab = (
     <div
       className="fixed z-[100]"
-      style={{
-        position: "fixed",
-        left: "auto",
-        right: "1.5rem",
-        bottom: "1.5rem",
-        top: "auto",
-      }}
+      style={{ position: "fixed", left: "auto", right: "1.5rem", bottom: "1.5rem", top: "auto" }}
     >
       <Button
         data-testid="button-contact-fab"
         size="icon"
-        className="h-14 w-14 rounded-full shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all md:h-12 md:w-12"
+        className="h-14 w-14 rounded-full shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 md:h-12 md:w-12"
         aria-label="Contact support"
         onClick={openModal}
       >
@@ -113,7 +113,8 @@ function ContactModalContent({
           name: name.trim(),
           email: email.trim(),
           subject: partNumber ? `Part: ${partNumber}` : "General enquiry",
-          message: message.trim() + (partNumber ? `\n\nPart number: ${partNumber}` : ""),
+          partNumber: partNumber ? partNumber.trim() : undefined,
+          message: message.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -156,10 +157,17 @@ function ContactModalContent({
               <Mail className="h-4 w-4" />
               {SUPPORT_EMAIL}
             </a>
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <a
+              href={whatsAppUrl(
+                partNumber ? `Hi, question about part ${partNumber}. ${message.trim().slice(0, 150)}` : message.trim() ? `Hi, ${message.trim().slice(0, 150)}` : "Hi, I have a question."
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 font-medium text-foreground hover:text-primary"
+            >
               <MessageSquare className="h-4 w-4" />
-              <span>Live Chat — Coming soon</span>
-            </div>
+              WhatsApp us
+            </a>
             <div className="flex items-center gap-2 text-muted-foreground">
               <MapPin className="h-4 w-4" />
               <span>{ONLINE_ONLY}</span>
