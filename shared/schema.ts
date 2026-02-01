@@ -101,6 +101,8 @@ export const pendingPayments = pgTable("pending_payments", {
   totalPence: integer("total_pence").notNull(),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
+  customerAddress: text("customer_address"),
+  customerPostcode: text("customer_postcode"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -121,6 +123,8 @@ export const orders = pgTable("orders", {
   totalPence: integer("total_pence").notNull(),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
+  customerAddress: text("customer_address"),
+  customerPostcode: text("customer_postcode"),
   stripeSessionId: text("stripe_session_id"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("pending"), // "pending" | "paid" | "failed"
@@ -135,6 +139,8 @@ export const createOrderSchema = z.object({
   })),
   customerEmail: z.string().email().optional(),
   customerName: z.string().optional(),
+  customerAddress: z.string().optional(),
+  customerPostcode: z.string().optional(),
   stripeSessionId: z.string().optional(),
   stripePaymentIntentId: z.string().optional(),
   paymentStatus: z.enum(["pending", "paid", "failed"]).optional(),
@@ -187,6 +193,8 @@ export type ApiOrder = {
   items: ApiOrderItem[];
   customerEmail?: string;
   customerName?: string;
+  customerAddress?: string;
+  customerPostcode?: string;
   stripeSessionId?: string;
   stripePaymentIntentId?: string;
   paymentStatus?: string;

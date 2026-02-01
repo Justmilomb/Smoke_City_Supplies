@@ -18,6 +18,8 @@ const createPaymentIntentSchema = createOrderSchema.pick({
   items: true,
   customerEmail: true,
   customerName: true,
+  customerAddress: true,
+  customerPostcode: true,
 });
 import multer from "multer";
 import { storage } from "./storage";
@@ -230,7 +232,7 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     if (!parsed.success) {
       return res.status(400).json({ message: "Invalid checkout data", errors: parsed.error.flatten() });
     }
-    const { items, customerEmail, customerName } = parsed.data;
+    const { items, customerEmail, customerName, customerAddress, customerPostcode } = parsed.data;
     if (!items.length) {
       return res.status(400).json({ message: "Cart is empty" });
     }
@@ -291,6 +293,8 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
           items: pending.items,
           customerEmail: pending.customerEmail,
           customerName: pending.customerName,
+          customerAddress: pending.customerAddress,
+          customerPostcode: pending.customerPostcode,
           stripePaymentIntentId: paymentIntentId,
           paymentStatus: "paid",
         };

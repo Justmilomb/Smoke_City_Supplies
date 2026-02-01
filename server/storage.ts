@@ -53,8 +53,8 @@ export interface IStorage {
   getImage(id: string): Promise<{ data: string; mimeType: string } | undefined>;
   deleteImage(id: string): Promise<boolean>;
 
-  createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string }): Promise<void>;
-  getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string } | undefined>;
+  createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void>;
+  getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined>;
   deletePendingPayment(paymentIntentId: string): Promise<boolean>;
 }
 
@@ -183,7 +183,7 @@ export class DbStorage implements IStorage {
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid order");
-    const { items, customerEmail, customerName, stripeSessionId, stripePaymentIntentId, paymentStatus } = parsed.data;
+    const { items, customerEmail, customerName, customerAddress, customerPostcode, stripeSessionId, stripePaymentIntentId, paymentStatus } = parsed.data;
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
@@ -198,6 +198,8 @@ export class DbStorage implements IStorage {
       totalPence,
       customerEmail: customerEmail ?? null,
       customerName: customerName ?? null,
+      customerAddress: customerAddress ?? null,
+      customerPostcode: customerPostcode ?? null,
       stripeSessionId: stripeSessionId ?? null,
       stripePaymentIntentId: stripePaymentIntentId ?? null,
       paymentStatus: paymentStatus ?? "pending",
@@ -236,6 +238,8 @@ export class DbStorage implements IStorage {
       items: apiItems,
       customerEmail,
       customerName,
+      customerAddress,
+      customerPostcode,
       stripeSessionId: stripeSessionId ?? undefined,
       stripePaymentIntentId: stripePaymentIntentId ?? undefined,
       paymentStatus: paymentStatus ?? "pending",
@@ -265,6 +269,8 @@ export class DbStorage implements IStorage {
         items,
         customerEmail: order.customerEmail ?? undefined,
         customerName: order.customerName ?? undefined,
+        customerAddress: order.customerAddress ?? undefined,
+        customerPostcode: order.customerPostcode ?? undefined,
         stripeSessionId: order.stripeSessionId ?? undefined,
         stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
         paymentStatus: order.paymentStatus ?? undefined,
@@ -295,6 +301,8 @@ export class DbStorage implements IStorage {
       items,
       customerEmail: order.customerEmail ?? undefined,
       customerName: order.customerName ?? undefined,
+      customerAddress: order.customerAddress ?? undefined,
+      customerPostcode: order.customerPostcode ?? undefined,
       stripeSessionId: order.stripeSessionId ?? undefined,
       stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
       paymentStatus: order.paymentStatus ?? undefined,
@@ -346,17 +354,19 @@ export class DbStorage implements IStorage {
     return true;
   }
 
-  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string }): Promise<void> {
+  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void> {
     await this.getDb().insert(pendingPaymentsTable).values({
       paymentIntentId: data.paymentIntentId,
       items: data.items,
       totalPence: data.totalPence,
       customerEmail: data.customerEmail ?? null,
       customerName: data.customerName ?? null,
+      customerAddress: data.customerAddress ?? null,
+      customerPostcode: data.customerPostcode ?? null,
     });
   }
 
-  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string } | undefined> {
+  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined> {
     const [row] = await this.getDb()
       .select()
       .from(pendingPaymentsTable)
@@ -368,6 +378,8 @@ export class DbStorage implements IStorage {
       totalPence: row.totalPence,
       customerEmail: row.customerEmail ?? undefined,
       customerName: row.customerName ?? undefined,
+      customerAddress: row.customerAddress ?? undefined,
+      customerPostcode: row.customerPostcode ?? undefined,
     };
   }
 
@@ -438,7 +450,7 @@ export class MemStorage implements IStorage {
   private orders = new Map<string, ApiOrder>();
   private categories = new Map<string, Category>();
   private images = new Map<string, { data: string; mimeType: string }>();
-  private pendingPayments = new Map<string, { items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string }>();
+  private pendingPayments = new Map<string, { items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }>();
 
   constructor() {
     seedProducts.forEach((p) => this.products.set(p.id, { ...p }));
@@ -518,7 +530,7 @@ export class MemStorage implements IStorage {
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid order");
-    const { items, customerEmail, customerName, stripeSessionId, stripePaymentIntentId, paymentStatus } = parsed.data;
+    const { items, customerEmail, customerName, customerAddress, customerPostcode, stripeSessionId, stripePaymentIntentId, paymentStatus } = parsed.data;
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
@@ -539,6 +551,8 @@ export class MemStorage implements IStorage {
       items: apiItems,
       customerEmail,
       customerName,
+      customerAddress,
+      customerPostcode,
       stripeSessionId: stripeSessionId ?? undefined,
       stripePaymentIntentId: stripePaymentIntentId ?? undefined,
       paymentStatus: paymentStatus ?? "pending",
@@ -632,16 +646,18 @@ export class MemStorage implements IStorage {
     return this.images.delete(id);
   }
 
-  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string }): Promise<void> {
+  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void> {
     this.pendingPayments.set(data.paymentIntentId, {
       items: data.items,
       totalPence: data.totalPence,
       customerEmail: data.customerEmail,
       customerName: data.customerName,
+      customerAddress: data.customerAddress,
+      customerPostcode: data.customerPostcode,
     });
   }
 
-  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string } | undefined> {
+  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined> {
     return this.pendingPayments.get(paymentIntentId);
   }
 
