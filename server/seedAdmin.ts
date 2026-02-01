@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
 
-const DEFAULT_ADMIN_PASSWORD = "admin";
+const DEFAULT_ADMIN_USERNAME = "proggs";
+const DEFAULT_ADMIN_PASSWORD = '"""""""';
 
 const DEFAULT_CATEGORIES = [
   { name: "Brakes", slug: "brakes", vehicleType: "all" as const },
@@ -15,13 +16,14 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export async function seedAdminIfNeeded(): Promise<void> {
-  const existing = await storage.getUserByUsername("admin");
+  const username = process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
+  const existing = await storage.getUserByUsername(username);
   if (existing) return;
 
   const password = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
   const hashed = await bcrypt.hash(password, 10);
-  await storage.createUser({ username: "admin", password: hashed });
-  console.log("[seedAdmin] Created default admin user (password: " + (process.env.ADMIN_PASSWORD ? "from env" : DEFAULT_ADMIN_PASSWORD) + ")");
+  await storage.createUser({ username, password: hashed });
+  console.log("[seedAdmin] Created default admin user:", username, "(password: " + (process.env.ADMIN_PASSWORD ? "from env" : "default") + ")");
 }
 
 export async function seedCategoriesIfNeeded(): Promise<void> {
