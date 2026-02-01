@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { Search, ShoppingCart, Menu, Phone, ArrowUp } from "lucide-react";
+import { Search, ShoppingCart, Menu, Phone, ArrowUp, Home, Package, Mail, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -17,42 +17,47 @@ import { Logo } from "./Logo";
 
 const HEADER_PHONE = "07597783587";
 
-function NavLink({
+const publicNavItems = [
+  { href: "/", label: "Home", icon: Home, testId: "link-mobile-home" },
+  { href: "/store", label: "Parts", icon: Package, testId: "link-mobile-parts" },
+  { href: "/contact", label: "Contact", icon: Mail, testId: "link-mobile-contact" },
+];
+const adminNavItem = { href: "/admin", label: "Admin", icon: Settings, testId: "link-mobile-admin" };
+
+function StoreNavItem({
   href,
   label,
+  icon: Icon,
   testId,
+  onClick,
 }: {
   href: string;
   label: string;
+  icon: React.ElementType;
   testId: string;
+  onClick?: () => void;
 }) {
   const [loc] = useLocation();
   const path = loc.indexOf("?") >= 0 ? loc.slice(0, loc.indexOf("?")) : loc;
-  const active = path === href;
+  const active =
+    href === "/" ? path === "/" : path === href || (path.startsWith(href) && href.length > 1);
 
   return (
     <Link href={href}>
       <a
         data-testid={testId}
+        onClick={onClick}
         className={
-          "px-4 py-2 text-sm font-medium transition-colors " +
-          (active
-            ? "text-foreground border-b-2 border-primary"
-            : "text-muted-foreground hover:text-foreground")
+          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors " +
+          (active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")
         }
       >
+        <Icon className="h-4 w-4 shrink-0" />
         {label}
       </a>
     </Link>
   );
 }
-
-const publicNavLinks = [
-  { href: "/", label: "Home", testId: "link-mobile-home" },
-  { href: "/store", label: "Parts", testId: "link-mobile-parts" },
-  { href: "/contact", label: "Contact", testId: "link-mobile-contact" },
-];
-const adminNavLink = { href: "/admin", label: "Admin", testId: "link-mobile-admin" };
 
 export default function SiteLayout({
   children,
@@ -67,7 +72,7 @@ export default function SiteLayout({
   const [searchQuery, setSearchQuery] = React.useState("");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [showBackToTop, setShowBackToTop] = React.useState(false);
-  const mobileNavLinks = user ? [...publicNavLinks, adminNavLink] : publicNavLinks;
+  const navItems = user ? [...publicNavItems, adminNavItem] : publicNavItems;
 
   React.useEffect(() => {
     const onScroll = () => setShowBackToTop(window.scrollY > 400);
@@ -151,32 +156,24 @@ export default function SiteLayout({
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px]">
-                <SheetHeader>
+              <SheetContent side="left" className="w-[260px] p-0">
+                <SheetHeader className="p-4 pb-0">
                   <SheetTitle>Menu</SheetTitle>
                 </SheetHeader>
-                <nav className="mt-8 flex flex-col gap-1">
-                  {mobileNavLinks.map(({ href, label, testId }) => (
-                    <Link key={href} href={href}>
-                      <a
-                        data-testid={testId}
-                        className="block rounded-lg px-4 py-3 text-base font-medium transition-colors hover:bg-muted"
-                        onClick={() => setMobileNavOpen(false)}
-                      >
-                        {label}
-                      </a>
-                    </Link>
+                <nav className="flex flex-col gap-1 p-3">
+                  {navItems.map(({ href, label, icon, testId }) => (
+                    <StoreNavItem
+                      key={href}
+                      href={href}
+                      label={label}
+                      icon={icon}
+                      testId={testId}
+                      onClick={() => setMobileNavOpen(false)}
+                    />
                   ))}
                 </nav>
               </SheetContent>
             </Sheet>
-
-            <nav className="hidden items-center gap-1 md:flex">
-              <NavLink href="/" label="Home" testId="link-home-nav" />
-              <NavLink href="/store" label="Parts" testId="link-parts" />
-              <NavLink href="/contact" label="Contact" testId="link-contact" />
-              {user && <NavLink href="/admin" label="Admin" testId="link-admin" />}
-            </nav>
           </div>
 
           <form
@@ -242,7 +239,18 @@ export default function SiteLayout({
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8 md:py-12">{children}</main>
+      <div className="flex">
+        <aside className="hidden w-56 shrink-0 border-r bg-muted/30 md:block">
+          <div className="sticky top-14 py-4">
+            <nav className="flex flex-col gap-1 p-3">
+              {navItems.map(({ href, label, icon, testId }) => (
+                <StoreNavItem key={href} href={href} label={label} icon={icon} testId={testId} />
+              ))}
+            </nav>
+          </div>
+        </aside>
+        <main className="flex-1 min-w-0 mx-auto max-w-5xl px-4 py-8 md:px-6 lg:px-8 md:py-12">{children}</main>
+      </div>
 
       {showBackToTop && (
         <Button
