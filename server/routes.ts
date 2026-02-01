@@ -130,8 +130,10 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
         partNumber: partNumber ?? undefined,
         message,
       });
-      // Optional: email seller so they can reply from Gmail/Outlook
-      await sendNewEnquiryNotificationToSeller(submission).catch(() => {});
+      // Notify seller in background so a slow/hanging SMTP doesn't block the response
+      sendNewEnquiryNotificationToSeller(submission).catch((err) =>
+        console.error("[contact] Notification email failed:", err)
+      );
       return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
     } catch (err) {
       console.error("[contact]", err);
