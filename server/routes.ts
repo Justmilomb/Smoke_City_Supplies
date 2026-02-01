@@ -114,9 +114,11 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
   app.post("/api/contact", contactRateLimiter, async (req, res) => {
     const parsed = contactFormSchema.safeParse(req.body);
     if (!parsed.success) {
+      const flat = parsed.error.flatten().fieldErrors;
+      const firstError = Object.values(flat).flat().find(Boolean);
       return res.status(400).json({
-        message: "Invalid form data",
-        errors: parsed.error.flatten().fieldErrors,
+        message: firstError ?? "Invalid form data",
+        errors: flat,
       });
     }
     const { name, email, subject, partNumber, message } = parsed.data;

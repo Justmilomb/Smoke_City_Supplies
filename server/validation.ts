@@ -29,13 +29,31 @@ export function sanitizeUrl(input: string | undefined | null): string {
   }
 }
 
-// Contact form schema
+// Contact form schema — trim first so whitespace doesn't cause "Invalid form data"
 export const contactFormSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100, "Name too long").transform(sanitizeString),
-  email: z.string().email("Invalid email").transform(sanitizeEmail),
-  subject: z.string().max(200, "Subject too long").optional().transform((val) => sanitizeString(val ?? "")),
-  partNumber: z.string().max(100, "Part number too long").optional().transform((val) => sanitizeString(val ?? "")),
-  message: z.string().min(10, "Message must be at least 10 characters").max(5000, "Message too long").transform(sanitizeString),
+  name: z
+    .string()
+    .transform((s) => (s ?? "").trim())
+    .pipe(z.string().min(1, "Name is required").max(100, "Name too long"))
+    .transform(sanitizeString),
+  email: z
+    .string()
+    .transform((s) => (s ?? "").trim().toLowerCase())
+    .pipe(z.string().email("Invalid email"))
+    .transform(sanitizeEmail),
+  subject: z
+    .string()
+    .optional()
+    .transform((val) => (val == null || val === "" ? undefined : sanitizeString(val).slice(0, 200))),
+  partNumber: z
+    .string()
+    .optional()
+    .transform((val) => (val == null || val === "" ? undefined : sanitizeString(val).slice(0, 100))),
+  message: z
+    .string()
+    .transform((s) => (s ?? "").trim())
+    .pipe(z.string().min(10, "Message must be at least 10 characters").max(5000, "Message too long"))
+    .transform(sanitizeString),
 });
 
 // Admin reply to contact submission
