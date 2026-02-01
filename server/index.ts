@@ -13,6 +13,8 @@ const PgSession = connectPgSimple(session);
 const MemSessionStore = createMemoryStore(session);
 
 const app = express();
+// Required behind reverse proxy (e.g. Render) so cookies and protocol work correctly
+app.set("trust proxy", 1);
 const httpServer = createServer(app);
 
 declare module "http" {

@@ -89,7 +89,7 @@ function CheckoutForm({
           <CreditCard className="h-4 w-4" />
           Card details
         </Label>
-        <div className="rounded-md border border-input bg-background px-3 py-2.5 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+        <div className="rounded-md border border-input bg-background px-3 py-2.5 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 min-h-[40px] [&_.StripeElement]:min-h-[24px] [&_.StripeElement]:block">
           <CardElement
             options={cardElementOptions}
             onChange={(e) => setCardComplete(e.complete)}
@@ -246,7 +246,6 @@ export default function CheckoutPage() {
                 <Elements
                   stripe={stripePromise}
                   options={{
-                    clientSecret,
                     appearance: {
                       theme: "stripe",
                       variables: {

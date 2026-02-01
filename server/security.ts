@@ -40,23 +40,30 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
 export function corsConfig(req: Request, res: Response, next: NextFunction) {
   const origin = req.headers.origin;
   const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(",")
+    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
     : [];
-  
-  if (process.env.NODE_ENV === "production" && origin && allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  } else if (process.env.NODE_ENV !== "production") {
+
+  // Same-origin: origin matches this host (so cookies work when no ALLOWED_ORIGINS set)
+  const host = req.get("host");
+  const protocol = req.protocol || "https";
+  const sameOrigin = origin && host && origin === `${protocol}://${host}`;
+
+  if (process.env.NODE_ENV === "production") {
+    if (origin && (allowedOrigins.includes(origin) || (sameOrigin && allowedOrigins.length === 0))) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+  } else {
     // Allow all origins in development
     res.setHeader("Access-Control-Allow-Origin", origin || "*");
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
-  
+
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
-  
+
   next();
 }
