@@ -10,6 +10,9 @@ import {
   type InsertCategory,
   type InsertProduct,
 } from "@shared/schema";
+
+const updateProductSchema = insertProductSchema.partial();
+import multer from "multer";
 import { storage } from "./storage";
 import { stripe } from "./stripe";
 import { uploadMiddleware } from "./upload";
@@ -109,19 +112,50 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
   });
 
-  // Image upload (camera or file) – admin only
-  app.post("/api/upload", requireAuth, apiRateLimiter, uploadMiddleware.single("image"), (req, res) => {
+  // Image upload (camera or file) – admin only; stored in DB as base64 for persistence on Render
+  app.post("/api/upload", requireAuth, apiRateLimiter, (req, res, next) => {
+    uploadMiddleware.single("image")(req, res, (err: unknown) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === "LIMIT_FILE_SIZE") {
+            return res.status(400).json({ message: "File too large (max 10MB)" });
+          }
+          return res.status(400).json({ message: err.message });
+        }
+        return res.status(400).json({ message: err instanceof Error ? err.message : "Upload failed" });
+      }
+      next();
+    });
+  }, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided" });
     }
-    const url = `/uploads/${req.file.filename}`;
-    return res.status(201).json({ url });
+    const { buffer, mimetype } = req.file;
+    const base64 = buffer.toString("base64");
+    const data = `data:${mimetype};base64,${base64}`;
+    const id = await storage.createImage(data, mimetype);
+    return res.status(201).json({ url: `/api/images/${id}` });
   });
 
   function paramId(req: { params: { id?: string | string[] } }): string {
     const p = req.params.id;
     return Array.isArray(p) ? (p[0] ?? "") : (p ?? "");
   }
+
+  // Image serving (from DB) and deletion
+  app.get("/api/images/:id", async (req, res) => {
+    const image = await storage.getImage(paramId(req));
+    if (!image) return res.status(404).send("Not found");
+    const base64Data = image.data.includes(",") ? image.data.split(",")[1] : image.data;
+    const buffer = Buffer.from(base64Data ?? "", "base64");
+    res.type(image.mimeType).send(buffer);
+  });
+
+  app.delete("/api/images/:id", requireAuth, apiRateLimiter, async (req, res) => {
+    const deleted = await storage.deleteImage(paramId(req));
+    if (!deleted) return res.status(404).json({ message: "Image not found" });
+    return res.status(204).send();
+  });
 
   // Products
   app.get("/api/products", async (_req, res) => {
@@ -154,9 +188,12 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     const id = paramId(req);
     const existing = await storage.getProduct(id);
     if (!existing) return res.status(404).json({ message: "Product not found" });
-    const patch = req.body as Partial<ApiProduct>;
-    const sanitized = sanitizeProductInput(patch);
-    const updated = await storage.updateProduct(id, { ...patch, ...sanitized });
+    const parsed = updateProductSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid product data", errors: parsed.error.flatten() });
+    }
+    const sanitized = sanitizeProductInput(parsed.data);
+    const updated = await storage.updateProduct(id, { ...parsed.data, ...sanitized });
     return res.json(updated);
   });
 

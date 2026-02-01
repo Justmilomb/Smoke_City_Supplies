@@ -86,6 +86,14 @@ export const insertProductSchema = z.object({
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
+// Images stored in DB (base64 data URL) for persistence on Render
+export const images = pgTable("images", {
+  id: varchar("id").primaryKey(),
+  data: text("data").notNull(),
+  mimeType: varchar("mime_type", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Orders for customer checkout
 export const orderItems = pgTable("order_items", {
   id: varchar("id").primaryKey(),

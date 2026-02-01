@@ -5,7 +5,6 @@ import createMemoryStore from "memorystore";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { UPLOADS_DIR } from "./upload";
 import { pool } from "./db";
 import "./auth"; // Passport strategies
 import { securityHeaders, corsConfig } from "./security";
@@ -14,9 +13,6 @@ const PgSession = connectPgSimple(session);
 const MemSessionStore = createMemoryStore(session);
 
 const app = express();
-
-// Serve uploaded images
-app.use("/uploads", express.static(UPLOADS_DIR));
 const httpServer = createServer(app);
 
 declare module "http" {

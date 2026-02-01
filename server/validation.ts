@@ -44,26 +44,32 @@ export const orderStatusSchema = z.object({
   }),
 });
 
-// Validate and sanitize product input
-export function sanitizeProductInput(input: any) {
-  return {
-    name: sanitizeString(input.name),
-    description: sanitizeString(input.description),
-    category: sanitizeString(input.category),
-    partNumber: input.partNumber != null ? sanitizeString(String(input.partNumber)) : undefined,
-    subcategory: input.subcategory != null ? sanitizeString(String(input.subcategory)) : undefined,
-    brand: input.brand != null ? sanitizeString(String(input.brand)) : undefined,
-    vehicle: typeof input.vehicle === "string" ? sanitizeString(input.vehicle) : undefined,
-    compatibility: Array.isArray(input.compatibility)
+// Validate and sanitize product input (only include fields that are explicitly provided, for PATCH safety)
+export function sanitizeProductInput(input: any): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  if (input.name !== undefined) result.name = sanitizeString(input.name);
+  if (input.description !== undefined) result.description = sanitizeString(input.description);
+  if (input.category !== undefined) result.category = sanitizeString(input.category);
+  if (input.partNumber !== undefined) result.partNumber = input.partNumber != null ? sanitizeString(String(input.partNumber)) : undefined;
+  if (input.subcategory !== undefined) result.subcategory = input.subcategory != null ? sanitizeString(String(input.subcategory)) : undefined;
+  if (input.brand !== undefined) result.brand = input.brand != null ? sanitizeString(String(input.brand)) : undefined;
+  if (input.vehicle !== undefined) result.vehicle = typeof input.vehicle === "string" ? sanitizeString(input.vehicle) : undefined;
+  if (input.compatibility !== undefined) {
+    result.compatibility = Array.isArray(input.compatibility)
       ? input.compatibility.map((c: any) => sanitizeString(c)).filter(Boolean)
-      : [],
-    tags: Array.isArray(input.tags)
+      : [];
+  }
+  if (input.tags !== undefined) {
+    result.tags = Array.isArray(input.tags)
       ? input.tags.map((t: any) => sanitizeString(t)).filter(Boolean)
-      : [],
-    features: Array.isArray(input.features)
+      : [];
+  }
+  if (input.features !== undefined) {
+    result.features = Array.isArray(input.features)
       ? input.features.map((f: any) => sanitizeString(f)).filter(Boolean)
-      : undefined,
-  };
+      : undefined;
+  }
+  return result;
 }
 
 // Validate and sanitize category input

@@ -136,14 +136,23 @@ export default function CartPage() {
                       </Button>
                       <span className="min-w-[2.5rem] text-center text-sm font-medium tabular-nums">
                         {item.quantity}
+                        {item.stockQuantity != null && (
+                          <span className="text-xs text-muted-foreground">/{item.stockQuantity}</span>
+                        )}
                       </span>
                       <Button
                         variant="outline"
                         size="icon"
                         className="h-9 w-9"
-                        onClick={() =>
-                          actions.updateQuantity(item.productId, item.quantity + 1)
-                        }
+                        onClick={() => {
+                          const maxStock = item.stockQuantity ?? Infinity;
+                          if (item.quantity >= maxStock) {
+                            toast.error(`Only ${maxStock} available`);
+                            return;
+                          }
+                          actions.updateQuantity(item.productId, item.quantity + 1);
+                        }}
+                        disabled={item.stockQuantity != null && item.quantity >= item.stockQuantity}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>

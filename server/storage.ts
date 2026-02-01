@@ -12,6 +12,7 @@ import type {
 import {
   categories as categoriesTable,
   createOrderSchema,
+  images as imagesTable,
   orderItems,
   orders,
   products,
@@ -45,6 +46,10 @@ export interface IStorage {
   createCategory(input: InsertCategory): Promise<Category>;
   updateCategory(id: string, patch: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: string): Promise<boolean>;
+
+  createImage(data: string, mimeType: string): Promise<string>;
+  getImage(id: string): Promise<{ data: string; mimeType: string } | undefined>;
+  deleteImage(id: string): Promise<boolean>;
 }
 
 function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
@@ -300,6 +305,31 @@ export class DbStorage implements IStorage {
     return this.getOrder(order.id);
   }
 
+  async createImage(data: string, mimeType: string): Promise<string> {
+    const id = `img_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`;
+    await this.getDb()
+      .insert(imagesTable)
+      .values({ id, data, mimeType });
+    return id;
+  }
+
+  async getImage(id: string): Promise<{ data: string; mimeType: string } | undefined> {
+    const [row] = await this.getDb()
+      .select()
+      .from(imagesTable)
+      .where(eq(imagesTable.id, id))
+      .limit(1);
+    if (!row) return undefined;
+    return { data: row.data, mimeType: row.mimeType };
+  }
+
+  async deleteImage(id: string): Promise<boolean> {
+    const existing = await this.getImage(id);
+    if (!existing) return false;
+    await this.getDb().delete(imagesTable).where(eq(imagesTable.id, id));
+    return true;
+  }
+
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
     const [updated] = await this.getDb()
       .update(orders)
@@ -359,6 +389,7 @@ export class MemStorage implements IStorage {
   private products = new Map<string, ApiProduct>();
   private orders = new Map<string, ApiOrder>();
   private categories = new Map<string, Category>();
+  private images = new Map<string, { data: string; mimeType: string }>();
 
   constructor() {
     seedProducts.forEach((p) => this.products.set(p.id, { ...p }));
@@ -532,6 +563,20 @@ export class MemStorage implements IStorage {
 
   async deleteCategory(id: string): Promise<boolean> {
     return this.categories.delete(id);
+  }
+
+  async createImage(data: string, mimeType: string): Promise<string> {
+    const id = `img_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`;
+    this.images.set(id, { data, mimeType });
+    return id;
+  }
+
+  async getImage(id: string): Promise<{ data: string; mimeType: string } | undefined> {
+    return this.images.get(id);
+  }
+
+  async deleteImage(id: string): Promise<boolean> {
+    return this.images.delete(id);
   }
 }
 

@@ -30,6 +30,23 @@ async function uploadFile(file: File): Promise<string> {
   return url;
 }
 
+function getImageIdFromUrl(url: string): string | null {
+  if (!url || typeof url !== "string") return null;
+  const match = url.match(/\/api\/images\/([^/?#]+)/);
+  return match ? match[1] : null;
+}
+
+async function deleteImageById(id: string): Promise<void> {
+  const res = await fetch(`/api/images/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Delete failed");
+  }
+}
+
 function validateFile(file: File): boolean {
   if (!file.type.startsWith("image/")) {
     toast.error("Please choose an image file (JPEG, PNG, GIF, WebP).");
@@ -50,6 +67,7 @@ export default function AdminImageUpload({
 }: AdminImageUploadProps) {
   const isMobile = useIsMobile();
   const [uploading, setUploading] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
   const cameraInputRef = React.useRef<HTMLInputElement>(null);
   const libraryInputRef = React.useRef<HTMLInputElement>(null);
@@ -122,6 +140,22 @@ export default function AdminImageUpload({
     }
   };
 
+  const handleRemove = React.useCallback(async () => {
+    if (disabled || deleting) return;
+    const imageId = getImageIdFromUrl(value);
+    if (imageId) {
+      setDeleting(true);
+      try {
+        await deleteImageById(imageId);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to delete image");
+      } finally {
+        setDeleting(false);
+      }
+    }
+    onChange("");
+  }, [value, onChange, disabled, deleting]);
+
   return (
     <div className="space-y-4" data-testid={dataTestId ?? "admin-image-upload"}>
       <div
@@ -154,10 +188,11 @@ export default function AdminImageUpload({
                   variant="secondary"
                   size="sm"
                   className="min-h-[44px] touch-manipulation"
-                  onClick={() => onChange("")}
+                  onClick={handleRemove}
+                  disabled={deleting}
                 >
                   <X className="h-4 w-4 mr-1" />
-                  Remove
+                  {deleting ? "Removing…" : "Remove"}
                 </Button>
                 <Button
                   type="button"

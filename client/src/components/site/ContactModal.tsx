@@ -49,7 +49,7 @@ export function ContactModalProvider({ children }: { children: React.ReactNode }
       <Button
         data-testid="button-contact-fab"
         size="icon"
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-lg md:h-12 md:w-12"
+        className="fixed bottom-4 right-4 z-40 h-14 w-14 rounded-full shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all md:bottom-6 md:right-6 md:h-12 md:w-12"
         aria-label="Contact support"
         onClick={openModal}
       >

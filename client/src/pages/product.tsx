@@ -4,7 +4,7 @@ import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useContactModal } from "@/components/site/ContactModal";
 import { useProduct } from "@/lib/products";
-import { useCart } from "@/lib/cart";
+import { useCart, useCartItemQuantity } from "@/lib/cart";
 import { getProductImage } from "@/lib/mockData";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,9 @@ export default function ProductPage() {
   const { data: part, isLoading } = useProduct(params?.id);
   const { actions: cartActions } = useCart();
   const contactModal = useContactModal();
+  const inCartQty = useCartItemQuantity(params?.id ?? "");
+  const stockQty = part?.quantity ?? 0;
+  const canAddMore = stockQty > inCartQty;
 
   usePageMeta({
     title: part?.name ?? "Product",
@@ -191,18 +194,27 @@ export default function ProductPage() {
                 size="lg"
                 className="h-12 flex-1"
                 onClick={() => {
+                  if (!canAddMore) {
+                    toast.error(`Only ${stockQty} available — you already have ${inCartQty} in your cart`);
+                    return;
+                  }
                   cartActions.add({
                     productId: part.id,
                     productName: part.name,
                     priceEach: part.price,
                     quantity: 1,
                     image: imageUrl,
+                    stockQuantity: stockQty,
                   });
                   toast.success("Added to cart");
                 }}
-                disabled={part.stock === "out"}
+                disabled={part.stock === "out" || !canAddMore}
               >
-                Add to Cart
+                {inCartQty > 0 && canAddMore
+                  ? `Add another (${inCartQty} in cart)`
+                  : inCartQty > 0 && !canAddMore
+                    ? `Max in cart (${inCartQty})`
+                    : "Add to Cart"}
               </Button>
               <Button
                 data-testid="button-ask-support"

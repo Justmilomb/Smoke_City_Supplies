@@ -259,7 +259,7 @@ export default function SiteLayout({
         <Button
           variant="outline"
           size="icon"
-          className="fixed bottom-20 right-6 z-30 h-11 w-11 rounded-full shadow-md md:bottom-6 md:right-24"
+          className="fixed bottom-20 right-4 z-30 h-11 w-11 rounded-full shadow-md md:bottom-20 md:right-6"
           aria-label="Back to top"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         >
