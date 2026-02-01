@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-const SUPPORT_PHONE = "07597783584";
+const SUPPORT_PHONE = "07597783587";
 const SUPPORT_EMAIL = "support@smokecitysupplies.com";
 const ONLINE_ONLY = "Online only — UK delivery";
 
