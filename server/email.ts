@@ -68,6 +68,7 @@ export async function sendEmail(options: {
   text: string;
   html?: string;
   replyTo?: string;
+  bcc?: string | string[];
 }): Promise<boolean> {
   const transport = getTransporter();
   if (!transport) {
@@ -84,6 +85,7 @@ export async function sendEmail(options: {
         text: options.text,
         html: options.html ?? options.text.replace(/\n/g, "<br>"),
         replyTo: options.replyTo,
+        bcc: options.bcc,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("Email send timeout")), EMAIL_TIMEOUT_MS)
@@ -109,6 +111,7 @@ export async function sendReplyToCustomer(
     subject,
     text,
     replyTo: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    bcc: process.env.TRUSTPILOT_BCC ? [process.env.TRUSTPILOT_BCC] : undefined,
   });
 }
 
