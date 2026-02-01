@@ -3,192 +3,151 @@ import {
   ArrowRight,
   Bike,
   Gauge,
-  Headphones,
-  PackageCheck,
-  Sparkles,
+  CheckCircle2,
   Truck,
+  Shield,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import SiteLayout from "@/components/site/SiteLayout";
 import { useProducts } from "@/lib/products";
 import ProductCard from "@/components/site/ProductCard";
 
-import heroBg from "@/assets/images/hero-bg.png";
-
 export default function StoreHome() {
   const { data: parts = [] } = useProducts();
-  const featured = parts.slice(0, 3);
+  const featured = parts.slice(0, 6);
 
   return (
     <SiteLayout>
-      <section className="relative overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
-        <img
-          data-testid="img-hero"
-          src={heroBg}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-90"
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(90deg, rgba(5,10,20,.85) 0%, rgba(5,10,20,.62) 40%, rgba(5,10,20,.08) 78%, rgba(5,10,20,0) 100%)",
-          }}
-        />
-        <div className="relative grid gap-12 p-8 md:grid-cols-12 md:p-12 lg:p-16">
-          <div className="md:col-span-7">
-            <Badge
-              data-testid="badge-hero"
-              className="rounded-full bg-white/10 text-white ring-1 ring-white/15"
-            >
-              <Sparkles className="mr-1 h-4 w-4" /> Next-day delivery on popular
-              parts
-            </Badge>
-
-            <h1
-              data-testid="text-hero-title"
-              className="mt-6 text-balance font-[var(--font-serif)] text-4xl font-semibold tracking-tight text-white md:text-5xl"
-            >
-              Bike & scooter parts, delivered fast.
-            </h1>
-            <p
-              data-testid="text-hero-subtitle"
-              className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-white/80 md:text-lg"
-            >
-              Clear categories, beginner-friendly guides, and customer service that
-              actually helps you pick the right part.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-              <Link href="/catalog">
-                <Button data-testid="button-hero-shop" asChild className="h-11 rounded-full">
-                  <a data-testid="link-hero-shop">
-                    Shop parts <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-              </Link>
-              <Link href="/catalog?q=brake">
-                <Button
-                  data-testid="button-hero-find"
-                  asChild
-                  variant="secondary"
-                  className="h-11 rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15"
-                >
-                  <a data-testid="link-hero-find">Find my part</a>
-                </Button>
-              </Link>
+      {/* Hero Section */}
+      <section className="relative mb-16 overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 border border-border/50">
+        <div className="relative px-8 py-16 md:px-12 md:py-20 lg:px-16 lg:py-24">
+          <div className="mx-auto max-w-4xl text-center">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+              <Zap className="h-4 w-4" />
+              Fast shipping on all orders
             </div>
-
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur-sm">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Truck className="h-4 w-4" /> Fast delivery
-                </div>
-                <div className="mt-2 text-xs text-white/70">
-                  Next-day on best sellers
-                </div>
-              </div>
-              <div className="rounded-2xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur-sm">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Headphones className="h-4 w-4" /> Great support
-                </div>
-                <div className="mt-2 text-xs text-white/70">Chat-style help pages</div>
-              </div>
-              <div className="rounded-2xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur-sm">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <PackageCheck className="h-4 w-4" /> Easy returns
-                </div>
-                <div className="mt-2 text-xs text-white/70">Simple, no stress</div>
-              </div>
+            <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+              Premium Parts for
+              <span className="block text-primary"> Your Ride</span>
+            </h1>
+            <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground md:text-xl">
+              Shop quality bike and scooter parts with expert guidance. Fast delivery, easy returns, and support that actually helps.
+            </p>
+            <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <Link href="/catalog">
+                <Button size="lg" className="h-12 px-8 text-base">
+                  Shop Now
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href="/catalog?vehicle=bike">
+                <Button variant="outline" size="lg" className="h-12 px-8 text-base">
+                  Browse Bike Parts
+                </Button>
+              </Link>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="md:col-span-5">
-            <Card className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
-              <div className="border-b border-border/60 p-6">
-                <div className="text-sm font-semibold">Shop by vehicle</div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Start simple—pick what you ride.
+      {/* Features */}
+      <section className="mb-16 grid gap-6 md:grid-cols-3">
+        <Card className="border-border/50 p-6">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Truck className="h-6 w-6" />
+          </div>
+          <h3 className="mb-2 font-semibold">Fast Shipping</h3>
+          <p className="text-sm text-muted-foreground">
+            Most orders ship same day. Free shipping on orders over $75.
+          </p>
+        </Card>
+        <Card className="border-border/50 p-6">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Shield className="h-6 w-6" />
+          </div>
+          <h3 className="mb-2 font-semibold">Quality Guaranteed</h3>
+          <p className="text-sm text-muted-foreground">
+            All parts tested and verified. 30-day return policy.
+          </p>
+        </Card>
+        <Card className="border-border/50 p-6">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <h3 className="mb-2 font-semibold">Expert Support</h3>
+          <p className="text-sm text-muted-foreground">
+            Need help choosing? Our team is here to guide you.
+          </p>
+        </Card>
+      </section>
+
+      {/* Shop by Vehicle */}
+      <section className="mb-16">
+        <h2 className="mb-6 text-2xl font-bold tracking-tight">Shop by Vehicle</h2>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Link href="/catalog?vehicle=bike">
+            <Card className="group relative overflow-hidden border-2 border-border/50 transition-all hover:border-primary/50 hover:shadow-lg">
+              <div className="p-8">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                  <Bike className="h-8 w-8" />
                 </div>
-              </div>
-              <div className="grid gap-4 p-6">
-                <Link href="/catalog?vehicle=bike">
-                  <a data-testid="link-shop-bike" className="block">
-                    <div className="group flex items-center justify-between rounded-2xl border border-border/60 bg-muted/30 p-4 transition hover:bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-                          <Bike className="h-5 w-5" />
-                        </span>
-                        <div>
-                          <div className="text-sm font-semibold">Bike parts</div>
-                          <div className="text-xs text-muted-foreground">
-                            Brakes, drivetrain, tires
-                          </div>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" />
-                    </div>
-                  </a>
-                </Link>
-
-                <Link href="/catalog?vehicle=scooter">
-                  <a data-testid="link-shop-scooter" className="block">
-                    <div className="group flex items-center justify-between rounded-2xl border border-border/60 bg-muted/30 p-4 transition hover:bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[hsl(var(--accent))]/12 text-[hsl(var(--accent))]">
-                          <Gauge className="h-5 w-5" />
-                        </span>
-                        <div>
-                          <div className="text-sm font-semibold">Scooter parts</div>
-                          <div className="text-xs text-muted-foreground">
-                            Tires, brakes, electrical
-                          </div>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" />
-                    </div>
-                  </a>
-                </Link>
+                <h3 className="mb-2 text-xl font-bold">Bike Parts</h3>
+                <p className="mb-4 text-muted-foreground">
+                  Everything you need for your bike: brakes, drivetrain, tires, and more.
+                </p>
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  Shop bike parts
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </div>
               </div>
             </Card>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-16">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2
-              data-testid="text-featured-title"
-              className="font-[var(--font-serif)] text-2xl font-semibold tracking-tight"
-            >
-              Featured & fast
-            </h2>
-            <p
-              data-testid="text-featured-subtitle"
-              className="mt-2 text-sm text-muted-foreground"
-            >
-              Popular items that ship quickly.
-            </p>
-          </div>
-          <Link href="/catalog">
-            <a
-              data-testid="link-featured-all"
-              className="text-sm font-medium text-[hsl(var(--primary))] hover:underline"
-            >
-              View all
-            </a>
+          </Link>
+          <Link href="/catalog?vehicle=scooter">
+            <Card className="group relative overflow-hidden border-2 border-border/50 transition-all hover:border-primary/50 hover:shadow-lg">
+              <div className="p-8">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                  <Gauge className="h-8 w-8" />
+                </div>
+                <h3 className="mb-2 text-xl font-bold">Scooter Parts</h3>
+                <p className="mb-4 text-muted-foreground">
+                  Complete selection of scooter components: tires, batteries, controllers, and more.
+                </p>
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  Shop scooter parts
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </div>
+              </div>
+            </Card>
           </Link>
         </div>
-
-        <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.map((p) => (
-            <ProductCard key={p.id} part={p} />
-          ))}
-        </div>
       </section>
+
+      {/* Featured Products */}
+      {featured.length > 0 && (
+        <section>
+          <div className="mb-6 flex items-end justify-between">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Featured Products</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Popular items with fast shipping
+              </p>
+            </div>
+            <Link href="/catalog">
+              <Button variant="ghost" className="gap-2">
+                View all
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {featured.map((p) => (
+              <ProductCard key={p.id} part={p} />
+            ))}
+          </div>
+        </section>
+      )}
     </SiteLayout>
   );
 }

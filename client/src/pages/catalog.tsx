@@ -2,6 +2,7 @@ import React from "react";
 import { useLocation } from "wouter";
 import { BookOpen, Info, Sparkles } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
 import { useCategories } from "@/lib/store";
 import { useProducts } from "@/lib/products";
 import FiltersBar, { type CatalogFilters } from "@/components/site/FiltersBar";
@@ -10,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { bikeTerms, scooterTerms } from "@/lib/dictionary";
 
 function parseVehicle(loc: string): "all" | "bike" | "scooter" {
   const idx = loc.indexOf("?");
@@ -56,94 +58,100 @@ export default function CatalogPage() {
 
   return (
     <SiteLayout>
-      <div className="flex flex-col gap-10">
-        <div>
-          <h1 data-testid="text-catalog-title" className="font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
-            Shop parts
-          </h1>
-          <p data-testid="text-catalog-subtitle" className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Filter by vehicle and category. If you’re not sure what something means, check the mini-dictionary.
-          </p>
+      <div className="flex flex-col gap-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 data-testid="text-catalog-title" className="text-3xl font-bold tracking-tight md:text-4xl">
+              Shop Parts
+            </h1>
+            <p data-testid="text-catalog-subtitle" className="mt-2 text-muted-foreground">
+              Find exactly what you need with our comprehensive catalog
+            </p>
+          </div>
+          <BackButton fallback="/" />
         </div>
 
         <FiltersBar categories={cats} value={filters} onChange={setFilters} />
 
-        <Card className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
+        <Card className="border-border/50 p-6">
+          <div className="mb-4 flex items-start justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-[hsl(var(--primary))]" />
-                <div className="text-sm font-semibold">Beginner help</div>
+              <div className="flex items-center gap-2 mb-1">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <div className="font-semibold">Terminology Guide</div>
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Quick explanations so new riders can shop confidently.
+              <div className="text-sm text-muted-foreground">
+                New to parts? Learn the basics here
               </div>
             </div>
-            <Badge data-testid="badge-dictionary" className="rounded-full bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-              <Sparkles className="mr-1 h-3.5 w-3.5" /> Simple
+            <Badge data-testid="badge-dictionary" variant="secondary" className="rounded-md">
+              <Sparkles className="mr-1 h-3.5 w-3.5" /> Helpful
             </Badge>
           </div>
 
-          <div className="mt-4">
-            <Tabs defaultValue={intentVehicle === "all" ? "bike" : intentVehicle}>
-              <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-[hsl(var(--muted))] p-1">
-                <TabsTrigger data-testid="tab-bike" value="bike" className="rounded-xl">
-                  Bike terms
-                </TabsTrigger>
-                <TabsTrigger data-testid="tab-scooter" value="scooter" className="rounded-xl">
-                  Scooter terms
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="bike" className="mt-4">
-                <Accordion type="single" collapsible className="w-full">
-                  {["Drivetrain", "Cassette", "Rotor", "Tubeless"].map((t) => (
-                    <AccordionItem key={t} value={t}>
-                      <AccordionTrigger data-testid={`accordion-${t}`}>{t}</AccordionTrigger>
-                      <AccordionContent>
-                        <div data-testid={`text-definition-${t}`} className="flex items-start gap-2 text-sm text-muted-foreground">
-                          <Info className="mt-0.5 h-4 w-4 text-[hsl(var(--primary))]" />
-                          {t === "Drivetrain" && "The parts that make the bike move (chain, cassette, crank)."}
-                          {t === "Cassette" && "The gears on the rear wheel."}
-                          {t === "Rotor" && "The disc that brake pads squeeze to stop you."}
-                          {t === "Tubeless" && "A tire setup without an inner tube."}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </TabsContent>
-              <TabsContent value="scooter" className="mt-4">
-                <Accordion type="single" collapsible className="w-full">
-                  {["Controller", "Inner tube", "Brake lever"].map((t) => (
-                    <AccordionItem key={t} value={t}>
-                      <AccordionTrigger data-testid={`accordion-${t}`}>{t}</AccordionTrigger>
-                      <AccordionContent>
-                        <div data-testid={`text-definition-${t}`} className="flex items-start gap-2 text-sm text-muted-foreground">
-                          <Info className="mt-0.5 h-4 w-4 text-[hsl(var(--accent))]" />
-                          {t === "Controller" && "The scooter’s brain that controls power."}
-                          {t === "Inner tube" && "The inflatable tube inside some tires."}
-                          {t === "Brake lever" && "The handlebar lever you pull to slow down/stop."}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </TabsContent>
-            </Tabs>
-          </div>
+          <Tabs defaultValue={intentVehicle === "all" ? "bike" : intentVehicle} className="mt-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger data-testid="tab-bike" value="bike">
+                Bike Terms
+              </TabsTrigger>
+              <TabsTrigger data-testid="tab-scooter" value="scooter">
+                Scooter Terms
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="bike" className="mt-4">
+              <Accordion type="single" collapsible className="w-full">
+                {bikeTerms.map((term) => (
+                  <AccordionItem key={term.term} value={term.term}>
+                    <AccordionTrigger data-testid={`accordion-${term.term}`} className="font-medium">
+                      {term.term}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div data-testid={`text-definition-${term.term}`} className="flex items-start gap-3 text-sm text-muted-foreground">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <span>{term.definition}</span>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </TabsContent>
+            <TabsContent value="scooter" className="mt-4">
+              <Accordion type="single" collapsible className="w-full">
+                {scooterTerms.map((term) => (
+                  <AccordionItem key={term.term} value={term.term}>
+                    <AccordionTrigger data-testid={`accordion-${term.term}`} className="font-medium">
+                      {term.term}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div data-testid={`text-definition-${term.term}`} className="flex items-start gap-3 text-sm text-muted-foreground">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <span>{term.definition}</span>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </TabsContent>
+          </Tabs>
         </Card>
 
-        <div className="flex items-center justify-between pt-2">
-          <div data-testid="text-results-count" className="text-sm text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{visible.length}</span> items
+        <div className="flex items-center justify-between">
+          <div data-testid="text-results-count" className="text-sm font-medium text-muted-foreground">
+            Showing <span className="font-semibold text-foreground">{visible.length}</span> {visible.length === 1 ? "item" : "items"}
           </div>
         </div>
 
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((p) => (
-            <ProductCard key={p.id} part={p} />
-          ))}
-        </div>
+        {visible.length === 0 ? (
+          <Card className="border-border/50 p-12 text-center">
+            <p className="text-muted-foreground">No products found. Try adjusting your filters.</p>
+          </Card>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {visible.map((p) => (
+              <ProductCard key={p.id} part={p} />
+            ))}
+          </div>
+        )}
       </div>
     </SiteLayout>
   );

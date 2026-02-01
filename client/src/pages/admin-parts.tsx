@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Edit3, Minus, Plus, Trash2 } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
 import { useProducts, useDeleteProduct, useUpdateProductQuantity } from "@/lib/products";
 import { getProductImage } from "@/lib/mockData";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -52,27 +53,29 @@ export default function AdminParts() {
   return (
     <SiteLayout>
       <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 data-testid="text-admin-parts-title" className="font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
-              Parts
-            </h1>
-            <p data-testid="text-admin-parts-subtitle" className="mt-1 text-sm text-muted-foreground">
-              Manage your catalog and track inventory. Changes are saved.
-            </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex items-start gap-4 flex-1">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+                Products
+              </h1>
+              <p className="mt-2 text-muted-foreground">
+                Manage your catalog and track inventory
+              </p>
+            </div>
+            <BackButton fallback="/admin" />
           </div>
-          <div className="flex gap-2">
-            <Link href="/admin/new">
+          <Link href="/admin/new">
+            <Button size="lg" className="gap-2" asChild>
               <a data-testid="link-admin-add">
-                <Button data-testid="button-admin-add" className="h-11 rounded-2xl">
-                  <Plus className="mr-2 h-4 w-4" /> Add part
-                </Button>
+                <Plus className="h-5 w-5" />
+                Add Product
               </a>
-            </Link>
-          </div>
+            </Button>
+          </Link>
         </div>
 
-        <Card className="glass rounded-3xl overflow-hidden">
+        <Card className="border-border/50 overflow-hidden">
           {isMobile ? (
             <div className="divide-y divide-border/60">
               {parts.map((p) => (
@@ -94,13 +97,13 @@ export default function AdminParts() {
                       </div>
                       <div className="mt-0.5 text-sm text-muted-foreground">{p.deliveryEta}</div>
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <Badge variant="secondary" className="rounded-full text-xs">
+                        <Badge variant="outline" className="rounded-md text-xs">
                           {p.vehicle}
                         </Badge>
-                        <Badge variant="secondary" className="rounded-full text-xs">
+                        <Badge variant="outline" className="rounded-md text-xs">
                           {p.category}
                         </Badge>
-                        <Badge data-testid={`badge-admin-stock-${p.id}`} className={`rounded-full border-0 text-xs ${stockTone(p.stock)}`}>
+                        <Badge data-testid={`badge-admin-stock-${p.id}`} variant="outline" className={`rounded-md text-xs ${stockTone(p.stock)}`}>
                           {p.stock}
                         </Badge>
                       </div>
@@ -109,36 +112,36 @@ export default function AdminParts() {
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10 rounded-xl"
-                        onClick={() => handleQuantityChange(p.id, Math.max(0, (p.quantity ?? 0) - 1))}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="min-w-[2rem] text-center text-sm tabular-nums">
-                        {p.quantity ?? 0}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10 rounded-xl"
-                        onClick={() => handleQuantityChange(p.id, (p.quantity ?? 0) + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 rounded-lg"
+                          onClick={() => handleQuantityChange(p.id, Math.max(0, (p.quantity ?? 0) - 1))}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="min-w-[2rem] text-center text-sm font-medium tabular-nums">
+                          {p.quantity ?? 0}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 rounded-lg"
+                          onClick={() => handleQuantityChange(p.id, (p.quantity ?? 0) + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
                     </div>
                     <div className="flex gap-2">
                       <Link href={`/admin/edit/${p.id}`}>
                         <a>
                           <Button
                             data-testid={`button-admin-edit-${p.id}`}
-                            variant="secondary"
+                            variant="outline"
                             size="sm"
-                            className="h-10 rounded-xl"
+                            className="h-9 rounded-lg gap-2"
                           >
-                            <Edit3 className="h-4 w-4 md:mr-2" />
+                            <Edit3 className="h-4 w-4" />
                             <span className="hidden md:inline">Edit</span>
                           </Button>
                         </a>
@@ -147,11 +150,11 @@ export default function AdminParts() {
                         data-testid={`button-admin-delete-${p.id}`}
                         variant="destructive"
                         size="sm"
-                        className="h-10 rounded-xl"
+                        className="h-9 rounded-lg gap-2"
                         onClick={() => handleDelete(p.id, p.name)}
                         disabled={deleteProduct.isPending}
                       >
-                        <Trash2 className="h-4 w-4 md:mr-2" />
+                        <Trash2 className="h-4 w-4" />
                         <span className="hidden md:inline">Delete</span>
                       </Button>
                     </div>
@@ -195,7 +198,7 @@ export default function AdminParts() {
                     <TableCell className="text-sm">{p.category}</TableCell>
                     <TableCell className="text-sm tabular-nums">${p.price.toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge data-testid={`badge-admin-stock-${p.id}`} className={`rounded-full border-0 ${stockTone(p.stock)}`}>
+                      <Badge data-testid={`badge-admin-stock-${p.id}`} variant="outline" className={`rounded-md ${stockTone(p.stock)}`}>
                         {p.stock}
                       </Badge>
                     </TableCell>
@@ -228,21 +231,25 @@ export default function AdminParts() {
                           <a>
                             <Button
                               data-testid={`button-admin-edit-${p.id}`}
-                              variant="secondary"
-                              className="h-9 rounded-xl"
+                              variant="outline"
+                              size="sm"
+                              className="h-9 rounded-lg gap-2"
                             >
-                              <Edit3 className="mr-2 h-4 w-4" /> Edit
+                              <Edit3 className="h-4 w-4" />
+                              Edit
                             </Button>
                           </a>
                         </Link>
                         <Button
                           data-testid={`button-admin-delete-${p.id}`}
                           variant="destructive"
-                          className="h-9 rounded-xl"
+                          size="sm"
+                          className="h-9 rounded-lg gap-2"
                           onClick={() => handleDelete(p.id, p.name)}
                           disabled={deleteProduct.isPending}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          <Trash2 className="h-4 w-4" />
+                          Delete
                         </Button>
                       </div>
                     </TableCell>

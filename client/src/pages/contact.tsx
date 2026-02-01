@@ -1,10 +1,12 @@
 import React from "react";
-import { Mail, Send } from "lucide-react";
+import { Mail, Send, MessageSquare } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export default function ContactPage() {
@@ -46,94 +48,115 @@ export default function ContactPage() {
 
   return (
     <SiteLayout>
-      <div className="mx-auto max-w-2xl space-y-10 py-8">
-        <div>
-          <h1 className="font-[var(--font-serif)] text-3xl font-semibold tracking-tight text-foreground">
-            Contact Support
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Have a question or need help? Send us a message and we’ll get back to you as soon as we can.
-          </p>
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+              Contact Us
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Have a question? We're here to help. Send us a message and we'll respond as soon as possible.
+            </p>
+          </div>
+          <BackButton fallback="/" />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="contact-name">Name</Label>
-              <Input
-                id="contact-name"
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="rounded-xl"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact-email">Email</Label>
-              <Input
-                id="contact-email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-xl"
-                required
-              />
-            </div>
-          </div>
+        <div className="grid gap-8 md:grid-cols-3">
+          <Card className="border-border/50 p-6 md:col-span-2">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="contact-name">Name</Label>
+                  <Input
+                    id="contact-name"
+                    type="text"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="rounded-lg"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact-email">Email</Label>
+                  <Input
+                    id="contact-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="rounded-lg"
+                    required
+                  />
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="contact-subject">Subject (optional)</Label>
-            <Input
-              id="contact-subject"
-              type="text"
-              placeholder="Order, returns, shipping…"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="rounded-xl"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-subject">Subject (optional)</Label>
+                <Input
+                  id="contact-subject"
+                  type="text"
+                  placeholder="Order, returns, shipping…"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="rounded-lg"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="contact-message">Message</Label>
-            <Textarea
-              id="contact-message"
-              placeholder="How can we help?"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={5}
-              className="rounded-xl resize-none"
-              required
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-message">Message</Label>
+                <Textarea
+                  id="contact-message"
+                  placeholder="How can we help?"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={6}
+                  className="rounded-lg resize-none"
+                  required
+                />
+              </div>
 
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="h-11 rounded-xl"
-          >
-            {submitting ? (
-              "Sending…"
-            ) : (
-              <>
-                <Send className="mr-2 h-4 w-4" />
-                Send message
-              </>
-            )}
-          </Button>
-        </form>
+              <Button
+                type="submit"
+                disabled={submitting}
+                size="lg"
+                className="w-full"
+              >
+                {submitting ? (
+                  "Sending…"
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send Message
+                  </>
+                )}
+              </Button>
+            </form>
+          </Card>
 
-        <div className="flex items-start gap-4 rounded-xl border border-border/60 bg-muted/30 p-6">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-            <Mail className="h-5 w-5 text-muted-foreground" />
-          </div>
-          <div>
-            <h2 className="font-medium text-foreground">Prefer email?</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              You can also reach us at support@smokecitysupplies.com. We typically respond within 1–2 business days.
-            </p>
+          <div className="space-y-4">
+            <Card className="border-border/50 p-6">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Mail className="h-6 w-6" />
+              </div>
+              <h3 className="mb-2 font-semibold">Email Us</h3>
+              <p className="text-sm text-muted-foreground">
+                support@smokecitysupplies.com
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                We typically respond within 1–2 business days.
+              </p>
+            </Card>
+
+            <Card className="border-border/50 p-6">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <MessageSquare className="h-6 w-6" />
+              </div>
+              <h3 className="mb-2 font-semibold">Response Time</h3>
+              <p className="text-sm text-muted-foreground">
+                Most inquiries are answered within 24 hours during business days.
+              </p>
+            </Card>
           </div>
         </div>
       </div>

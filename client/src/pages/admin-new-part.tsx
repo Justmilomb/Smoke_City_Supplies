@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
 import { useCategories } from "@/lib/store";
 import { useCreateProduct } from "@/lib/products";
 import type { PartCategory, VehicleType } from "@/lib/mockData";
@@ -124,25 +125,18 @@ export default function AdminNewPart() {
       <div className="flex flex-col gap-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Badge data-testid="badge-admin-new" className="rounded-full bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-              <Sparkles className="mr-1 h-3.5 w-3.5" /> Add new
-            </Badge>
-            <h1 data-testid="text-admin-new-title" className="mt-2 font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
-              Add a part
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+              Add Product
             </h1>
-            <p data-testid="text-admin-new-subtitle" className="mt-1 text-sm text-muted-foreground">
-              Upload an image, fill the details, and publish to your catalog.
+            <p className="mt-2 text-muted-foreground">
+              Upload an image and fill in product details
             </p>
           </div>
-          <Link href="/admin">
-            <a data-testid="link-admin-back" className="text-sm font-medium text-[hsl(var(--primary))] hover:underline">
-              Back to dashboard
-            </a>
-          </Link>
+          <BackButton fallback="/admin" />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-12">
-          <Card className="glass overflow-hidden rounded-3xl lg:col-span-5">
+          <Card className="border-border/50 overflow-hidden rounded-lg lg:col-span-5">
             <div className="border-b border-border/60 p-5">
               <div className="flex items-center gap-2">
                 <ImagePlus className="h-4 w-4 text-[hsl(var(--primary))]" />
@@ -154,7 +148,7 @@ export default function AdminNewPart() {
             </div>
 
             <div className="p-5">
-              <div className="aspect-square rounded-3xl bg-[hsl(var(--muted))]">
+              <div className="aspect-square rounded-lg bg-[hsl(var(--muted))]">
                 {preview ? (
                   <img
                     data-testid="img-admin-preview"
@@ -175,7 +169,7 @@ export default function AdminNewPart() {
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-xl file:border-0 file:bg-[hsl(var(--primary))] file:px-4 file:py-3 file:text-sm file:font-semibold file:text-[hsl(var(--primary-foreground))] hover:file:opacity-90"
+                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-primary-foreground hover:file:opacity-90"
                   onChange={(e) => {
                     onFile(e.target.files?.[0]);
                     e.target.value = "";
@@ -189,7 +183,7 @@ export default function AdminNewPart() {
             </div>
           </Card>
 
-          <Card className="glass rounded-3xl p-5 lg:col-span-7">
+          <Card className="border-border/50 rounded-lg p-5 lg:col-span-7">
             <Form {...form}>
               <form data-testid="form-admin-new" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -199,7 +193,7 @@ export default function AdminNewPart() {
                     <FormItem>
                       <FormLabel>Part name</FormLabel>
                       <FormControl>
-                        <Input data-testid="input-part-name" placeholder="e.g., 10×2.5 tire, 160mm rotor" {...field} className="h-11 rounded-xl" />
+                        <Input data-testid="input-part-name" placeholder="e.g., 10×2.5 tire, 160mm rotor" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -215,7 +209,7 @@ export default function AdminNewPart() {
                         <FormLabel>Vehicle</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-part-vehicle" className="h-11 rounded-xl">
+                            <SelectTrigger data-testid="select-part-vehicle" className="h-11 rounded-lg">
                               <SelectValue placeholder="Select vehicle" />
                             </SelectTrigger>
                           </FormControl>
@@ -237,7 +231,7 @@ export default function AdminNewPart() {
                         <FormLabel>Category</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-part-category" className="h-11 rounded-xl">
+                            <SelectTrigger data-testid="select-part-category" className="h-11 rounded-lg">
                               <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                           </FormControl>
@@ -263,7 +257,7 @@ export default function AdminNewPart() {
                       <FormItem>
                         <FormLabel>Price (GBP)</FormLabel>
                         <FormControl>
-                          <Input data-testid="input-part-price" type="number" step="0.01" placeholder="19.99" {...field} className="h-11 rounded-xl" />
+                          <Input data-testid="input-part-price" type="number" step="0.01" placeholder="19.99" {...field} className="h-11 rounded-lg" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -278,7 +272,7 @@ export default function AdminNewPart() {
                         <FormLabel>Stock</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-part-stock" className="h-11 rounded-xl">
+                            <SelectTrigger data-testid="select-part-stock" className="h-11 rounded-lg">
                               <SelectValue placeholder="Stock" />
                             </SelectTrigger>
                           </FormControl>
@@ -301,7 +295,7 @@ export default function AdminNewPart() {
                     <FormItem>
                       <FormLabel>Delivery promise</FormLabel>
                       <FormControl>
-                        <Input data-testid="input-part-delivery" placeholder="Next-day delivery" {...field} className="h-11 rounded-xl" />
+                        <Input data-testid="input-part-delivery" placeholder="Next-day delivery" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -315,7 +309,7 @@ export default function AdminNewPart() {
                     <FormItem>
                       <FormLabel>Compatibility (comma separated)</FormLabel>
                       <FormControl>
-                        <Input data-testid="input-part-compat" placeholder="e.g., Road, MTB, 10 inch" {...field} className="h-11 rounded-xl" />
+                        <Input data-testid="input-part-compat" placeholder="e.g., Road, MTB, 10 inch" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -329,7 +323,7 @@ export default function AdminNewPart() {
                     <FormItem>
                       <FormLabel>Tags (comma separated)</FormLabel>
                       <FormControl>
-                        <Input data-testid="input-part-tags" placeholder="e.g., Popular, Fast shipping" {...field} className="h-11 rounded-xl" />
+                        <Input data-testid="input-part-tags" placeholder="e.g., Popular, Fast shipping" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -343,7 +337,7 @@ export default function AdminNewPart() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea data-testid="textarea-part-description" placeholder="Short, clear description…" {...field} className="min-h-[120px] rounded-xl" />
+                        <Textarea data-testid="textarea-part-description" placeholder="Short, clear description…" {...field} className="min-h-[120px] rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -354,7 +348,7 @@ export default function AdminNewPart() {
                   <Button
                     data-testid="button-admin-save"
                     type="submit"
-                    className="h-11 rounded-2xl"
+                    className="h-11 rounded-lg"
                     disabled={createProduct.isPending}
                   >
                     {createProduct.isPending ? "Saving…" : "Save part"}
@@ -363,7 +357,7 @@ export default function AdminNewPart() {
                     data-testid="button-admin-cancel"
                     type="button"
                     variant="secondary"
-                    className="h-11 rounded-2xl"
+                    className="h-11 rounded-lg"
                     onClick={() => setLoc("/admin")}
                   >
                     Cancel

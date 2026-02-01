@@ -57,38 +57,38 @@
 }
 
 :root {
-  --button-outline: rgba(0, 0, 0, 0.12);
-  --badge-outline: rgba(0, 0, 0, 0.06);
+  --button-outline: rgba(0, 0, 0, 0.08);
+  --badge-outline: rgba(0, 0, 0, 0.04);
   --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0, 0, 0, 0.03);
-  --elevate-2: rgba(0, 0, 0, 0.08);
+  --elevate-1: rgba(0, 0, 0, 0.02);
+  --elevate-2: rgba(0, 0, 0, 0.06);
 
-  --background: 220 24% 98%;
-  --foreground: 222 30% 12%;
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
 
   --card: 0 0% 100%;
-  --card-foreground: 222 30% 12%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222 30% 12%;
+  --popover-foreground: 222 47% 11%;
 
-  --primary: 204 86% 52%;
-  --primary-foreground: 210 40% 98%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 18% 94%;
-  --secondary-foreground: 222 30% 12%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 222 47% 11%;
 
-  --muted: 220 18% 95%;
-  --muted-foreground: 222 12% 45%;
+  --muted: 220 13% 96%;
+  --muted-foreground: 220 9% 46%;
 
-  --accent: 188 84% 44%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 221 83% 53%;
+  --accent-foreground: 0 0% 100%;
 
   --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 222 18% 88%;
-  --input: 222 18% 84%;
-  --ring: 204 86% 52%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 221 83% 53%;
 
   --chart-1: 204 86% 52%;
   --chart-2: 188 84% 44%;
@@ -276,11 +276,7 @@
   }
 
   .app-surface {
-    background:
-      radial-gradient(1200px 700px at 15% 0%, hsl(204 90% 56% / 0.16), transparent 55%),
-      radial-gradient(900px 600px at 90% 10%, hsl(188 88% 48% / 0.14), transparent 52%),
-      radial-gradient(900px 600px at 45% 100%, hsl(262 88% 64% / 0.10), transparent 55%),
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 55%, hsl(220 24% 96%) 100%);
+    background: hsl(var(--background));
   }
 
   .glass {

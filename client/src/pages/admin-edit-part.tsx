@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
 import { useCategories } from "@/lib/store";
 import { useProduct, useUpdateProduct } from "@/lib/products";
 import { getProductImage } from "@/lib/mockData";
@@ -169,25 +170,18 @@ export default function AdminEditPart() {
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <Badge className="rounded-full bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-              <Pencil className="mr-1 h-3.5 w-3.5" /> Edit part
-            </Badge>
-            <h1 className="mt-2 font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
-              Edit {product.name}
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+              Edit Product
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Update details and image. Changes are saved when you click Save.
+            <p className="mt-2 text-muted-foreground">
+              Update product details and image
             </p>
           </div>
-          <Link href="/admin/parts">
-            <a className="text-sm font-medium text-[hsl(var(--primary))] hover:underline">
-              Back to parts
-            </a>
-          </Link>
+          <BackButton fallback="/admin/parts" />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-12">
-          <Card className="glass overflow-hidden rounded-3xl lg:col-span-5">
+          <Card className="border-border/50 overflow-hidden rounded-lg lg:col-span-5">
             <div className="border-b border-border/60 p-5">
               <div className="flex items-center gap-2">
                 <ImagePlus className="h-4 w-4 text-[hsl(var(--primary))]" />
@@ -195,7 +189,7 @@ export default function AdminEditPart() {
               </div>
             </div>
             <div className="p-5">
-              <div className="aspect-square rounded-3xl bg-[hsl(var(--muted))]">
+              <div className="aspect-square rounded-lg bg-[hsl(var(--muted))]">
                 {preview ? (
                   <img
                     src={preview}
@@ -213,7 +207,7 @@ export default function AdminEditPart() {
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-xl file:border-0 file:bg-[hsl(var(--primary))] file:px-4 file:py-3 file:text-sm file:font-semibold file:text-[hsl(var(--primary-foreground))] hover:file:opacity-90"
+                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-primary-foreground hover:file:opacity-90"
                   onChange={(e) => {
                     onFile(e.target.files?.[0]);
                     e.target.value = "";
@@ -224,7 +218,7 @@ export default function AdminEditPart() {
             </div>
           </Card>
 
-          <Card className="glass rounded-3xl p-5 lg:col-span-7">
+          <Card className="border-border/50 rounded-lg p-5 lg:col-span-7">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -234,7 +228,7 @@ export default function AdminEditPart() {
                     <FormItem>
                       <FormLabel>Part name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., 10×2.5 tire" {...field} className="h-11 rounded-xl" />
+                        <Input placeholder="e.g., 10×2.5 tire" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -249,7 +243,7 @@ export default function AdminEditPart() {
                         <FormLabel>Vehicle</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger className="h-11 rounded-xl">
+                            <SelectTrigger className="h-11 rounded-lg">
                               <SelectValue placeholder="Select vehicle" />
                             </SelectTrigger>
                           </FormControl>
@@ -270,7 +264,7 @@ export default function AdminEditPart() {
                         <FormLabel>Category</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger className="h-11 rounded-xl">
+                            <SelectTrigger className="h-11 rounded-lg">
                               <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                           </FormControl>
@@ -295,7 +289,7 @@ export default function AdminEditPart() {
                       <FormItem>
                         <FormLabel>Price (GBP)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="19.99" {...field} className="h-11 rounded-xl" />
+                          <Input type="number" step="0.01" placeholder="19.99" {...field} className="h-11 rounded-lg" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -309,7 +303,7 @@ export default function AdminEditPart() {
                         <FormLabel>Stock</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger className="h-11 rounded-xl">
+                            <SelectTrigger className="h-11 rounded-lg">
                               <SelectValue placeholder="Stock" />
                             </SelectTrigger>
                           </FormControl>
@@ -331,7 +325,7 @@ export default function AdminEditPart() {
                     <FormItem>
                       <FormLabel>Delivery promise</FormLabel>
                       <FormControl>
-                        <Input placeholder="Next-day delivery" {...field} className="h-11 rounded-xl" />
+                        <Input placeholder="Next-day delivery" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -344,7 +338,7 @@ export default function AdminEditPart() {
                     <FormItem>
                       <FormLabel>Compatibility (comma separated)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Road, MTB" {...field} className="h-11 rounded-xl" />
+                        <Input placeholder="e.g., Road, MTB" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -357,7 +351,7 @@ export default function AdminEditPart() {
                     <FormItem>
                       <FormLabel>Tags (comma separated)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Popular, Fast shipping" {...field} className="h-11 rounded-xl" />
+                        <Input placeholder="e.g., Popular, Fast shipping" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -370,7 +364,7 @@ export default function AdminEditPart() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Short, clear description…" {...field} className="min-h-[120px] rounded-xl" />
+                        <Textarea placeholder="Short, clear description…" {...field} className="min-h-[120px] rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -379,7 +373,7 @@ export default function AdminEditPart() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <Button
                     type="submit"
-                    className="h-11 rounded-2xl"
+                    className="h-11 rounded-lg"
                     disabled={updateProduct.isPending}
                   >
                     {updateProduct.isPending ? "Saving…" : "Save changes"}
@@ -387,7 +381,7 @@ export default function AdminEditPart() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="h-11 rounded-2xl"
+                    className="h-11 rounded-lg"
                     onClick={() => setLoc("/admin/parts")}
                   >
                     Cancel

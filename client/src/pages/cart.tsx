@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
-import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Trash2, CheckCircle2 } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -74,17 +75,15 @@ export default function CartPage() {
   if (state.items.length === 0 && !orderPlaced) {
     return (
       <SiteLayout>
-        <Card className="rounded-2xl border border-border/60 bg-card p-12 text-center shadow-sm">
-          <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h2 className="mt-4 font-[var(--font-serif)] text-xl font-semibold">
-            Your cart is empty
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Add parts from the catalog to get started.
+        <Card className="border-border/50 p-16 text-center">
+          <ShoppingBag className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Your cart is empty</h2>
+          <p className="text-muted-foreground mb-6">
+            Start shopping to add items to your cart
           </p>
           <Link href="/catalog">
-            <Button className="mt-6 rounded-2xl" asChild>
-              <a>Shop parts</a>
+            <Button size="lg" asChild>
+              <a>Browse Products</a>
             </Button>
           </Link>
         </Card>
@@ -95,27 +94,32 @@ export default function CartPage() {
   if (orderPlaced) {
     return (
       <SiteLayout>
-        <Card className="rounded-2xl border border-border/60 bg-card p-8 text-center shadow-sm">
-          <h2 className="font-[var(--font-serif)] text-2xl font-semibold text-emerald-600">
-            Order confirmed
+        <Card className="border-border/50 p-12 text-center max-w-2xl mx-auto">
+          <div className="mb-6 flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <CheckCircle2 className="h-8 w-8" />
+            </div>
+          </div>
+          <h2 className="text-3xl font-bold mb-2 text-emerald-600">
+            Order Confirmed!
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {orderId && (
-              <>Order ID: <span className="font-mono">{orderId}</span></>
-            )}
+          {orderId && (
+            <p className="text-muted-foreground mb-4">
+              Order ID: <span className="font-mono font-semibold">{orderId}</span>
+            </p>
+          )}
+          <p className="text-muted-foreground mb-8">
+            Thank you for your order. We'll send you a confirmation email shortly and ship your items as soon as possible.
           </p>
-          <p className="mt-4 text-muted-foreground">
-            Thank you for your order. We&apos;ll get it shipped soon.
-          </p>
-          <div className="mt-6 flex justify-center gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/catalog">
-              <Button variant="secondary" className="rounded-2xl" asChild>
-                <a>Continue shopping</a>
+              <Button variant="outline" size="lg" asChild>
+                <a>Continue Shopping</a>
               </Button>
             </Link>
             <Link href="/">
-              <Button className="rounded-2xl" asChild>
-                <a>Back to home</a>
+              <Button size="lg" asChild>
+                <a>Back to Home</a>
               </Button>
             </Link>
           </div>
@@ -127,111 +131,132 @@ export default function CartPage() {
   return (
     <SiteLayout>
       <div className="flex flex-col gap-8">
-        <h1 className="font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
-          Your cart
-        </h1>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+              Shopping Cart
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Review your items and proceed to checkout
+            </p>
+          </div>
+          <BackButton fallback="/catalog" />
+        </div>
 
-        <div className="grid gap-10 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-8">
+        <div className="grid gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-4">
             {state.items.map((item) => (
-              <Card
-                key={item.productId}
-                className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6"
-              >
-                <div className="flex flex-1 items-start gap-4 sm:min-w-0">
-                  <div className="h-20 w-20 shrink-0 rounded-xl bg-muted/50 overflow-hidden sm:h-16 sm:w-16">
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt=""
-                        className="h-full w-full object-contain p-2"
-                      />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">
-                        —
+              <Card key={item.productId} className="border-border/50 p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className="flex flex-1 items-start gap-4">
+                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-muted/50">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.productName}
+                          className="h-full w-full object-contain p-2"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <Link href={`/product/${item.productId}`}>
+                        <a className="font-semibold hover:text-primary transition-colors block mb-1">
+                          {item.productName}
+                        </a>
+                      </Link>
+                      <p className="text-sm text-muted-foreground">
+                        ${item.priceEach.toFixed(2)} each
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 sm:justify-end">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() =>
+                          actions.updateQuantity(
+                            item.productId,
+                            Math.max(1, item.quantity - 1)
+                          )
+                        }
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="min-w-[2.5rem] text-center text-sm font-medium tabular-nums">
+                        {item.quantity}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() =>
+                          actions.updateQuantity(item.productId, item.quantity + 1)
+                        }
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Subtotal</div>
+                        <div className="text-lg font-bold tabular-nums">
+                          ${(item.priceEach * item.quantity).toFixed(2)}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/product/${item.productId}`}>
-                      <a className="font-medium hover:underline block">
-                        {item.productName}
-                      </a>
-                    </Link>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      ${item.priceEach.toFixed(2)} each
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/60 pt-4 sm:border-0 sm:pt-0 sm:justify-end">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-11 w-11 rounded-xl shrink-0"
-                      onClick={() =>
-                        actions.updateQuantity(
-                          item.productId,
-                          Math.max(1, item.quantity - 1)
-                        )
-                      }
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <span className="min-w-[2.5rem] text-center text-sm tabular-nums font-medium">
-                      {item.quantity}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-11 w-11 rounded-xl shrink-0"
-                      onClick={() =>
-                        actions.updateQuantity(item.productId, item.quantity + 1)
-                      }
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-semibold tabular-nums">
-                      ${(item.priceEach * item.quantity).toFixed(2)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 rounded-xl text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => actions.remove(item.productId)}
-                      aria-label="Remove from cart"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                        onClick={() => actions.remove(item.productId)}
+                        aria-label="Remove from cart"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
             ))}
           </div>
 
-          <Card className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm h-fit">
-            <div className="text-base font-semibold">Summary</div>
-            <div className="mt-5 flex justify-between text-sm text-muted-foreground">
-              <span>Subtotal ({state.items.reduce((s, i) => s + i.quantity, 0)} items)</span>
-              <span className="tabular-nums font-medium text-foreground">
-                ${total.toFixed(2)}
-              </span>
-            </div>
-            <div className="mt-4 pt-4 border-t border-border/60 flex justify-between font-semibold text-base">
-              <span>Total</span>
-              <span className="tabular-nums">${total.toFixed(2)}</span>
+          <Card className="border-border/50 p-6 h-fit lg:sticky lg:top-20">
+            <h2 className="mb-6 text-lg font-semibold">Order Summary</h2>
+            <div className="space-y-4 mb-6">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Subtotal ({state.items.reduce((s, i) => s + i.quantity, 0)} {state.items.reduce((s, i) => s + i.quantity, 0) === 1 ? "item" : "items"})
+                </span>
+                <span className="font-medium tabular-nums">
+                  ${total.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="font-medium">Calculated at checkout</span>
+              </div>
+              <div className="border-t pt-4 flex justify-between">
+                <span className="font-semibold">Total</span>
+                <span className="text-xl font-bold tabular-nums">
+                  ${total.toFixed(2)}
+                </span>
+              </div>
             </div>
             <Button
-              className="mt-6 w-full h-12 rounded-2xl"
+              className="w-full h-12 text-base"
+              size="lg"
               onClick={() => setCheckoutOpen(true)}
             >
-              Checkout
+              Proceed to Checkout
             </Button>
             <Link href="/catalog">
-              <Button variant="secondary" className="mt-4 w-full h-11 rounded-2xl" asChild>
-                <a>Continue shopping</a>
+              <Button variant="outline" className="mt-3 w-full" asChild>
+                <a>Continue Shopping</a>
               </Button>
             </Link>
           </Card>
@@ -239,11 +264,11 @@ export default function CartPage() {
       </div>
 
       <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="rounded-3xl sm:max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Checkout</DialogTitle>
             <DialogDescription>
-              Optional: add your email and name for order updates.
+              Enter your information to complete your order
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -255,7 +280,7 @@ export default function CartPage() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-xl"
+                className="rounded-lg"
               />
             </div>
             <div className="grid gap-2">
@@ -265,27 +290,30 @@ export default function CartPage() {
                 placeholder="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="rounded-xl"
+                className="rounded-lg"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
-              Total: <span className="font-semibold text-foreground">${total.toFixed(2)}</span>
+            <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-muted-foreground">Order Total</span>
+                <span className="font-semibold">${total.toFixed(2)}</span>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button
-              variant="secondary"
+              variant="outline"
               onClick={() => setCheckoutOpen(false)}
-              className="rounded-xl"
+              className="rounded-lg"
             >
               Cancel
             </Button>
             <Button
-              className="rounded-xl"
+              className="rounded-lg"
               onClick={handleCheckout}
               disabled={state.items.length === 0 || placingOrder}
             >
-              {placingOrder ? "Placing…" : "Place order"}
+              {placingOrder ? "Processing…" : "Place Order"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -8,6 +8,7 @@ import { createServer } from "http";
 import { UPLOADS_DIR } from "./upload";
 import { pool } from "./db";
 import "./auth"; // Passport strategies
+import { securityHeaders, corsConfig } from "./security";
 
 const PgSession = connectPgSimple(session);
 const MemSessionStore = createMemoryStore(session);
@@ -32,7 +33,11 @@ app.use(
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "10mb" }));
+
+// Security headers (apply to all routes)
+app.use(securityHeaders);
+app.use(corsConfig);
 
 // Session (required for Passport) — use PostgreSQL when DATABASE_URL set, else in-memory for local dev
 const sessionSecret = process.env.SESSION_SECRET || "dev-session-secret-change-in-production";

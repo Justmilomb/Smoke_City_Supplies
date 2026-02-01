@@ -1,5 +1,6 @@
 import React from "react";
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -106,17 +107,20 @@ export default function AdminOrders() {
 
   return (
     <SiteLayout>
-      <div className="flex flex-col gap-6">
-        <div>
-          <h1 className="font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
-            Orders
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            View and update order status. Inventory is updated when orders are placed.
-          </p>
+      <div className="flex flex-col gap-8">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+              Orders
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              View and manage customer orders. Update status to track fulfillment.
+            </p>
+          </div>
+          <BackButton fallback="/admin" />
         </div>
 
-        <Card className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
+        <Card className="border-border/50 overflow-hidden">
           {orders.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               No orders yet.

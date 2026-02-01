@@ -37,22 +37,22 @@ export default function AdminLogin() {
   return (
     <SiteLayout>
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4">
-        <div className="w-full max-w-sm">
-          <div className="mb-6 flex items-center gap-2">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-              <Lock className="h-5 w-5" />
-            </span>
-            <div>
-              <h1 className="font-[var(--font-serif)] text-2xl font-semibold tracking-tight">
-                Admin sign in
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Sign in to manage products and orders
-              </p>
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <div className="mb-4 flex justify-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Lock className="h-8 w-8" />
+              </div>
             </div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Admin Sign In
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Sign in to manage your store
+            </p>
           </div>
-          <Card className="glass rounded-3xl p-6">
-            <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <Card className="border-border/50 p-8">
+            <form onSubmit={onSubmit} className="flex flex-col gap-6">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <Input
@@ -61,7 +61,7 @@ export default function AdminLogin() {
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="h-11 rounded-xl"
+                  className="h-11 rounded-lg"
                   placeholder="admin"
                   disabled={isLoggingIn}
                 />
@@ -74,22 +74,23 @@ export default function AdminLogin() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 rounded-xl"
+                  className="h-11 rounded-lg"
                   placeholder="••••••••"
                   disabled={isLoggingIn}
                 />
               </div>
               <Button
                 type="submit"
-                className="mt-2 h-11 rounded-2xl"
+                size="lg"
+                className="w-full"
                 disabled={isLoggingIn}
               >
-                {isLoggingIn ? "Signing in…" : "Sign in"}
+                {isLoggingIn ? "Signing in…" : "Sign In"}
               </Button>
             </form>
           </Card>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Default: username <strong>admin</strong>, password <strong>admin</strong>. Change in production.
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Default credentials: username <strong>admin</strong>, password <strong>admin</strong>
           </p>
         </div>
       </div>

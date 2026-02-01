@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "wouter";
 import { FolderTree, Plus, Pencil, Trash2 } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
 import {
   useCategoriesQuery,
   useCreateCategory,
@@ -121,29 +122,21 @@ export default function AdminCategories() {
     <SiteLayout>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Badge
-              data-testid="badge-admin-categories"
-              className="rounded-full bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]"
-            >
-              <FolderTree className="mr-1 h-3.5 w-3.5" /> Categories
-            </Badge>
-            <h1 className="mt-2 font-[var(--font-serif)] text-3xl font-semibold tracking-tight">
-              Manage categories
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Add and edit categories for parts. Products use these in the catalog.
-            </p>
+          <div className="flex items-start gap-4 flex-1">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+                Categories
+              </h1>
+              <p className="mt-2 text-muted-foreground">
+                Organize your products with custom categories
+              </p>
+            </div>
+            <BackButton fallback="/admin" />
           </div>
-          <div className="flex gap-2">
-            <Link href="/admin">
-              <a className="text-sm font-medium text-[hsl(var(--primary))] hover:underline">
-                Back to dashboard
-              </a>
-            </Link>
-            <Button
-              data-testid="button-add-category"
-              className="h-11 rounded-2xl"
+          <Button
+            data-testid="button-add-category"
+            size="lg"
+            className="gap-2"
               onClick={() => {
                 setEditing(null);
                 setName("");
@@ -157,14 +150,14 @@ export default function AdminCategories() {
           </div>
         </div>
 
-        <Card className="glass rounded-3xl p-6">
+        <Card className="border-border/50 p-6">
           {!categories?.length ? (
             <div className="py-12 text-center text-muted-foreground">
               <FolderTree className="mx-auto h-12 w-12 opacity-50" />
               <p className="mt-2">No categories yet</p>
               <p className="text-sm">Add a category to organize your parts.</p>
               <Button
-                className="mt-4 rounded-2xl"
+                className="mt-4 rounded-lg"
                 onClick={() => setDialogOpen(true)}
               >
                 <Plus className="mr-2 h-4 w-4" /> Add category
@@ -175,11 +168,11 @@ export default function AdminCategories() {
               {categories.map((c) => (
                 <li
                   key={c.id}
-                  className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/60 p-4"
+                  className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border/50 bg-card p-4"
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-medium">{c.name}</span>
-                    <Badge variant="secondary" className="rounded-full text-xs">
+                    <Badge variant="outline" className="rounded-md text-xs">
                       {c.vehicleType}
                     </Badge>
                     <span className="text-xs text-muted-foreground">{c.slug}</span>
@@ -188,7 +181,7 @@ export default function AdminCategories() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 rounded-xl"
+                      className="h-9 rounded-lg"
                       onClick={() => openEdit(c)}
                     >
                       <Pencil className="h-4 w-4" />
@@ -196,7 +189,7 @@ export default function AdminCategories() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 rounded-xl text-destructive hover:text-destructive"
+                      className="h-9 rounded-lg text-destructive hover:text-destructive"
                       onClick={() => handleDelete(c.id)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -210,7 +203,7 @@ export default function AdminCategories() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="rounded-3xl sm:max-w-md">
+        <DialogContent className="rounded-lg sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit category" : "Add category"}</DialogTitle>
           </DialogHeader>
@@ -222,7 +215,7 @@ export default function AdminCategories() {
                 value={name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="e.g. Brakes"
-                className="h-11 rounded-xl"
+                className="h-11 rounded-lg"
                 disabled={createCategory.isPending || updateCategory.isPending}
               />
             </div>
@@ -233,7 +226,7 @@ export default function AdminCategories() {
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="brakes"
-                className="h-11 rounded-xl font-mono text-sm"
+                className="h-11 rounded-lg font-mono text-sm"
                 disabled={createCategory.isPending || updateCategory.isPending}
               />
             </div>
@@ -243,7 +236,7 @@ export default function AdminCategories() {
                 value={vehicleType}
                 onValueChange={(v) => setVehicleType(v as "bike" | "scooter" | "all")}
               >
-                <SelectTrigger className="h-11 rounded-xl">
+                <SelectTrigger className="h-11 rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

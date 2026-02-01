@@ -1,76 +1,84 @@
 import { Link } from "wouter";
-import { Truck, Clock, MapPin, Package } from "lucide-react";
+import { Truck, Clock, MapPin, Package, CheckCircle2 } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
+import BackButton from "@/components/site/BackButton";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default function ShippingPage() {
   return (
     <SiteLayout>
-      <div className="mx-auto max-w-2xl space-y-12 py-8">
-        <div>
-          <h1 className="font-[var(--font-serif)] text-3xl font-semibold tracking-tight text-foreground">
-            Shipping & Delivery
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            How we get your parts to you.
-          </p>
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+              Shipping & Delivery
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Fast, reliable shipping to get your parts to you quickly
+            </p>
+          </div>
+          <BackButton fallback="/" />
         </div>
 
-        <section className="space-y-6">
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <Truck className="h-5 w-5 text-muted-foreground" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="border-border/50 p-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Truck className="h-6 w-6" />
             </div>
+            <h2 className="mb-2 text-lg font-semibold">Delivery Times</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Most orders ship within 1–2 business days. Standard delivery is 3–5 business days from shipment. Next-day delivery is available on popular parts for eligible areas.
+            </p>
+          </Card>
+
+          <Card className="border-border/50 p-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Package className="h-6 w-6" />
+            </div>
+            <h2 className="mb-2 text-lg font-semibold">Shipping Costs</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Standard shipping: $5.99. Free shipping on orders over $75. Express options available at checkout.
+            </p>
+          </Card>
+
+          <Card className="border-border/50 p-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <MapPin className="h-6 w-6" />
+            </div>
+            <h2 className="mb-2 text-lg font-semibold">Areas We Cover</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              We ship to the continental United States. Alaska, Hawaii, and international shipping may be available—contact us for a quote.
+            </p>
+          </Card>
+
+          <Card className="border-border/50 p-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Clock className="h-6 w-6" />
+            </div>
+            <h2 className="mb-2 text-lg font-semibold">Tracking</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Once your order ships, you'll receive an email with a tracking number so you can follow your delivery.
+            </p>
+          </Card>
+        </div>
+
+        <Card className="mt-8 border-border/50 bg-primary/5 p-6">
+          <div className="flex items-start gap-4">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 text-primary shrink-0" />
             <div>
-              <h2 className="font-medium text-foreground">Delivery times</h2>
-              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                Most orders ship within 1–2 business days. Standard delivery is 3–5 business days from shipment. Next-day delivery is available on popular parts for eligible areas.
+              <h3 className="font-semibold mb-1">Need Help?</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Have questions about shipping for your order? We're here to help.
               </p>
+              <Link href="/contact">
+                <Button variant="outline" size="sm" asChild>
+                  <a>Contact Support</a>
+                </Button>
+              </Link>
             </div>
           </div>
-
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <Package className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h2 className="font-medium text-foreground">Shipping costs</h2>
-              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                Standard shipping: $5.99. Free shipping on orders over $75. Express options available at checkout.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <MapPin className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h2 className="font-medium text-foreground">Areas we cover</h2>
-              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                We ship to the continental United States. Alaska, Hawaii, and international shipping may be available—contact us for a quote.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h2 className="font-medium text-foreground">Tracking</h2>
-              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                Once your order ships, you’ll receive an email with a tracking number so you can follow your delivery.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <p className="text-sm text-muted-foreground">
-          <Link href="/contact">
-            <a className="underline hover:text-foreground">Contact us</a>
-          </Link>{" "}
-          if you have questions about shipping for your order.
-        </p>
+        </Card>
       </div>
     </SiteLayout>
   );

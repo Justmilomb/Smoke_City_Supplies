@@ -14,6 +14,18 @@ import { uploadMiddleware } from "./upload";
 import { requireAuth } from "./auth";
 import { seedAdminIfNeeded, seedCategoriesIfNeeded } from "./seedAdmin";
 import passport from "passport";
+import {
+  contactFormSchema,
+  orderStatusSchema,
+  sanitizeProductInput,
+  sanitizeCategoryInput,
+} from "./validation";
+import {
+  authRateLimiter,
+  contactRateLimiter,
+  apiRateLimiter,
+  orderRateLimiter,
+} from "./rateLimit";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -35,7 +47,7 @@ export async function registerRoutes(
     return res.json({ user: null });
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", authRateLimiter, (req, res, next) => {
     passport.authenticate("local", (err: Error | null, user: Express.User | false) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: "Invalid username or password" });
@@ -56,23 +68,22 @@ export async function registerRoutes(
     });
   });
 
-  // Contact form (public)
-  app.post("/api/contact", (req, res) => {
-    const { name, email, subject, message } = req.body as {
-      name?: string;
-      email?: string;
-      subject?: string;
-      message?: string;
-    };
-    if (!name?.trim() || !email?.trim() || !message?.trim()) {
-      return res.status(400).json({ message: "Name, email, and message are required" });
+  // Contact form (public) - with rate limiting and validation
+  app.post("/api/contact", contactRateLimiter, (req, res) => {
+    const parsed = contactFormSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Invalid form data",
+        errors: parsed.error.flatten().fieldErrors,
+      });
     }
-    console.log("[contact]", { name: name.trim(), email: email.trim(), subject: subject?.trim() ?? "(no subject)", message: message.trim() });
+    const { name, email, subject, message } = parsed.data;
+    console.log("[contact]", { name, email, subject: subject ?? "(no subject)", message });
     return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
   });
 
   // Image upload (camera or file) – admin only
-  app.post("/api/upload", requireAuth, uploadMiddleware.single("image"), (req, res) => {
+  app.post("/api/upload", requireAuth, apiRateLimiter, uploadMiddleware.single("image"), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided" });
     }
@@ -92,24 +103,28 @@ export async function registerRoutes(
     return res.json(product);
   });
 
-  app.post("/api/products", requireAuth, async (req, res) => {
+  app.post("/api/products", requireAuth, apiRateLimiter, async (req, res) => {
     const parsed = insertProductSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "Invalid product", errors: parsed.error.flatten() });
     }
-    const product = await storage.createProduct(parsed.data);
+    // Sanitize text inputs
+    const sanitized = sanitizeProductInput(parsed.data);
+    const product = await storage.createProduct({ ...parsed.data, ...sanitized });
     return res.status(201).json(product);
   });
 
-  app.patch("/api/products/:id", requireAuth, async (req, res) => {
+  app.patch("/api/products/:id", requireAuth, apiRateLimiter, async (req, res) => {
     const existing = await storage.getProduct(req.params.id);
     if (!existing) return res.status(404).json({ message: "Product not found" });
     const patch = req.body as Partial<ApiProduct>;
-    const updated = await storage.updateProduct(req.params.id, patch);
+    // Sanitize text inputs in patch
+    const sanitized = sanitizeProductInput(patch);
+    const updated = await storage.updateProduct(req.params.id, { ...patch, ...sanitized });
     return res.json(updated);
   });
 
-  app.patch("/api/products/:id/quantity", requireAuth, async (req, res) => {
+  app.patch("/api/products/:id/quantity", requireAuth, apiRateLimiter, async (req, res) => {
     const { quantity } = req.body as { quantity?: number };
     if (typeof quantity !== "number" || quantity < 0) {
       return res.status(400).json({ message: "Invalid quantity" });
@@ -119,14 +134,14 @@ export async function registerRoutes(
     return res.json(updated);
   });
 
-  app.delete("/api/products/:id", requireAuth, async (req, res) => {
+  app.delete("/api/products/:id", requireAuth, apiRateLimiter, async (req, res) => {
     const deleted = await storage.deleteProduct(req.params.id);
     if (!deleted) return res.status(404).json({ message: "Product not found" });
     return res.status(204).send();
   });
 
   // Orders
-  app.post("/api/orders", async (req, res) => {
+  app.post("/api/orders", orderRateLimiter, async (req, res) => {
     const parsed = createOrderSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "Invalid order", errors: parsed.error.flatten() });
@@ -147,13 +162,16 @@ export async function registerRoutes(
     return res.json(order);
   });
 
-  app.patch("/api/orders/:id", requireAuth, async (req, res) => {
+  app.patch("/api/orders/:id", requireAuth, apiRateLimiter, async (req, res) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const { status } = req.body as { status?: string };
-    if (!status || typeof status !== "string" || !status.trim()) {
-      return res.status(400).json({ message: "Status is required" });
+    const parsed = orderStatusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Invalid order status",
+        errors: parsed.error.flatten().fieldErrors,
+      });
     }
-    const updated = await storage.updateOrderStatus(id, status.trim());
+    const updated = await storage.updateOrderStatus(id, parsed.data.status);
     if (!updated) return res.status(404).json({ message: "Order not found" });
     return res.json(updated);
   });
@@ -170,26 +188,30 @@ export async function registerRoutes(
     return res.json(category);
   });
 
-  app.post("/api/categories", requireAuth, async (req, res) => {
+  app.post("/api/categories", requireAuth, apiRateLimiter, async (req, res) => {
     const parsed = insertCategorySchema.safeParse(req.body);
     if (!parsed.success) {
       return res
         .status(400)
         .json({ message: "Invalid category", errors: parsed.error.flatten() });
     }
-    const category = await storage.createCategory(parsed.data);
+    // Sanitize inputs
+    const sanitized = sanitizeCategoryInput(parsed.data);
+    const category = await storage.createCategory({ ...parsed.data, ...sanitized });
     return res.status(201).json(category);
   });
 
-  app.patch("/api/categories/:id", requireAuth, async (req, res) => {
+  app.patch("/api/categories/:id", requireAuth, apiRateLimiter, async (req, res) => {
     const existing = await storage.getCategory(req.params.id);
     if (!existing) return res.status(404).json({ message: "Category not found" });
     const patch = req.body as Partial<InsertCategory>;
-    const updated = await storage.updateCategory(req.params.id, patch);
+    // Sanitize inputs
+    const sanitized = sanitizeCategoryInput(patch);
+    const updated = await storage.updateCategory(req.params.id, { ...patch, ...sanitized });
     return res.json(updated);
   });
 
-  app.delete("/api/categories/:id", requireAuth, async (req, res) => {
+  app.delete("/api/categories/:id", requireAuth, apiRateLimiter, async (req, res) => {
     const deleted = await storage.deleteCategory(req.params.id);
     if (!deleted) return res.status(404).json({ message: "Category not found" });
     return res.status(204).send();
