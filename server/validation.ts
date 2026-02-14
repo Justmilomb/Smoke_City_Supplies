@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Sanitize string inputs to prevent XSS - basic HTML tag removal
-export function sanitizeString(input: string | undefined | null): string {
+export function sanitizeString(input: unknown): string {
   if (!input || typeof input !== "string") return "";
   // Remove HTML tags and trim
   return input.replace(/<[^>]*>/g, "").trim().slice(0, 10000);
@@ -76,8 +76,24 @@ export const orderPatchSchema = z.object({
   deliveredAt: z.string().max(50).optional().nullable(),
 });
 
+export const productQuantitySchema = z.object({
+  quantity: z.number().int().min(0),
+});
+
+export const categoryPatchSchema = z.object({
+  name: z.string().min(1).optional(),
+  slug: z.string().min(1).optional(),
+  icon: z.string().optional(),
+  vehicleType: z.enum(["bike", "scooter", "all"]).optional(),
+});
+
+function sanitizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => sanitizeString(String(item))).filter(Boolean);
+}
+
 // Validate and sanitize product input (only include fields that are explicitly provided, for PATCH safety)
-export function sanitizeProductInput(input: any): Record<string, unknown> {
+export function sanitizeProductInput(input: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   if (input.name !== undefined) result.name = sanitizeString(input.name);
   if (input.description !== undefined) result.description = sanitizeString(input.description);
@@ -87,25 +103,25 @@ export function sanitizeProductInput(input: any): Record<string, unknown> {
   if (input.brand !== undefined) result.brand = input.brand != null ? sanitizeString(String(input.brand)) : undefined;
   if (input.vehicle !== undefined) result.vehicle = typeof input.vehicle === "string" ? sanitizeString(input.vehicle) : undefined;
   if (input.compatibility !== undefined) {
-    result.compatibility = Array.isArray(input.compatibility)
-      ? input.compatibility.map((c: any) => sanitizeString(c)).filter(Boolean)
-      : [];
+    result.compatibility = sanitizeStringArray(input.compatibility);
   }
   if (input.tags !== undefined) {
-    result.tags = Array.isArray(input.tags)
-      ? input.tags.map((t: any) => sanitizeString(t)).filter(Boolean)
-      : [];
+    result.tags = sanitizeStringArray(input.tags);
   }
   if (input.features !== undefined) {
-    result.features = Array.isArray(input.features)
-      ? input.features.map((f: any) => sanitizeString(f)).filter(Boolean)
-      : undefined;
+    result.features = sanitizeStringArray(input.features);
+  }
+  if (input.seoTitle !== undefined) result.seoTitle = sanitizeString(input.seoTitle);
+  if (input.seoDescription !== undefined) result.seoDescription = sanitizeString(input.seoDescription);
+  if (input.seoSlug !== undefined) result.seoSlug = sanitizeString(input.seoSlug).toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  if (input.seoKeywords !== undefined) {
+    result.seoKeywords = sanitizeStringArray(input.seoKeywords);
   }
   return result;
 }
 
 // Validate and sanitize category input
-export function sanitizeCategoryInput(input: any) {
+export function sanitizeCategoryInput(input: Record<string, unknown>) {
   return {
     name: sanitizeString(input.name),
     slug: sanitizeString(input.slug).toLowerCase().replace(/[^a-z0-9-]/g, "-"),

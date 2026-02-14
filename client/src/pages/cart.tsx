@@ -7,11 +7,18 @@ import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 const API_BASE = "/api";
 
 export default function CartPage() {
   const { state, actions } = useCart();
+  usePageMeta({
+    title: "Cart",
+    description: "Review your selected parts before secure checkout.",
+    canonical: "/cart",
+    noIndex: true,
+  });
 
   const total = state.items.reduce(
     (sum, i) => sum + i.priceEach * i.quantity,

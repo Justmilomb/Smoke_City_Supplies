@@ -63,6 +63,10 @@ async function createProduct(input: CreateProductInput): Promise<Part> {
       description: input.description,
       specs: input.specs,
       features: input.features,
+      seoTitle: input.seoTitle,
+      seoDescription: input.seoDescription,
+      seoKeywords: input.seoKeywords,
+      seoSlug: input.seoSlug,
     }),
   });
   if (!res.ok) {

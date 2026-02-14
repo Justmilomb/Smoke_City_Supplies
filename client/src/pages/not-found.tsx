@@ -4,8 +4,14 @@ import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 export default function NotFound() {
+  usePageMeta({
+    title: "Page Not Found",
+    description: "The page you are looking for does not exist.",
+    noIndex: true,
+  });
   return (
     <SiteLayout>
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">

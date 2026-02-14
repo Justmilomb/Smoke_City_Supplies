@@ -36,6 +36,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function AdminNewPart() {
+  usePageMeta({ title: "Add Product", description: "Create a new product in the admin panel.", noIndex: true });
   const cats = useCategories();
   const createProduct = useCreateProduct();
   const [, setLoc] = useLocation();

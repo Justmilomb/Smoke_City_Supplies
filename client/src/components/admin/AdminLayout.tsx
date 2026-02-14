@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Package, FolderTree, Plus, ShoppingBag, Menu, Printer, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   Sheet,
   SheetContent,
@@ -42,6 +43,12 @@ function NavItem({ href, label, icon: Icon }: { href: string; label: string; ico
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  usePageMeta({
+    title: "Admin",
+    description: "Store administration panel",
+    canonical: "/admin",
+    noIndex: true,
+  });
 
   const sidebar = (
     <nav className="flex flex-col gap-1 p-3">

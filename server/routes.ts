@@ -6,7 +6,6 @@ import {
   createOrderWithSessionSchema,
   insertCategorySchema,
   insertProductSchema,
-  type ApiProduct,
   type CreateOrderInput,
   type InsertCategory,
   type InsertProduct,
@@ -21,9 +20,15 @@ const createPaymentIntentSchema = createOrderSchema.pick({
   customerAddress: true,
   customerPostcode: true,
 });
+const shippingQuoteSchema = createOrderSchema.pick({
+  items: true,
+  customerPostcode: true,
+});
 import multer from "multer";
 import { storage } from "./storage";
 import { stripe } from "./stripe";
+import { calculateShippingQuote } from "./shipping";
+import { generateProductSeo } from "./seo";
 import { uploadMiddleware } from "./upload";
 import { requireAuth } from "./auth";
 import { seedAdminIfNeeded, seedCategoriesIfNeeded } from "./seedAdmin";
@@ -32,8 +37,9 @@ import passport from "passport";
 import {
   contactFormSchema,
   contactReplySchema,
+  categoryPatchSchema,
   orderPatchSchema,
-  orderStatusSchema,
+  productQuantitySchema,
   sanitizeProductInput,
   sanitizeCategoryInput,
 } from "./validation";
@@ -79,6 +85,76 @@ export async function registerRoutes(
 ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`).join("\n")}
 </urlset>`;
     res.type("application/xml").send(xml);
+  });
+
+  app.get("/google-shopping.xml", async (req, res) => {
+    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const products = await storage.listProducts();
+    const rows = products.map((p) => {
+      const url = `${base}/product/${p.id}`;
+      const image = p.image
+        ? (p.image.startsWith("http") ? p.image : `${base}${p.image.startsWith("/") ? "" : "/"}${p.image}`)
+        : `${base}/opengraph.jpg`;
+      const availability = p.quantity > 0 && p.stock !== "out" ? "in_stock" : "out_of_stock";
+      const title = (p.seoTitle ?? p.name).slice(0, 150);
+      const description = (p.seoDescription ?? p.description).slice(0, 5000);
+      const brand = p.brand ?? "Smoke City Supplies";
+      return `
+      <item>
+        <g:id>${escapeXml(p.id)}</g:id>
+        <title>${escapeXml(title)}</title>
+        <description>${escapeXml(description)}</description>
+        <link>${escapeXml(url)}</link>
+        <g:image_link>${escapeXml(image)}</g:image_link>
+        <g:availability>${availability}</g:availability>
+        <g:condition>new</g:condition>
+        <g:price>${p.price.toFixed(2)} GBP</g:price>
+        <g:brand>${escapeXml(brand)}</g:brand>
+        <g:google_product_category>Vehicles &amp; Parts &gt; Vehicle Parts &amp; Accessories</g:google_product_category>
+      </item>`;
+    }).join("\n");
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Smoke City Supplies Product Feed</title>
+    <link>${escapeXml(base)}</link>
+    <description>Live product feed for Google Merchant Center</description>
+    ${rows}
+  </channel>
+</rss>`;
+    res.type("application/xml").send(xml);
+  });
+
+  app.get("/api/config", (_req, res) => {
+    const whatsappNumber = (process.env.WHATSAPP_NUMBER ?? "").replace(/[^\d]/g, "");
+    return res.json({
+      whatsappNumber: whatsappNumber || null,
+      supportEmail: process.env.SUPPORT_EMAIL ?? "support@smokecitysupplies.com",
+      supportPhone: process.env.SUPPORT_PHONE ?? "07597783587",
+    });
+  });
+
+  app.post("/api/shipping/quote", orderRateLimiter, async (req, res) => {
+    const parsed = shippingQuoteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid shipping quote request", errors: parsed.error.flatten() });
+    }
+    const subtotalPence = Math.round(
+      parsed.data.items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
+    );
+    const quote = calculateShippingQuote({
+      subtotalPence,
+      postcode: parsed.data.customerPostcode,
+      itemCount: parsed.data.items.reduce((sum, i) => sum + i.quantity, 0),
+    });
+    return res.json({
+      subtotalPence,
+      shippingPence: quote.amountPence,
+      shippingMethod: quote.method,
+      shippingLabel: quote.label,
+      shippingEta: quote.eta,
+      totalPence: subtotalPence + quote.amountPence,
+    });
   });
 
   // Auth (public)
@@ -277,7 +353,8 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
       ...sanitized,
       vehicle: (sanitized.vehicle ?? parsed.data.vehicle) as string,
     };
-    const product = await storage.createProduct(data);
+    const seo = await generateProductSeo(data);
+    const product = await storage.createProduct({ ...data, ...seo });
     return res.status(201).json(product);
   });
 
@@ -290,16 +367,22 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
       return res.status(400).json({ message: "Invalid product data", errors: parsed.error.flatten() });
     }
     const sanitized = sanitizeProductInput(parsed.data);
-    const updated = await storage.updateProduct(id, { ...parsed.data, ...sanitized });
+    const seo = await generateProductSeo({
+      ...existing,
+      ...parsed.data,
+      ...sanitized,
+    });
+    const updated = await storage.updateProduct(id, { ...parsed.data, ...sanitized, ...seo });
     return res.json(updated);
   });
 
   app.patch("/api/products/:id/quantity", requireAuth, apiRateLimiter, async (req, res) => {
     const id = paramId(req);
-    const { quantity } = req.body as { quantity?: number };
-    if (typeof quantity !== "number" || quantity < 0) {
-      return res.status(400).json({ message: "Invalid quantity" });
+    const parsed = productQuantitySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid quantity", errors: parsed.error.flatten().fieldErrors });
     }
+    const { quantity } = parsed.data;
     const updated = await storage.updateProductQuantity(id, quantity);
     if (!updated) return res.status(404).json({ message: "Product not found" });
     return res.json(updated);
@@ -311,7 +394,7 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     return res.status(204).send();
   });
 
-  // Create PaymentIntent for on-site checkout (Stripe API, your design)
+  // Public checkout endpoint. Amount is always calculated server-side from items + shipping quote.
   app.post("/api/create-payment-intent", orderRateLimiter, async (req, res) => {
     if (!stripe) {
       return res.status(503).json({ message: "Stripe is not configured" });
@@ -324,9 +407,15 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     if (!items.length) {
       return res.status(400).json({ message: "Cart is empty" });
     }
-    const totalPence = Math.round(
+    const subtotalPence = Math.round(
       items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
     );
+    const shippingQuote = calculateShippingQuote({
+      subtotalPence,
+      postcode: customerPostcode,
+      itemCount: items.reduce((sum, i) => sum + i.quantity, 0),
+    });
+    const totalPence = subtotalPence + shippingQuote.amountPence;
     if (totalPence < 50) {
       return res.status(400).json({ message: "Minimum order is £0.50" });
     }
@@ -342,13 +431,23 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
       await storage.createPendingPayment({
         paymentIntentId: paymentIntent.id,
         items,
+        subtotalPence,
+        shippingPence: shippingQuote.amountPence,
+        shippingMethod: shippingQuote.method,
         totalPence,
         customerEmail: customerEmail ?? undefined,
         customerName: customerName ?? undefined,
+        customerAddress: customerAddress ?? undefined,
+        customerPostcode: customerPostcode ?? undefined,
       });
       return res.status(201).json({
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
+        subtotalPence,
+        shippingPence: shippingQuote.amountPence,
+        shippingMethod: shippingQuote.method,
+        shippingLabel: shippingQuote.label,
+        totalPence,
       });
     } catch (err) {
       console.error("[create-payment-intent]", err);
@@ -356,7 +455,7 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     }
   });
 
-  // Orders (create with items, or with paymentIntentId/sessionId after payment)
+  // Public order creation endpoint. For paid flows, Stripe status is verified before order creation.
   app.post("/api/orders", orderRateLimiter, async (req, res) => {
     const withPaymentIntent = createOrderWithPaymentIntentSchema.safeParse(req.body);
     if (withPaymentIntent.success) {
@@ -383,6 +482,8 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
           customerName: pending.customerName,
           customerAddress: pending.customerAddress,
           customerPostcode: pending.customerPostcode,
+          shippingPence: pending.shippingPence,
+          shippingMethod: pending.shippingMethod,
           stripePaymentIntentId: paymentIntentId,
           paymentStatus: "paid",
         };
@@ -437,6 +538,8 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
           items,
           customerEmail: session.customer_email ?? session.customer_details?.email ?? undefined,
           customerName: session.customer_details?.name ?? undefined,
+          shippingPence: session.total_details?.amount_shipping ?? 0,
+          shippingMethod: "checkout-session",
           stripeSessionId: session.id,
           stripePaymentIntentId: paymentIntentId ?? undefined,
           paymentStatus: "paid",
@@ -520,9 +623,13 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     const id = paramId(req);
     const existing = await storage.getCategory(id);
     if (!existing) return res.status(404).json({ message: "Category not found" });
-    const patch = req.body as Partial<InsertCategory>;
+    const parsed = categoryPatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid category update", errors: parsed.error.flatten().fieldErrors });
+    }
+    const patch = parsed.data as Record<string, unknown>;
     const sanitized = sanitizeCategoryInput(patch);
-    const updated = await storage.updateCategory(id, { ...patch, ...sanitized });
+    const updated = await storage.updateCategory(id, { ...parsed.data, ...sanitized });
     return res.json(updated);
   });
 

@@ -9,7 +9,9 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 export default function ShippingPage() {
   usePageMeta({
     title: "Shipping & Delivery",
-    description: "UK delivery for motorcycle parts. Fast shipping options and delivery times. Smoke City Supplies — online motorcycle parts.",
+    description: "UK delivery for motorcycle parts. Fast shipping options and delivery times. Smoke City Supplies - online motorcycle parts.",
+    canonical: "/shipping",
+    keywords: ["motorcycle parts shipping", "UK delivery", "shipping policy UK"],
   });
   return (
     <SiteLayout>
@@ -46,7 +48,7 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Shipping Costs</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Standard UK delivery: £4.99. Free delivery on orders over £50. Express and next-day options may be available at checkout for eligible items.
+              Standard UK delivery starts at £4.99. Free UK shipping applies automatically for orders over £75. Remote-area and heavy-order rates are calculated at checkout.
             </p>
           </Card>
 

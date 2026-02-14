@@ -9,7 +9,9 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 export default function ReturnsPage() {
   usePageMeta({
     title: "Returns Policy",
-    description: "Returns and refunds for motorcycle parts. UK returns policy. Smoke City Supplies — hassle-free returns.",
+    description: "Returns and refunds for motorcycle parts. UK returns policy. Smoke City Supplies - hassle-free returns.",
+    canonical: "/returns",
+    keywords: ["motorcycle parts returns", "UK returns policy", "parts refund policy"],
   });
   return (
     <SiteLayout>

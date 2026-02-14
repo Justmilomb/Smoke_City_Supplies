@@ -66,6 +66,10 @@ export const products = pgTable("products", {
   description: text("description").notNull(),
   specs: jsonb("specs").$type<ProductSpec[]>().notNull(),
   features: jsonb("features").$type<string[]>(),
+  seoTitle: text("seo_title"),
+  seoDescription: text("seo_description"),
+  seoKeywords: jsonb("seo_keywords").$type<string[]>(),
+  seoSlug: text("seo_slug"),
 });
 
 export const insertProductSchema = z.object({
@@ -87,6 +91,10 @@ export const insertProductSchema = z.object({
   description: z.string(),
   specs: z.array(productSpecSchema),
   features: z.array(z.string()).optional(),
+  seoTitle: z.string().optional(),
+  seoDescription: z.string().optional(),
+  seoKeywords: z.array(z.string()).optional(),
+  seoSlug: z.string().optional(),
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
@@ -104,6 +112,9 @@ export const images = pgTable("images", {
 export const pendingPayments = pgTable("pending_payments", {
   paymentIntentId: varchar("payment_intent_id", { length: 255 }).primaryKey(),
   items: jsonb("items").$type<{ productId: string; productName: string; quantity: number; priceEach: number }[]>().notNull(),
+  subtotalPence: integer("subtotal_pence").notNull().default(0),
+  shippingPence: integer("shipping_pence").notNull().default(0),
+  shippingMethod: text("shipping_method"),
   totalPence: integer("total_pence").notNull(),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
@@ -126,6 +137,9 @@ export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(),
   createdAt: text("created_at").notNull(),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
+  subtotalPence: integer("subtotal_pence").notNull().default(0),
+  shippingPence: integer("shipping_pence").notNull().default(0),
+  shippingMethod: text("shipping_method"),
   totalPence: integer("total_pence").notNull(),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
@@ -150,6 +164,8 @@ export const createOrderSchema = z.object({
   customerName: z.string().optional(),
   customerAddress: z.string().optional(),
   customerPostcode: z.string().optional(),
+  shippingPence: z.number().int().min(0).optional(),
+  shippingMethod: z.string().optional(),
   stripeSessionId: z.string().optional(),
   stripePaymentIntentId: z.string().optional(),
   paymentStatus: z.enum(["pending", "paid", "failed"]).optional(),
@@ -185,6 +201,10 @@ export type ApiProduct = {
   description: string;
   specs: ProductSpec[];
   features?: string[];
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string[];
+  seoSlug?: string;
 };
 
 export type ApiOrderItem = {
@@ -198,6 +218,9 @@ export type ApiOrder = {
   id: string;
   createdAt: string;
   status: string;
+  subtotalPence: number;
+  shippingPence: number;
+  shippingMethod?: string;
   totalPence: number;
   items: ApiOrderItem[];
   customerEmail?: string;

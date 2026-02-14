@@ -23,9 +23,11 @@ export default function ProductPage() {
   const canAddMore = stockQty > inCartQty;
 
   usePageMeta({
-    title: part?.name ?? "Product",
-    description: part?.description?.slice(0, 160).trim() ?? "Motorcycle part from Smoke City Supplies. UK delivery.",
+    title: part?.seoTitle ?? part?.name ?? "Product",
+    description: part?.seoDescription ?? part?.description?.slice(0, 160).trim() ?? "Motorcycle part from Smoke City Supplies. UK delivery.",
     image: part ? getProductImage(part) : undefined,
+    keywords: part?.seoKeywords ?? [part?.category ?? "", part?.brand ?? "", "motorcycle parts UK"].filter(Boolean),
+    canonical: part ? `/product/${part.id}` : undefined,
   });
 
   if (isLoading) {
@@ -67,8 +69,8 @@ export default function ProductPage() {
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: part.name,
-    description: part.description?.slice(0, 500) ?? part.name,
+    name: part.seoTitle ?? part.name,
+    description: part.seoDescription ?? part.description?.slice(0, 500) ?? part.name,
     ...(absoluteImage && { image: absoluteImage }),
     ...(part.brand && { brand: { "@type": "Brand", name: part.brand } }),
     offers: {

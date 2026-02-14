@@ -22,7 +22,9 @@ export default function Home() {
   const featuredProducts = products.slice(0, 5);
   usePageMeta({
     title: "Smoke City Supplies | Motorcycle Parts UK",
-    description: "Genuine motorcycle parts, UK delivery. Online only — shop brakes, engine, suspension, exhaust and more. Expert advice and support.",
+    description: "Genuine motorcycle parts, UK delivery. Online only - shop brakes, engine, suspension, exhaust and more. Expert advice and support.",
+    canonical: "/",
+    keywords: ["motorcycle parts UK", "bike parts online", "scooter parts", "UK delivery motorcycle parts"],
   });
   return (
     <SiteLayout>

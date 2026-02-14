@@ -37,6 +37,10 @@ export type Part = {
   description: string;
   specs: { label: string; value: string }[];
   features?: string[];
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string[];
+  seoSlug?: string;
 };
 
 /** Motorcycle manufacturers for filter grouping */

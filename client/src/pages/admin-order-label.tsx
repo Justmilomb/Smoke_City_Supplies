@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Printer, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 const API = "/api";
 
@@ -26,6 +27,7 @@ async function fetchOrder(id: string): Promise<Order> {
 }
 
 export default function AdminOrderLabel() {
+  usePageMeta({ title: "Order Label", description: "Print shipping label", noIndex: true });
   const params = useParams<{ id: string }>();
   const orderId = params?.id ?? "";
 

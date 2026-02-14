@@ -8,6 +8,9 @@ export type PageMeta = {
   description?: string;
   /** Absolute or relative image URL for og:image / twitter:image */
   image?: string;
+  keywords?: string[];
+  canonical?: string;
+  noIndex?: boolean;
 };
 
 function setMetaDescription(content: string) {
@@ -46,7 +49,7 @@ function setMetaName(name: string, content: string) {
  * Call once per page (e.g. in the page component).
  */
 export function usePageMeta(meta: PageMeta) {
-  const { title, description, image } = meta;
+  const { title, description, image, keywords, canonical, noIndex } = meta;
 
   useEffect(() => {
     const fullTitle = title.includes(SITE_NAME) ? title : `${title} | ${SITE_NAME}`;
@@ -55,6 +58,10 @@ export function usePageMeta(meta: PageMeta) {
     if (description) {
       setMetaDescription(description);
     }
+    if (keywords && keywords.length > 0) {
+      setMetaName("keywords", keywords.join(", "));
+    }
+    setMetaName("robots", noIndex ? "noindex, nofollow" : "index, follow");
 
     if (image) {
       const absoluteImage = image.startsWith("http") ? image : `${window.location.origin}${image.startsWith("/") ? "" : "/"}${image}`;
@@ -63,10 +70,23 @@ export function usePageMeta(meta: PageMeta) {
     }
 
     setMetaProperty("og:title", fullTitle);
+    setMetaProperty("og:type", "website");
+    setMetaProperty("og:url", window.location.href);
     setMetaName("twitter:title", fullTitle);
     if (description) {
       setMetaProperty("og:description", description);
       setMetaName("twitter:description", description);
     }
-  }, [title, description, image]);
+    if (canonical) {
+      let canonicalEl = document.querySelector("link[rel='canonical']") as HTMLLinkElement | null;
+      if (!canonicalEl) {
+        canonicalEl = document.createElement("link");
+        canonicalEl.rel = "canonical";
+        document.head.appendChild(canonicalEl);
+      }
+      canonicalEl.href = canonical.startsWith("http")
+        ? canonical
+        : `${window.location.origin}${canonical.startsWith("/") ? "" : "/"}${canonical}`;
+    }
+  }, [title, description, image, keywords, canonical, noIndex]);
 }

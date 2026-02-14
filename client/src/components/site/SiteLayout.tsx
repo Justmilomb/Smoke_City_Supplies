@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { Search, ShoppingCart, Menu, Phone, ArrowUp, Home, Package, Mail, Settings } from "lucide-react";
+import { Search, ShoppingCart, Menu, Phone, ArrowUp, Home, Package, Mail, Settings, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,7 @@ import { useCartCount } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "./Logo";
 
-const HEADER_PHONE = "07597783587";
+const DEFAULT_HEADER_PHONE = "07597783587";
 
 const publicNavItems = [
   { href: "/", label: "Home", icon: Home, testId: "link-mobile-home" },
@@ -72,6 +72,8 @@ export default function SiteLayout({
   const [searchQuery, setSearchQuery] = React.useState("");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [showBackToTop, setShowBackToTop] = React.useState(false);
+  const [headerPhone, setHeaderPhone] = React.useState(DEFAULT_HEADER_PHONE);
+  const [whatsappNumber, setWhatsappNumber] = React.useState<string | null>(null);
   const navItems = user ? [...publicNavItems, adminNavItem] : publicNavItems;
 
   React.useEffect(() => {
@@ -85,6 +87,25 @@ export default function SiteLayout({
     const q = new URLSearchParams(search).get("q") ?? "";
     setSearchQuery(q);
   }, [loc]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/config");
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (typeof data.supportPhone === "string" && data.supportPhone.trim()) setHeaderPhone(data.supportPhone);
+        if (typeof data.whatsappNumber === "string" && data.whatsappNumber.trim()) setWhatsappNumber(data.whatsappNumber);
+      } catch {
+        // Keep defaults.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,13 +217,24 @@ export default function SiteLayout({
 
           <div className="flex items-center justify-end gap-2 md:gap-3 shrink-0">
             <a
-              href={`tel:${HEADER_PHONE.replace(/\s/g, "")}`}
+              href={`tel:${headerPhone.replace(/\s/g, "")}`}
               className="hidden md:flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
               data-testid="link-phone"
             >
               <Phone className="h-4 w-4" />
-              <span>{HEADER_PHONE}</span>
+              <span>{headerPhone}</span>
             </a>
+            {whatsappNumber ? (
+              <a
+                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hi, I need help with parts.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden md:flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>WhatsApp</span>
+              </a>
+            ) : null}
             {right}
             <Link href="/cart">
               <Button

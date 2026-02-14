@@ -24,7 +24,6 @@ function parseVehicle(loc: string): "all" | "bike" | "scooter" {
 }
 
 export default function CatalogPage() {
-  usePageMeta({ title: "Catalog", description: "Browse motorcycle and bike parts by category. UK delivery." });
   const cats = useCategories();
   const { data: parts = [], isLoading } = useProducts();
   const [loc] = useLocation();
@@ -69,6 +68,44 @@ export default function CatalogPage() {
   }, [filters, parts]);
 
   const intentVehicle = parseVehicle(loc);
+  const seoTitle = React.useMemo(() => {
+    if (filters.q.trim()) return `Catalog Search "${filters.q.trim()}"`;
+    if (filters.category !== "all") return `${filters.category} Catalog`;
+    if (filters.vehicle !== "all") return `${filters.vehicle[0].toUpperCase()}${filters.vehicle.slice(1)} Parts Catalog`;
+    return "Catalog";
+  }, [filters.q, filters.category, filters.vehicle]);
+
+  const seoDescription = React.useMemo(() => {
+    const base = "Browse motorcycle and bike parts by category with UK delivery.";
+    if (filters.q.trim()) return `Search catalog results for ${filters.q.trim()} at Smoke City Supplies. ${base}`;
+    if (filters.category !== "all") return `Browse ${filters.category} catalog listings at Smoke City Supplies. ${base}`;
+    return base;
+  }, [filters.q, filters.category]);
+
+  const canonical = React.useMemo(() => {
+    const idx = loc.indexOf("?");
+    if (idx < 0) return "/catalog";
+    const params = new URLSearchParams(loc.slice(idx));
+    const normalized = new URLSearchParams();
+    for (const key of ["q", "vehicle", "category", "sort", "model", "brands", "priceMin", "priceMax", "inStock"]) {
+      const value = params.get(key);
+      if (value) normalized.set(key, value);
+    }
+    const q = normalized.toString();
+    return q ? `/catalog?${q}` : "/catalog";
+  }, [loc]);
+
+  usePageMeta({
+    title: seoTitle,
+    description: seoDescription,
+    canonical,
+    keywords: [
+      "motorcycle parts catalog",
+      "bike parts catalog",
+      filters.category !== "all" ? `${filters.category} catalog` : "",
+      filters.q.trim(),
+    ].filter(Boolean),
+  });
 
   return (
     <SiteLayout>

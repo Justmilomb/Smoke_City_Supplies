@@ -57,8 +57,8 @@ export interface IStorage {
   getImage(id: string): Promise<{ data: string; mimeType: string } | undefined>;
   deleteImage(id: string): Promise<boolean>;
 
-  createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void>;
-  getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined>;
+  createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void>;
+  getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined>;
   deletePendingPayment(paymentIntentId: string): Promise<boolean>;
 
   getSeedState(key: string): Promise<string | undefined>;
@@ -91,6 +91,10 @@ function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
     description: row.description,
     specs: row.specs,
     features: row.features ?? undefined,
+    seoTitle: row.seoTitle ?? undefined,
+    seoDescription: row.seoDescription ?? undefined,
+    seoKeywords: row.seoKeywords ?? undefined,
+    seoSlug: row.seoSlug ?? undefined,
   };
 }
 
@@ -157,6 +161,10 @@ export class DbStorage implements IStorage {
         description: input.description,
         specs: input.specs,
         features: input.features ?? null,
+        seoTitle: input.seoTitle ?? null,
+        seoDescription: input.seoDescription ?? null,
+        seoKeywords: input.seoKeywords ?? null,
+        seoSlug: input.seoSlug ?? null,
       })
       .returning();
     if (!row) throw new Error("Failed to create product");
@@ -199,14 +207,19 @@ export class DbStorage implements IStorage {
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
-    const totalPence = Math.round(
+    const subtotalPence = Math.round(
       items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
     );
+    const shippingPence = Math.max(0, Math.round(input.shippingPence ?? 0));
+    const totalPence = subtotalPence + shippingPence;
 
     await this.getDb().insert(orders).values({
       id: orderId,
       createdAt: now,
       status: "pending",
+      subtotalPence,
+      shippingPence,
+      shippingMethod: input.shippingMethod ?? null,
       totalPence,
       customerEmail: customerEmail ?? null,
       customerName: customerName ?? null,
@@ -246,6 +259,9 @@ export class DbStorage implements IStorage {
       id: orderId,
       createdAt: now,
       status: "pending",
+      subtotalPence,
+      shippingPence,
+      shippingMethod: input.shippingMethod,
       totalPence,
       items: apiItems,
       customerEmail,
@@ -277,6 +293,9 @@ export class DbStorage implements IStorage {
         id: order.id,
         createdAt: order.createdAt,
         status: order.status,
+        subtotalPence: order.subtotalPence,
+        shippingPence: order.shippingPence ?? 0,
+        shippingMethod: order.shippingMethod ?? undefined,
         totalPence: order.totalPence,
         items,
         customerEmail: order.customerEmail ?? undefined,
@@ -312,6 +331,9 @@ export class DbStorage implements IStorage {
       id: order.id,
       createdAt: order.createdAt,
       status: order.status,
+      subtotalPence: order.subtotalPence,
+      shippingPence: order.shippingPence ?? 0,
+      shippingMethod: order.shippingMethod ?? undefined,
       totalPence: order.totalPence,
       items,
       customerEmail: order.customerEmail ?? undefined,
@@ -372,10 +394,13 @@ export class DbStorage implements IStorage {
     return true;
   }
 
-  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void> {
+  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void> {
     await this.getDb().insert(pendingPaymentsTable).values({
       paymentIntentId: data.paymentIntentId,
       items: data.items,
+      subtotalPence: data.subtotalPence,
+      shippingPence: data.shippingPence,
+      shippingMethod: data.shippingMethod ?? null,
       totalPence: data.totalPence,
       customerEmail: data.customerEmail ?? null,
       customerName: data.customerName ?? null,
@@ -384,7 +409,7 @@ export class DbStorage implements IStorage {
     });
   }
 
-  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined> {
+  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined> {
     const [row] = await this.getDb()
       .select()
       .from(pendingPaymentsTable)
@@ -393,6 +418,9 @@ export class DbStorage implements IStorage {
     if (!row) return undefined;
     return {
       items: row.items,
+      subtotalPence: row.subtotalPence,
+      shippingPence: row.shippingPence ?? 0,
+      shippingMethod: row.shippingMethod ?? undefined,
       totalPence: row.totalPence,
       customerEmail: row.customerEmail ?? undefined,
       customerName: row.customerName ?? undefined,
@@ -564,7 +592,7 @@ export class MemStorage implements IStorage {
   private orders = new Map<string, ApiOrder>();
   private categories = new Map<string, Category>();
   private images = new Map<string, { data: string; mimeType: string }>();
-  private pendingPayments = new Map<string, { items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }>();
+  private pendingPayments = new Map<string, { items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }>();
   private contactSubmissions = new Map<string, ApiContactSubmission>();
 
   constructor() {
@@ -616,6 +644,10 @@ export class MemStorage implements IStorage {
       description: input.description,
       specs: input.specs,
       features: input.features,
+      seoTitle: input.seoTitle,
+      seoDescription: input.seoDescription,
+      seoKeywords: input.seoKeywords,
+      seoSlug: input.seoSlug,
     };
     this.products.set(id, product);
     return product;
@@ -649,9 +681,11 @@ export class MemStorage implements IStorage {
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
-    const totalPence = Math.round(
+    const subtotalPence = Math.round(
       items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
     );
+    const shippingPence = Math.max(0, Math.round(input.shippingPence ?? 0));
+    const totalPence = subtotalPence + shippingPence;
     const apiItems: ApiOrderItem[] = items.map((i) => ({
       productId: i.productId,
       productName: i.productName,
@@ -662,6 +696,9 @@ export class MemStorage implements IStorage {
       id: orderId,
       createdAt: now,
       status: "pending",
+      subtotalPence,
+      shippingPence,
+      shippingMethod: input.shippingMethod,
       totalPence,
       items: apiItems,
       customerEmail,
@@ -765,9 +802,12 @@ export class MemStorage implements IStorage {
     return this.images.delete(id);
   }
 
-  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void> {
+  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void> {
     this.pendingPayments.set(data.paymentIntentId, {
       items: data.items,
+      subtotalPence: data.subtotalPence,
+      shippingPence: data.shippingPence,
+      shippingMethod: data.shippingMethod,
       totalPence: data.totalPence,
       customerEmail: data.customerEmail,
       customerName: data.customerName,
@@ -776,7 +816,7 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined> {
+  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined> {
     return this.pendingPayments.get(paymentIntentId);
   }
 

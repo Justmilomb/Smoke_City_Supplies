@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -138,14 +138,20 @@ export default function CheckoutPage() {
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [postcode, setPostcode] = useState("");
+  const [shippingPence, setShippingPence] = useState(0);
+  const [shippingLabel, setShippingLabel] = useState("Estimated UK Shipping");
+  const [shippingEta, setShippingEta] = useState("");
   const [step, setStep] = useState<"details" | "payment">("details");
 
   usePageMeta({
     title: "Checkout",
     description: "Secure checkout at Smoke City Supplies.",
+    canonical: "/checkout",
+    noIndex: true,
   });
 
-  const total = state.items.reduce((sum, i) => sum + i.priceEach * i.quantity, 0);
+  const subtotal = state.items.reduce((sum, i) => sum + i.priceEach * i.quantity, 0);
+  const total = subtotal + shippingPence / 100;
 
   const detailsValid =
     name.trim().length > 0 &&
@@ -181,6 +187,8 @@ export default function CheckoutPage() {
       const data = await res.json();
       setClientSecret(data.clientSecret);
       setPaymentIntentId(data.paymentIntentId);
+      setShippingPence(typeof data.shippingPence === "number" ? data.shippingPence : 0);
+      setShippingLabel(typeof data.shippingLabel === "string" ? data.shippingLabel : "Shipping");
       setStep("payment");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Checkout failed");
@@ -188,6 +196,45 @@ export default function CheckoutPage() {
       setCreating(false);
     }
   }, [state.items, email, name, addressLine1, addressLine2, postcode, creating, clientSecret, detailsValid]);
+
+  useEffect(() => {
+    if (state.items.length === 0) {
+      setShippingPence(0);
+      setShippingLabel("Estimated UK Shipping");
+      setShippingEta("");
+      return;
+    }
+    let cancelled = false;
+    const fetchQuote = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/shipping/quote`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: state.items.map((i) => ({
+              productId: i.productId,
+              productName: i.productName,
+              quantity: i.quantity,
+              priceEach: i.priceEach,
+            })),
+            customerPostcode: postcode.trim() || undefined,
+          }),
+        });
+        if (!res.ok || cancelled) return;
+        const quote = await res.json();
+        if (cancelled) return;
+        setShippingPence(typeof quote.shippingPence === "number" ? quote.shippingPence : 0);
+        setShippingLabel(typeof quote.shippingLabel === "string" ? quote.shippingLabel : "Shipping");
+        setShippingEta(typeof quote.shippingEta === "string" ? quote.shippingEta : "");
+      } catch {
+        // Keep last successful quote.
+      }
+    };
+    fetchQuote();
+    return () => {
+      cancelled = true;
+    };
+  }, [postcode, state.items]);
 
   const handleSuccess = useCallback(
     (orderId: string) => {
@@ -379,6 +426,15 @@ export default function CheckoutPage() {
                 </li>
               ))}
             </ul>
+            <div className="mb-2 flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="font-medium tabular-nums">£{subtotal.toFixed(2)}</span>
+            </div>
+            <div className="mb-2 flex justify-between text-sm">
+              <span className="text-muted-foreground">{shippingLabel}</span>
+              <span className="font-medium tabular-nums">£{(shippingPence / 100).toFixed(2)}</span>
+            </div>
+            {shippingEta ? <p className="mb-4 text-xs text-muted-foreground">{shippingEta}</p> : null}
             <div className="border-t border-border pt-5 flex justify-between">
               <span className="font-semibold">Total</span>
               <span className="text-xl font-bold tabular-nums">

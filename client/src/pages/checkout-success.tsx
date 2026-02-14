@@ -19,6 +19,7 @@ export default function CheckoutSuccessPage() {
   usePageMeta({
     title: "Order Confirmed",
     description: "Thank you for your order at Smoke City Supplies.",
+    noIndex: true,
   });
 
   useEffect(() => {
