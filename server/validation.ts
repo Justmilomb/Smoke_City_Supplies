@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Sanitize string inputs to prevent XSS - basic HTML tag removal
-export function sanitizeString(input: unknown): string {
+export function sanitizeString(input: string | undefined | null): string {
   if (!input || typeof input !== "string") return "";
   // Remove HTML tags and trim
   return input.replace(/<[^>]*>/g, "").trim().slice(0, 10000);
@@ -29,99 +29,45 @@ export function sanitizeUrl(input: string | undefined | null): string {
   }
 }
 
-// Contact form schema — trim first so whitespace doesn't cause "Invalid form data"
+// Contact form schema
 export const contactFormSchema = z.object({
-  name: z
-    .string()
-    .transform((s) => (s ?? "").trim())
-    .pipe(z.string().min(1, "Name is required").max(100, "Name too long"))
-    .transform(sanitizeString),
-  email: z
-    .string()
-    .transform((s) => (s ?? "").trim().toLowerCase())
-    .pipe(z.string().email("Invalid email"))
-    .transform(sanitizeEmail),
-  subject: z
-    .string()
-    .optional()
-    .transform((val) => (val == null || val === "" ? undefined : sanitizeString(val).slice(0, 200))),
-  partNumber: z
-    .string()
-    .optional()
-    .transform((val) => (val == null || val === "" ? undefined : sanitizeString(val).slice(0, 100))),
-  message: z
-    .string()
-    .transform((s) => (s ?? "").trim())
-    .pipe(z.string().min(10, "Message must be at least 10 characters").max(5000, "Message too long"))
-    .transform(sanitizeString),
+  name: z.string().min(1, "Name is required").max(100, "Name too long").transform(sanitizeString),
+  email: z.string().email("Invalid email").transform(sanitizeEmail),
+  subject: z.string().max(200, "Subject too long").optional().transform((val) => sanitizeString(val)),
+  message: z.string().min(10, "Message must be at least 10 characters").max(5000, "Message too long").transform(sanitizeString),
 });
 
-// Admin reply to contact submission
-export const contactReplySchema = z.object({
-  replyBody: z.string().min(1, "Reply is required").max(10000, "Reply too long").transform(sanitizeString),
-});
-
-// Order status schema (legacy, single field)
+// Order status schema
 export const orderStatusSchema = z.object({
   status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"], {
     errorMap: () => ({ message: "Invalid order status" }),
   }),
 });
 
-// Order patch schema for status + delivery tracking (all optional so PATCH can send only changed fields)
-export const orderPatchSchema = z.object({
-  status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"]).optional(),
-  trackingNumber: z.string().max(500).optional().nullable(),
-  shippedAt: z.string().max(50).optional().nullable(),
-  deliveredAt: z.string().max(50).optional().nullable(),
-});
-
-export const productQuantitySchema = z.object({
-  quantity: z.number().int().min(0),
-});
-
-export const categoryPatchSchema = z.object({
-  name: z.string().min(1).optional(),
-  slug: z.string().min(1).optional(),
-  icon: z.string().optional(),
-  vehicleType: z.enum(["bike", "scooter", "all"]).optional(),
-});
-
-function sanitizeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => sanitizeString(String(item))).filter(Boolean);
-}
-
-// Validate and sanitize product input (only include fields that are explicitly provided, for PATCH safety)
-export function sanitizeProductInput(input: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  if (input.name !== undefined) result.name = sanitizeString(input.name);
-  if (input.description !== undefined) result.description = sanitizeString(input.description);
-  if (input.category !== undefined) result.category = sanitizeString(input.category);
-  if (input.partNumber !== undefined) result.partNumber = input.partNumber != null ? sanitizeString(String(input.partNumber)) : undefined;
-  if (input.subcategory !== undefined) result.subcategory = input.subcategory != null ? sanitizeString(String(input.subcategory)) : undefined;
-  if (input.brand !== undefined) result.brand = input.brand != null ? sanitizeString(String(input.brand)) : undefined;
-  if (input.vehicle !== undefined) result.vehicle = typeof input.vehicle === "string" ? sanitizeString(input.vehicle) : undefined;
-  if (input.compatibility !== undefined) {
-    result.compatibility = sanitizeStringArray(input.compatibility);
-  }
-  if (input.tags !== undefined) {
-    result.tags = sanitizeStringArray(input.tags);
-  }
-  if (input.features !== undefined) {
-    result.features = sanitizeStringArray(input.features);
-  }
-  if (input.seoTitle !== undefined) result.seoTitle = sanitizeString(input.seoTitle);
-  if (input.seoDescription !== undefined) result.seoDescription = sanitizeString(input.seoDescription);
-  if (input.seoSlug !== undefined) result.seoSlug = sanitizeString(input.seoSlug).toLowerCase().replace(/[^a-z0-9-]/g, "-");
-  if (input.seoKeywords !== undefined) {
-    result.seoKeywords = sanitizeStringArray(input.seoKeywords);
-  }
-  return result;
+// Validate and sanitize product input
+export function sanitizeProductInput(input: any) {
+  return {
+    name: sanitizeString(input.name),
+    description: sanitizeString(input.description),
+    category: sanitizeString(input.category),
+    partNumber: input.partNumber != null ? sanitizeString(String(input.partNumber)) : undefined,
+    subcategory: input.subcategory != null ? sanitizeString(String(input.subcategory)) : undefined,
+    brand: input.brand != null ? sanitizeString(String(input.brand)) : undefined,
+    vehicle: typeof input.vehicle === "string" ? sanitizeString(input.vehicle) : undefined,
+    compatibility: Array.isArray(input.compatibility)
+      ? input.compatibility.map((c: any) => sanitizeString(c)).filter(Boolean)
+      : [],
+    tags: Array.isArray(input.tags)
+      ? input.tags.map((t: any) => sanitizeString(t)).filter(Boolean)
+      : [],
+    features: Array.isArray(input.features)
+      ? input.features.map((f: any) => sanitizeString(f)).filter(Boolean)
+      : undefined,
+  };
 }
 
 // Validate and sanitize category input
-export function sanitizeCategoryInput(input: Record<string, unknown>) {
+export function sanitizeCategoryInput(input: any) {
   return {
     name: sanitizeString(input.name),
     slug: sanitizeString(input.slug).toLowerCase().replace(/[^a-z0-9-]/g, "-"),

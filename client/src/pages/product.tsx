@@ -4,7 +4,7 @@ import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useContactModal } from "@/components/site/ContactModal";
 import { useProduct } from "@/lib/products";
-import { useCart, useCartItemQuantity } from "@/lib/cart";
+import { useCart } from "@/lib/cart";
 import { getProductImage } from "@/lib/mockData";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
@@ -18,16 +18,11 @@ export default function ProductPage() {
   const { data: part, isLoading } = useProduct(params?.id);
   const { actions: cartActions } = useCart();
   const contactModal = useContactModal();
-  const inCartQty = useCartItemQuantity(params?.id ?? "");
-  const stockQty = part?.quantity ?? 0;
-  const canAddMore = stockQty > inCartQty;
 
   usePageMeta({
-    title: part?.seoTitle ?? part?.name ?? "Product",
-    description: part?.seoDescription ?? part?.description?.slice(0, 160).trim() ?? "Motorcycle part from Smoke City Supplies. UK delivery.",
+    title: part?.name ?? "Product",
+    description: part?.description?.slice(0, 160).trim() ?? "Motorcycle part from Smoke City Supplies. UK delivery.",
     image: part ? getProductImage(part) : undefined,
-    keywords: part?.seoKeywords ?? [part?.category ?? "", part?.brand ?? "", "motorcycle parts UK"].filter(Boolean),
-    canonical: part ? `/product/${part.id}` : undefined,
   });
 
   if (isLoading) {
@@ -69,8 +64,8 @@ export default function ProductPage() {
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: part.seoTitle ?? part.name,
-    description: part.seoDescription ?? part.description?.slice(0, 500) ?? part.name,
+    name: part.name,
+    description: part.description?.slice(0, 500) ?? part.name,
     ...(absoluteImage && { image: absoluteImage }),
     ...(part.brand && { brand: { "@type": "Brand", name: part.brand } }),
     offers: {
@@ -196,27 +191,18 @@ export default function ProductPage() {
                 size="lg"
                 className="h-12 flex-1"
                 onClick={() => {
-                  if (!canAddMore) {
-                    toast.error(`Only ${stockQty} available — you already have ${inCartQty} in your cart`);
-                    return;
-                  }
                   cartActions.add({
                     productId: part.id,
                     productName: part.name,
                     priceEach: part.price,
                     quantity: 1,
                     image: imageUrl,
-                    stockQuantity: stockQty,
                   });
                   toast.success("Added to cart");
                 }}
-                disabled={part.stock === "out" || !canAddMore}
+                disabled={part.stock === "out"}
               >
-                {inCartQty > 0 && canAddMore
-                  ? `Add another (${inCartQty} in cart)`
-                  : inCartQty > 0 && !canAddMore
-                    ? `Max in cart (${inCartQty})`
-                    : "Add to Cart"}
+                Add to Cart
               </Button>
               <Button
                 data-testid="button-ask-support"

@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { FolderTree, Plus, Pencil, Trash2 } from "lucide-react";
-import AdminLayout from "@/components/admin/AdminLayout";
+import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import {
@@ -112,16 +112,16 @@ export default function AdminCategories() {
 
   if (isLoading) {
     return (
-      <AdminLayout>
+      <SiteLayout>
         <div className="flex min-h-[40vh] items-center justify-center">
           <p className="text-muted-foreground">Loading categories…</p>
         </div>
-      </AdminLayout>
+      </SiteLayout>
     );
   }
 
   return (
-    <AdminLayout>
+    <SiteLayout>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-start gap-4 flex-1">
@@ -267,6 +267,6 @@ export default function AdminCategories() {
           </form>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+    </SiteLayout>
   );
 }

@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import AdminLayout from "@/components/admin/AdminLayout";
+import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import AdminImageUpload from "@/components/admin/AdminImageUpload";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -36,7 +36,6 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function AdminNewPart() {
-  usePageMeta({ title: "Add Product", description: "Create a new product in the admin panel.", noIndex: true });
   const cats = useCategories();
   const createProduct = useCreateProduct();
   const [, setLoc] = useLocation();
@@ -99,7 +98,7 @@ export default function AdminNewPart() {
   };
 
   return (
-    <AdminLayout>
+    <SiteLayout>
       <div className="flex flex-col gap-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -315,6 +314,6 @@ export default function AdminNewPart() {
           </Card>
         </div>
       </div>
-    </AdminLayout>
+    </SiteLayout>
   );
 }

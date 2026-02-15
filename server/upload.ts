@@ -1,6 +1,34 @@
+import path from "path";
+import fs from "fs";
 import multer from "multer";
 
-const storage = multer.memoryStorage();
+// Use process.cwd() so uploads work when server is bundled as CJS (dist/index.cjs)
+export const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+
+try {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+} catch {
+  // directory may already exist
+}
+
+if (process.env.NODE_ENV === "production") {
+  console.warn(
+    "[upload] WARNING: Uploads are stored on the local filesystem. On Render (and similar platforms) the filesystem is ephemeral—uploaded images will be lost on every deploy or restart. For persistent storage, use Cloudinary, S3, or Render Disk."
+  );
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".jpg";
+    const safeName = (file.originalname || "image")
+      .replace(path.extname(file.originalname) || "", "")
+      .replace(/[^a-zA-Z0-9-_]/g, "_")
+      .slice(0, 50);
+    const name = `${Date.now()}-${safeName}${ext}`;
+    cb(null, name);
+  },
+});
 
 export const uploadMiddleware = multer({
   storage,

@@ -1,5 +1,4 @@
 import React from "react";
-import { useLocation } from "wouter";
 import { MapPin, Shield, Award, Headphones } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import { useCategories } from "@/lib/store";
@@ -40,7 +39,10 @@ function filterParts(parts: Part[], filters: CatalogFilters): Part[] {
 }
 
 export default function StoreHome() {
-  const [loc] = useLocation();
+  usePageMeta({
+    title: "Shop Motorcycle Parts",
+    description: "Browse motorcycle parts by category, brand and bike model. Brakes, engine, suspension, exhaust, electrical and more. UK delivery.",
+  });
   const cats = useCategories();
   const { data: parts = [], isLoading } = useProducts();
   const [filters, setFilters] = React.useState<CatalogFilters>({
@@ -67,70 +69,8 @@ export default function StoreHome() {
   const displayed = visible.slice(0, page * PARTS_PER_PAGE);
   const hasMore = page < totalPages;
 
-  const seoTitle = React.useMemo(() => {
-    if (filters.q.trim()) return `Search "${filters.q.trim()}" Motorcycle Parts`;
-    if (filters.category !== "all") return `${filters.category} Motorcycle Parts`;
-    if (filters.vehicle !== "all") return `${filters.vehicle[0].toUpperCase()}${filters.vehicle.slice(1)} Parts`;
-    return "Shop Motorcycle Parts";
-  }, [filters.q, filters.category, filters.vehicle]);
-
-  const seoDescription = React.useMemo(() => {
-    const base = "Browse motorcycle parts by category, brand and model. UK delivery and secure checkout.";
-    if (filters.q.trim()) return `Search results for ${filters.q.trim()} at Smoke City Supplies. ${base}`;
-    if (filters.category !== "all") return `Shop ${filters.category} parts at Smoke City Supplies. ${base}`;
-    return base;
-  }, [filters.q, filters.category]);
-
-  const canonical = React.useMemo(() => {
-    const idx = loc.indexOf("?");
-    if (idx < 0) return "/store";
-    const search = loc.slice(idx);
-    const params = new URLSearchParams(search);
-    const allowed = new URLSearchParams();
-    for (const key of ["q", "vehicle", "category", "sort", "model", "brands", "priceMin", "priceMax", "inStock"]) {
-      const value = params.get(key);
-      if (value) allowed.set(key, value);
-    }
-    const normalized = allowed.toString();
-    return normalized ? `/store?${normalized}` : "/store";
-  }, [loc]);
-
-  usePageMeta({
-    title: seoTitle,
-    description: seoDescription,
-    canonical,
-    keywords: [
-      "motorcycle parts UK",
-      "bike parts",
-      "scooter parts",
-      filters.category !== "all" ? `${filters.category} parts` : "",
-      filters.q.trim(),
-    ].filter(Boolean),
-  });
-
-  const collectionJsonLd = React.useMemo(() => ({
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    name: seoTitle,
-    description: seoDescription,
-    mainEntity: {
-      "@type": "ItemList",
-      numberOfItems: displayed.length,
-      itemListElement: displayed.slice(0, 12).map((part, index) => ({
-        "@type": "ListItem",
-        position: index + 1,
-        url: `${typeof window !== "undefined" ? window.location.origin : ""}/product/${part.id}`,
-        name: part.name,
-      })),
-    },
-  }), [seoTitle, seoDescription, displayed]);
-
   return (
     <SiteLayout>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}
-      />
       <div className="flex flex-col gap-6">
         {/* Local shop banner + trust badges */}
         <div className="rounded-lg border border-border/50 bg-primary/5 px-4 py-3 md:px-6 md:py-4">

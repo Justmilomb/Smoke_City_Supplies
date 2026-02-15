@@ -14,36 +14,6 @@ services:
         fromDatabase:
           name: smoke-city-supplies-db
           property: connectionString
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: VITE_STRIPE_PUBLISHABLE_KEY
-        sync: false
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_SECURE
-        value: "false"
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: SMTP_FROM
-        sync: false
-      - key: NOTIFY_ENQUIRY_EMAIL
-        sync: false
-      - key: WHATSAPP_NUMBER
-        sync: false
-      - key: SUPPORT_EMAIL
-        value: support@smokecitysupplies.com
-      - key: SUPPORT_PHONE
-        value: "07597783587"
-      - key: NVIDIA_API_KEY
-        sync: false
-      - key: NVIDIA_SEO_MODEL
-        value: moonshotai/kimi-k2.5
-      - key: ALLOWED_ORIGINS
-        value: https://smoke-city-supplies.onrender.com
     healthCheckPath: /health
 
 databases:

@@ -23,12 +23,12 @@ export default function ProductCard({ part }: { part: Part }) {
   const s = stockLabel(part.stock, part.quantity);
 
   return (
-    <Link href={`/product/${part.id}`}>
-      <a
-        data-testid={`card-product-${part.id}`}
-        className="group block focus-visible:outline-none"
-      >
-        <Card className="h-full overflow-hidden border border-border/50 transition-all hover:border-primary/50 hover:shadow-lg">
+    <Link
+      href={`/product/${part.id}`}
+      data-testid={`card-product-${part.id}`}
+      className="group block focus-visible:outline-none"
+    >
+      <Card className="h-full overflow-hidden border border-border/50 transition-all hover:border-primary/50 hover:shadow-lg">
           <div className="relative aspect-square bg-gradient-to-br from-muted/50 to-muted/30">
             <img
               data-testid={`img-product-${part.id}`}
@@ -106,7 +106,6 @@ export default function ProductCard({ part }: { part: Part }) {
             </div>
           </div>
         </Card>
-      </a>
     </Link>
   );
 }

@@ -9,9 +9,7 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 export default function ShippingPage() {
   usePageMeta({
     title: "Shipping & Delivery",
-    description: "UK delivery for motorcycle parts. Fast shipping options and delivery times. Smoke City Supplies - online motorcycle parts.",
-    canonical: "/shipping",
-    keywords: ["motorcycle parts shipping", "UK delivery", "shipping policy UK"],
+    description: "UK delivery for motorcycle parts. Fast shipping options and delivery times. Smoke City Supplies — online motorcycle parts.",
   });
   return (
     <SiteLayout>
@@ -25,7 +23,7 @@ export default function ShippingPage() {
               Fast, reliable shipping to get your parts to you quickly
             </p>
             <p className="mt-3 text-sm text-muted-foreground max-w-2xl">
-              We ship motorcycle parts across the UK. Payment at checkout is secure and powered by Stripe. Delivery times and options depend on your location and the items you order. All prices include UK delivery unless stated otherwise.
+              We ship motorcycle parts across the UK. Delivery times and options depend on your location and the items you order. All prices include UK delivery unless stated otherwise.
             </p>
           </div>
           <BackButton fallback="/" />
@@ -48,7 +46,7 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Shipping Costs</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Standard UK delivery starts at £4.99. Free UK shipping applies automatically for orders over £75. Remote-area and heavy-order rates are calculated at checkout.
+              Standard shipping: $5.99. Free shipping on orders over $75. Express options available at checkout.
             </p>
           </Card>
 
@@ -58,7 +56,7 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Areas We Cover</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              We ship across the United Kingdom—England, Scotland, Wales, and Northern Ireland. International shipping is not currently available; contact us if you have questions.
+              We ship to the continental United States. Alaska, Hawaii, and international shipping may be available—contact us for a quote.
             </p>
           </Card>
 

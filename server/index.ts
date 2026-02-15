@@ -5,6 +5,7 @@ import createMemoryStore from "memorystore";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { UPLOADS_DIR } from "./upload";
 import { pool } from "./db";
 import "./auth"; // Passport strategies
 import { securityHeaders, corsConfig } from "./security";
@@ -13,8 +14,9 @@ const PgSession = connectPgSimple(session);
 const MemSessionStore = createMemoryStore(session);
 
 const app = express();
-// Required behind reverse proxy (e.g. Render) so cookies and protocol work correctly
-app.set("trust proxy", 1);
+
+// Serve uploaded images
+app.use("/uploads", express.static(UPLOADS_DIR));
 const httpServer = createServer(app);
 
 declare module "http" {
@@ -131,9 +133,10 @@ app.use((req, res, next) => {
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Default to 3000 for local dev (5000 conflicts with macOS AirPlay).
   // On Render, PORT is set automatically.
-  const port = parseInt(process.env.PORT || "3000", 10);
+  // Default to 5000 for Replit, else 3000 for local dev (avoids common macOS port conflicts).
+  const defaultPort = process.env.REPL_ID ? "5000" : "3000";
+  const port = parseInt(process.env.PORT || defaultPort, 10);
   httpServer.listen(port, "0.0.0.0", () => {
     log(`serving on http://0.0.0.0:${port}`);
   });

@@ -1,8 +1,7 @@
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
 
-const DEFAULT_ADMIN_USERNAME = "proggs";
-const DEFAULT_ADMIN_PASSWORD = '"""""""';
+const DEFAULT_ADMIN_PASSWORD = "admin";
 
 const DEFAULT_CATEGORIES = [
   { name: "Brakes", slug: "brakes", vehicleType: "all" as const },
@@ -16,28 +15,21 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export async function seedAdminIfNeeded(): Promise<void> {
-  const username = process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
-  const existing = await storage.getUserByUsername(username);
+  const existing = await storage.getUserByUsername("admin");
   if (existing) return;
 
   const password = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
   const hashed = await bcrypt.hash(password, 10);
-  await storage.createUser({ username, password: hashed });
-  console.log("[seedAdmin] Created default admin user:", username, "(password: " + (process.env.ADMIN_PASSWORD ? "from env" : "default") + ")");
+  await storage.createUser({ username: "admin", password: hashed });
+  console.log("[seedAdmin] Created default admin user (password: " + (process.env.ADMIN_PASSWORD ? "from env" : DEFAULT_ADMIN_PASSWORD) + ")");
 }
 
 export async function seedCategoriesIfNeeded(): Promise<void> {
-  if ((await storage.getSeedState("categories_seeded")) === "1") return;
-
   const list = await storage.listCategories();
-  if (list.length > 0) {
-    await storage.setSeedState("categories_seeded", "1");
-    return;
-  }
+  if (list.length > 0) return;
 
   for (const c of DEFAULT_CATEGORIES) {
     await storage.createCategory(c);
   }
-  await storage.setSeedState("categories_seeded", "1");
   console.log("[seedAdmin] Created default categories");
 }

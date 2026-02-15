@@ -12,7 +12,7 @@ export type Category = {
 };
 
 async function fetchCategories(): Promise<Category[]> {
-  const res = await fetch(`${API}/categories`, { credentials: "include" });
+  const res = await fetch(`${API}/categories`);
   if (!res.ok) throw new Error("Failed to fetch categories");
   return res.json();
 }

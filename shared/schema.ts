@@ -17,12 +17,6 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-// One-time seed flags so admin add/remove stays permanent (no re-seeding)
-export const seedState = pgTable("seed_state", {
-  key: varchar("key", { length: 64 }).primaryKey(),
-  value: text("value").notNull(),
-});
-
 // Categories for dynamic management
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -66,10 +60,6 @@ export const products = pgTable("products", {
   description: text("description").notNull(),
   specs: jsonb("specs").$type<ProductSpec[]>().notNull(),
   features: jsonb("features").$type<string[]>(),
-  seoTitle: text("seo_title"),
-  seoDescription: text("seo_description"),
-  seoKeywords: jsonb("seo_keywords").$type<string[]>(),
-  seoSlug: text("seo_slug"),
 });
 
 export const insertProductSchema = z.object({
@@ -91,37 +81,10 @@ export const insertProductSchema = z.object({
   description: z.string(),
   specs: z.array(productSpecSchema),
   features: z.array(z.string()).optional(),
-  seoTitle: z.string().optional(),
-  seoDescription: z.string().optional(),
-  seoKeywords: z.array(z.string()).optional(),
-  seoSlug: z.string().optional(),
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
-
-// Images stored in DB (base64 data URL) for persistence on Render
-export const images = pgTable("images", {
-  id: varchar("id").primaryKey(),
-  data: text("data").notNull(),
-  mimeType: varchar("mime_type", { length: 50 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Pending payment (PaymentIntent) — links PI to cart for on-site checkout
-export const pendingPayments = pgTable("pending_payments", {
-  paymentIntentId: varchar("payment_intent_id", { length: 255 }).primaryKey(),
-  items: jsonb("items").$type<{ productId: string; productName: string; quantity: number; priceEach: number }[]>().notNull(),
-  subtotalPence: integer("subtotal_pence").notNull().default(0),
-  shippingPence: integer("shipping_pence").notNull().default(0),
-  shippingMethod: text("shipping_method"),
-  totalPence: integer("total_pence").notNull(),
-  customerEmail: text("customer_email"),
-  customerName: text("customer_name"),
-  customerAddress: text("customer_address"),
-  customerPostcode: text("customer_postcode"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
 
 // Orders for customer checkout
 export const orderItems = pgTable("order_items", {
@@ -137,20 +100,9 @@ export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(),
   createdAt: text("created_at").notNull(),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
-  subtotalPence: integer("subtotal_pence").notNull().default(0),
-  shippingPence: integer("shipping_pence").notNull().default(0),
-  shippingMethod: text("shipping_method"),
   totalPence: integer("total_pence").notNull(),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
-  customerAddress: text("customer_address"),
-  customerPostcode: text("customer_postcode"),
-  stripeSessionId: text("stripe_session_id"),
-  stripePaymentIntentId: text("stripe_payment_intent_id"),
-  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("pending"), // "pending" | "paid" | "failed"
-  trackingNumber: text("tracking_number"),
-  shippedAt: text("shipped_at"), // ISO date string
-  deliveredAt: text("delivered_at"), // ISO date string
 });
 
 export const createOrderSchema = z.object({
@@ -162,23 +114,8 @@ export const createOrderSchema = z.object({
   })),
   customerEmail: z.string().email().optional(),
   customerName: z.string().optional(),
-  customerAddress: z.string().optional(),
-  customerPostcode: z.string().optional(),
-  shippingPence: z.number().int().min(0).optional(),
-  shippingMethod: z.string().optional(),
-  stripeSessionId: z.string().optional(),
-  stripePaymentIntentId: z.string().optional(),
-  paymentStatus: z.enum(["pending", "paid", "failed"]).optional(),
-});
-export const createOrderWithSessionSchema = z.object({
-  sessionId: z.string().min(1),
-});
-export const createOrderWithPaymentIntentSchema = z.object({
-  paymentIntentId: z.string().min(1),
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
-export type CreateOrderWithSessionInput = z.infer<typeof createOrderWithSessionSchema>;
-export type CreateOrderWithPaymentIntentInput = z.infer<typeof createOrderWithPaymentIntentSchema>;
 
 // API shape for product (matches client Part + quantity)
 export type ApiProduct = {
@@ -201,10 +138,6 @@ export type ApiProduct = {
   description: string;
   specs: ProductSpec[];
   features?: string[];
-  seoTitle?: string;
-  seoDescription?: string;
-  seoKeywords?: string[];
-  seoSlug?: string;
 };
 
 export type ApiOrderItem = {
@@ -218,49 +151,8 @@ export type ApiOrder = {
   id: string;
   createdAt: string;
   status: string;
-  subtotalPence: number;
-  shippingPence: number;
-  shippingMethod?: string;
   totalPence: number;
   items: ApiOrderItem[];
   customerEmail?: string;
   customerName?: string;
-  customerAddress?: string;
-  customerPostcode?: string;
-  stripeSessionId?: string;
-  stripePaymentIntentId?: string;
-  paymentStatus?: string;
-  trackingNumber?: string;
-  shippedAt?: string;
-  deliveredAt?: string;
-};
-
-// Contact form submissions (enquiries) — saved to DB, admin can reply from panel or from their email
-export const contactSubmissions = pgTable("contact_submissions", {
-  id: varchar("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull(),
-  subject: text("subject"),
-  partNumber: text("part_number"),
-  message: text("message").notNull(),
-  status: varchar("status", { length: 20 }).notNull().default("new"), // "new" | "replied"
-  replyBody: text("reply_body"),
-  repliedAt: text("replied_at"),
-  adminNotes: text("admin_notes"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export type ContactSubmission = typeof contactSubmissions.$inferSelect;
-export type ApiContactSubmission = {
-  id: string;
-  name: string;
-  email: string;
-  subject?: string;
-  partNumber?: string;
-  message: string;
-  status: string;
-  replyBody?: string;
-  repliedAt?: string;
-  adminNotes?: string;
-  createdAt: string;
 };

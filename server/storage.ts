@@ -1,5 +1,4 @@
 import type {
-  ApiContactSubmission,
   ApiOrder,
   ApiOrderItem,
   ApiProduct,
@@ -12,14 +11,10 @@ import type {
 } from "@shared/schema";
 import {
   categories as categoriesTable,
-  contactSubmissions as contactSubmissionsTable,
   createOrderSchema,
-  images as imagesTable,
   orderItems,
   orders,
-  pendingPayments as pendingPaymentsTable,
   products,
-  seedState as seedStateTable,
   users,
 } from "@shared/schema";
 import { desc, eq } from "drizzle-orm";
@@ -42,32 +37,13 @@ export interface IStorage {
   createOrder(input: CreateOrderInput): Promise<ApiOrder>;
   listOrders(): Promise<ApiOrder[]>;
   getOrder(id: string): Promise<ApiOrder | undefined>;
-  getOrderByStripeSessionId(sessionId: string): Promise<ApiOrder | undefined>;
-  getOrderByStripePaymentIntentId(paymentIntentId: string): Promise<ApiOrder | undefined>;
   updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined>;
-  updateOrder(id: string, patch: Partial<Pick<ApiOrder, "status" | "trackingNumber" | "shippedAt" | "deliveredAt">>): Promise<ApiOrder | undefined>;
 
   listCategories(): Promise<Category[]>;
   getCategory(id: string): Promise<Category | undefined>;
   createCategory(input: InsertCategory): Promise<Category>;
   updateCategory(id: string, patch: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: string): Promise<boolean>;
-
-  createImage(data: string, mimeType: string): Promise<string>;
-  getImage(id: string): Promise<{ data: string; mimeType: string } | undefined>;
-  deleteImage(id: string): Promise<boolean>;
-
-  createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void>;
-  getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined>;
-  deletePendingPayment(paymentIntentId: string): Promise<boolean>;
-
-  getSeedState(key: string): Promise<string | undefined>;
-  setSeedState(key: string, value: string): Promise<void>;
-
-  createContactSubmission(data: { name: string; email: string; subject?: string; partNumber?: string; message: string }): Promise<ApiContactSubmission>;
-  listContactSubmissions(): Promise<ApiContactSubmission[]>;
-  getContactSubmission(id: string): Promise<ApiContactSubmission | undefined>;
-  updateContactSubmission(id: string, patch: { status?: string; replyBody?: string; repliedAt?: string; adminNotes?: string }): Promise<ApiContactSubmission | undefined>;
 }
 
 function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
@@ -91,10 +67,6 @@ function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
     description: row.description,
     specs: row.specs,
     features: row.features ?? undefined,
-    seoTitle: row.seoTitle ?? undefined,
-    seoDescription: row.seoDescription ?? undefined,
-    seoKeywords: row.seoKeywords ?? undefined,
-    seoSlug: row.seoSlug ?? undefined,
   };
 }
 
@@ -161,10 +133,6 @@ export class DbStorage implements IStorage {
         description: input.description,
         specs: input.specs,
         features: input.features ?? null,
-        seoTitle: input.seoTitle ?? null,
-        seoDescription: input.seoDescription ?? null,
-        seoKeywords: input.seoKeywords ?? null,
-        seoSlug: input.seoSlug ?? null,
       })
       .returning();
     if (!row) throw new Error("Failed to create product");
@@ -203,31 +171,21 @@ export class DbStorage implements IStorage {
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid order");
-    const { items, customerEmail, customerName, customerAddress, customerPostcode, stripeSessionId, stripePaymentIntentId, paymentStatus } = parsed.data;
+    const { items, customerEmail, customerName } = parsed.data;
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
-    const subtotalPence = Math.round(
+    const totalPence = Math.round(
       items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
     );
-    const shippingPence = Math.max(0, Math.round(input.shippingPence ?? 0));
-    const totalPence = subtotalPence + shippingPence;
 
     await this.getDb().insert(orders).values({
       id: orderId,
       createdAt: now,
       status: "pending",
-      subtotalPence,
-      shippingPence,
-      shippingMethod: input.shippingMethod ?? null,
       totalPence,
       customerEmail: customerEmail ?? null,
       customerName: customerName ?? null,
-      customerAddress: customerAddress ?? null,
-      customerPostcode: customerPostcode ?? null,
-      stripeSessionId: stripeSessionId ?? null,
-      stripePaymentIntentId: stripePaymentIntentId ?? null,
-      paymentStatus: paymentStatus ?? "pending",
     });
 
     const orderItemsToInsert = items.map((i) => ({
@@ -259,18 +217,10 @@ export class DbStorage implements IStorage {
       id: orderId,
       createdAt: now,
       status: "pending",
-      subtotalPence,
-      shippingPence,
-      shippingMethod: input.shippingMethod,
       totalPence,
       items: apiItems,
       customerEmail,
       customerName,
-      customerAddress,
-      customerPostcode,
-      stripeSessionId: stripeSessionId ?? undefined,
-      stripePaymentIntentId: stripePaymentIntentId ?? undefined,
-      paymentStatus: paymentStatus ?? "pending",
     };
   }
 
@@ -293,21 +243,10 @@ export class DbStorage implements IStorage {
         id: order.id,
         createdAt: order.createdAt,
         status: order.status,
-        subtotalPence: order.subtotalPence,
-        shippingPence: order.shippingPence ?? 0,
-        shippingMethod: order.shippingMethod ?? undefined,
         totalPence: order.totalPence,
         items,
         customerEmail: order.customerEmail ?? undefined,
         customerName: order.customerName ?? undefined,
-        customerAddress: order.customerAddress ?? undefined,
-        customerPostcode: order.customerPostcode ?? undefined,
-        stripeSessionId: order.stripeSessionId ?? undefined,
-        stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
-        paymentStatus: order.paymentStatus ?? undefined,
-        trackingNumber: order.trackingNumber ?? undefined,
-        shippedAt: order.shippedAt ?? undefined,
-        deliveredAt: order.deliveredAt ?? undefined,
       });
     }
 
@@ -331,141 +270,17 @@ export class DbStorage implements IStorage {
       id: order.id,
       createdAt: order.createdAt,
       status: order.status,
-      subtotalPence: order.subtotalPence,
-      shippingPence: order.shippingPence ?? 0,
-      shippingMethod: order.shippingMethod ?? undefined,
       totalPence: order.totalPence,
       items,
       customerEmail: order.customerEmail ?? undefined,
       customerName: order.customerName ?? undefined,
-      customerAddress: order.customerAddress ?? undefined,
-      customerPostcode: order.customerPostcode ?? undefined,
-      stripeSessionId: order.stripeSessionId ?? undefined,
-      stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
-      paymentStatus: order.paymentStatus ?? undefined,
-      trackingNumber: order.trackingNumber ?? undefined,
-      shippedAt: order.shippedAt ?? undefined,
-      deliveredAt: order.deliveredAt ?? undefined,
     };
-  }
-
-  async getOrderByStripeSessionId(sessionId: string): Promise<ApiOrder | undefined> {
-    const [order] = await this.getDb()
-      .select()
-      .from(orders)
-      .where(eq(orders.stripeSessionId, sessionId))
-      .limit(1);
-    if (!order) return undefined;
-    return this.getOrder(order.id);
-  }
-
-  async getOrderByStripePaymentIntentId(paymentIntentId: string): Promise<ApiOrder | undefined> {
-    const [order] = await this.getDb()
-      .select()
-      .from(orders)
-      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
-      .limit(1);
-    if (!order) return undefined;
-    return this.getOrder(order.id);
-  }
-
-  async createImage(data: string, mimeType: string): Promise<string> {
-    const id = `img_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`;
-    await this.getDb()
-      .insert(imagesTable)
-      .values({ id, data, mimeType });
-    return id;
-  }
-
-  async getImage(id: string): Promise<{ data: string; mimeType: string } | undefined> {
-    const [row] = await this.getDb()
-      .select()
-      .from(imagesTable)
-      .where(eq(imagesTable.id, id))
-      .limit(1);
-    if (!row) return undefined;
-    return { data: row.data, mimeType: row.mimeType };
-  }
-
-  async deleteImage(id: string): Promise<boolean> {
-    const existing = await this.getImage(id);
-    if (!existing) return false;
-    await this.getDb().delete(imagesTable).where(eq(imagesTable.id, id));
-    return true;
-  }
-
-  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void> {
-    await this.getDb().insert(pendingPaymentsTable).values({
-      paymentIntentId: data.paymentIntentId,
-      items: data.items,
-      subtotalPence: data.subtotalPence,
-      shippingPence: data.shippingPence,
-      shippingMethod: data.shippingMethod ?? null,
-      totalPence: data.totalPence,
-      customerEmail: data.customerEmail ?? null,
-      customerName: data.customerName ?? null,
-      customerAddress: data.customerAddress ?? null,
-      customerPostcode: data.customerPostcode ?? null,
-    });
-  }
-
-  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined> {
-    const [row] = await this.getDb()
-      .select()
-      .from(pendingPaymentsTable)
-      .where(eq(pendingPaymentsTable.paymentIntentId, paymentIntentId))
-      .limit(1);
-    if (!row) return undefined;
-    return {
-      items: row.items,
-      subtotalPence: row.subtotalPence,
-      shippingPence: row.shippingPence ?? 0,
-      shippingMethod: row.shippingMethod ?? undefined,
-      totalPence: row.totalPence,
-      customerEmail: row.customerEmail ?? undefined,
-      customerName: row.customerName ?? undefined,
-      customerAddress: row.customerAddress ?? undefined,
-      customerPostcode: row.customerPostcode ?? undefined,
-    };
-  }
-
-  async deletePendingPayment(paymentIntentId: string): Promise<boolean> {
-    const existing = await this.getPendingPayment(paymentIntentId);
-    if (!existing) return false;
-    await this.getDb().delete(pendingPaymentsTable).where(eq(pendingPaymentsTable.paymentIntentId, paymentIntentId));
-    return true;
-  }
-
-  async getSeedState(key: string): Promise<string | undefined> {
-    const [row] = await this.getDb()
-      .select()
-      .from(seedStateTable)
-      .where(eq(seedStateTable.key, key))
-      .limit(1);
-    return row?.value ?? undefined;
-  }
-
-  async setSeedState(key: string, value: string): Promise<void> {
-    await this.getDb()
-      .insert(seedStateTable)
-      .values({ key, value })
-      .onConflictDoUpdate({ target: seedStateTable.key, set: { value } });
   }
 
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
-    return this.updateOrder(id, { status });
-  }
-
-  async updateOrder(id: string, patch: Partial<Pick<ApiOrder, "status" | "trackingNumber" | "shippedAt" | "deliveredAt">>): Promise<ApiOrder | undefined> {
-    const set: Record<string, unknown> = {};
-    if (patch.status !== undefined) set.status = patch.status;
-    if (patch.trackingNumber !== undefined) set.trackingNumber = patch.trackingNumber ?? null;
-    if (patch.shippedAt !== undefined) set.shippedAt = patch.shippedAt ?? null;
-    if (patch.deliveredAt !== undefined) set.deliveredAt = patch.deliveredAt ?? null;
-    if (Object.keys(set).length === 0) return this.getOrder(id);
     const [updated] = await this.getDb()
       .update(orders)
-      .set(set)
+      .set({ status })
       .where(eq(orders.id, id))
       .returning();
     if (!updated) return undefined;
@@ -513,76 +328,6 @@ export class DbStorage implements IStorage {
     await this.getDb().delete(categoriesTable).where(eq(categoriesTable.id, id));
     return true;
   }
-
-  private rowToApiContactSubmission(row: typeof contactSubmissionsTable.$inferSelect): ApiContactSubmission {
-    return {
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      subject: row.subject ?? undefined,
-      partNumber: row.partNumber ?? undefined,
-      message: row.message,
-      status: row.status,
-      replyBody: row.replyBody ?? undefined,
-      repliedAt: row.repliedAt ?? undefined,
-      adminNotes: row.adminNotes ?? undefined,
-      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
-    };
-  }
-
-  async createContactSubmission(data: { name: string; email: string; subject?: string; partNumber?: string; message: string }): Promise<ApiContactSubmission> {
-    const id = randomUUID();
-    const [row] = await this.getDb()
-      .insert(contactSubmissionsTable)
-      .values({
-        id,
-        name: data.name,
-        email: data.email,
-        subject: data.subject ?? null,
-        partNumber: data.partNumber ?? null,
-        message: data.message,
-      })
-      .returning();
-    if (!row) throw new Error("Failed to create contact submission");
-    return this.rowToApiContactSubmission(row);
-  }
-
-  async listContactSubmissions(): Promise<ApiContactSubmission[]> {
-    const rows = await this.getDb()
-      .select()
-      .from(contactSubmissionsTable)
-      .orderBy(desc(contactSubmissionsTable.createdAt));
-    return rows.map((r) => this.rowToApiContactSubmission(r));
-  }
-
-  async getContactSubmission(id: string): Promise<ApiContactSubmission | undefined> {
-    const [row] = await this.getDb()
-      .select()
-      .from(contactSubmissionsTable)
-      .where(eq(contactSubmissionsTable.id, id))
-      .limit(1);
-    if (!row) return undefined;
-    return this.rowToApiContactSubmission(row);
-  }
-
-  async updateContactSubmission(
-    id: string,
-    patch: { status?: string; replyBody?: string; repliedAt?: string; adminNotes?: string }
-  ): Promise<ApiContactSubmission | undefined> {
-    const set: Record<string, unknown> = {};
-    if (patch.status !== undefined) set.status = patch.status;
-    if (patch.replyBody !== undefined) set.replyBody = patch.replyBody ?? null;
-    if (patch.repliedAt !== undefined) set.repliedAt = patch.repliedAt ?? null;
-    if (patch.adminNotes !== undefined) set.adminNotes = patch.adminNotes ?? null;
-    if (Object.keys(set).length === 0) return this.getContactSubmission(id);
-    const [row] = await this.getDb()
-      .update(contactSubmissionsTable)
-      .set(set)
-      .where(eq(contactSubmissionsTable.id, id))
-      .returning();
-    if (!row) return undefined;
-    return this.rowToApiContactSubmission(row);
-  }
 }
 
 // In-memory storage for local dev when DATABASE_URL is not set
@@ -591,9 +336,6 @@ export class MemStorage implements IStorage {
   private products = new Map<string, ApiProduct>();
   private orders = new Map<string, ApiOrder>();
   private categories = new Map<string, Category>();
-  private images = new Map<string, { data: string; mimeType: string }>();
-  private pendingPayments = new Map<string, { items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }>();
-  private contactSubmissions = new Map<string, ApiContactSubmission>();
 
   constructor() {
     seedProducts.forEach((p) => this.products.set(p.id, { ...p }));
@@ -644,10 +386,6 @@ export class MemStorage implements IStorage {
       description: input.description,
       specs: input.specs,
       features: input.features,
-      seoTitle: input.seoTitle,
-      seoDescription: input.seoDescription,
-      seoKeywords: input.seoKeywords,
-      seoSlug: input.seoSlug,
     };
     this.products.set(id, product);
     return product;
@@ -677,15 +415,13 @@ export class MemStorage implements IStorage {
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid order");
-    const { items, customerEmail, customerName, customerAddress, customerPostcode, stripeSessionId, stripePaymentIntentId, paymentStatus } = parsed.data;
+    const { items, customerEmail, customerName } = parsed.data;
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
-    const subtotalPence = Math.round(
+    const totalPence = Math.round(
       items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
     );
-    const shippingPence = Math.max(0, Math.round(input.shippingPence ?? 0));
-    const totalPence = subtotalPence + shippingPence;
     const apiItems: ApiOrderItem[] = items.map((i) => ({
       productId: i.productId,
       productName: i.productName,
@@ -696,18 +432,10 @@ export class MemStorage implements IStorage {
       id: orderId,
       createdAt: now,
       status: "pending",
-      subtotalPence,
-      shippingPence,
-      shippingMethod: input.shippingMethod,
       totalPence,
       items: apiItems,
       customerEmail,
       customerName,
-      customerAddress,
-      customerPostcode,
-      stripeSessionId: stripeSessionId ?? undefined,
-      stripePaymentIntentId: stripePaymentIntentId ?? undefined,
-      paymentStatus: paymentStatus ?? "pending",
     };
 
     for (const item of items) {
@@ -731,22 +459,10 @@ export class MemStorage implements IStorage {
     return this.orders.get(id);
   }
 
-  async getOrderByStripeSessionId(sessionId: string): Promise<ApiOrder | undefined> {
-    return Array.from(this.orders.values()).find((o) => o.stripeSessionId === sessionId);
-  }
-
-  async getOrderByStripePaymentIntentId(paymentIntentId: string): Promise<ApiOrder | undefined> {
-    return Array.from(this.orders.values()).find((o) => o.stripePaymentIntentId === paymentIntentId);
-  }
-
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
-    return this.updateOrder(id, { status });
-  }
-
-  async updateOrder(id: string, patch: Partial<Pick<ApiOrder, "status" | "trackingNumber" | "shippedAt" | "deliveredAt">>): Promise<ApiOrder | undefined> {
     const order = this.orders.get(id);
     if (!order) return undefined;
-    const updated: ApiOrder = { ...order, ...patch };
+    const updated = { ...order, status };
     this.orders.set(id, updated);
     return updated;
   }
@@ -786,92 +502,6 @@ export class MemStorage implements IStorage {
 
   async deleteCategory(id: string): Promise<boolean> {
     return this.categories.delete(id);
-  }
-
-  async createImage(data: string, mimeType: string): Promise<string> {
-    const id = `img_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`;
-    this.images.set(id, { data, mimeType });
-    return id;
-  }
-
-  async getImage(id: string): Promise<{ data: string; mimeType: string } | undefined> {
-    return this.images.get(id);
-  }
-
-  async deleteImage(id: string): Promise<boolean> {
-    return this.images.delete(id);
-  }
-
-  async createPendingPayment(data: { paymentIntentId: string; items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string }): Promise<void> {
-    this.pendingPayments.set(data.paymentIntentId, {
-      items: data.items,
-      subtotalPence: data.subtotalPence,
-      shippingPence: data.shippingPence,
-      shippingMethod: data.shippingMethod,
-      totalPence: data.totalPence,
-      customerEmail: data.customerEmail,
-      customerName: data.customerName,
-      customerAddress: data.customerAddress,
-      customerPostcode: data.customerPostcode,
-    });
-  }
-
-  async getPendingPayment(paymentIntentId: string): Promise<{ items: { productId: string; productName: string; quantity: number; priceEach: number }[]; subtotalPence: number; shippingPence: number; shippingMethod?: string; totalPence: number; customerEmail?: string; customerName?: string; customerAddress?: string; customerPostcode?: string } | undefined> {
-    return this.pendingPayments.get(paymentIntentId);
-  }
-
-  async deletePendingPayment(paymentIntentId: string): Promise<boolean> {
-    return this.pendingPayments.delete(paymentIntentId);
-  }
-
-  private seedState = new Map<string, string>();
-
-  async getSeedState(key: string): Promise<string | undefined> {
-    return this.seedState.get(key);
-  }
-
-  async setSeedState(key: string, value: string): Promise<void> {
-    this.seedState.set(key, value);
-  }
-
-  async createContactSubmission(data: { name: string; email: string; subject?: string; partNumber?: string; message: string }): Promise<ApiContactSubmission> {
-    const id = `cs_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`;
-    const submission: ApiContactSubmission = {
-      id,
-      name: data.name,
-      email: data.email,
-      subject: data.subject,
-      partNumber: data.partNumber,
-      message: data.message,
-      status: "new",
-      createdAt: new Date().toISOString(),
-    };
-    this.contactSubmissions.set(id, submission);
-    return submission;
-  }
-
-  async listContactSubmissions(): Promise<ApiContactSubmission[]> {
-    return Array.from(this.contactSubmissions.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  }
-
-  async getContactSubmission(id: string): Promise<ApiContactSubmission | undefined> {
-    return this.contactSubmissions.get(id);
-  }
-
-  async updateContactSubmission(
-    id: string,
-    patch: { status?: string; replyBody?: string; repliedAt?: string; adminNotes?: string }
-  ): Promise<ApiContactSubmission | undefined> {
-    const existing = this.contactSubmissions.get(id);
-    if (!existing) return undefined;
-    const updated: ApiContactSubmission = {
-      ...existing,
-      ...patch,
-    };
-    this.contactSubmissions.set(id, updated);
-    return updated;
   }
 }
 

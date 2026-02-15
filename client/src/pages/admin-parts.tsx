@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Edit3, Minus, Plus, Trash2 } from "lucide-react";
-import AdminLayout from "@/components/admin/AdminLayout";
+import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useProducts, useDeleteProduct, useUpdateProductQuantity } from "@/lib/products";
 import { getProductImage } from "@/lib/mockData";
@@ -46,14 +46,14 @@ export default function AdminParts() {
 
   if (isLoading) {
     return (
-      <AdminLayout>
+      <SiteLayout>
         <div className="text-muted-foreground">Loading parts…</div>
-      </AdminLayout>
+      </SiteLayout>
     );
   }
 
   return (
-    <AdminLayout>
+    <SiteLayout>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-start gap-4 flex-1">
@@ -262,6 +262,6 @@ export default function AdminParts() {
           )}
         </Card>
       </div>
-    </AdminLayout>
+    </SiteLayout>
   );
 }

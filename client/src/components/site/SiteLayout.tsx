@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { Search, ShoppingCart, Menu, Phone, ArrowUp, Home, Package, Mail, Settings, MessageSquare } from "lucide-react";
+import { Search, ShoppingCart, Menu, Phone, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,49 +15,43 @@ import { useCartCount } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "./Logo";
 
-const DEFAULT_HEADER_PHONE = "07597783587";
+const HEADER_PHONE = "07597783584";
 
-const publicNavItems = [
-  { href: "/", label: "Home", icon: Home, testId: "link-mobile-home" },
-  { href: "/store", label: "Parts", icon: Package, testId: "link-mobile-parts" },
-  { href: "/contact", label: "Contact", icon: Mail, testId: "link-mobile-contact" },
-];
-const adminNavItem = { href: "/admin", label: "Admin", icon: Settings, testId: "link-mobile-admin" };
-
-function StoreNavItem({
+function NavLink({
   href,
   label,
-  icon: Icon,
   testId,
-  onClick,
 }: {
   href: string;
   label: string;
-  icon: React.ElementType;
   testId: string;
-  onClick?: () => void;
 }) {
   const [loc] = useLocation();
   const path = loc.indexOf("?") >= 0 ? loc.slice(0, loc.indexOf("?")) : loc;
-  const active =
-    href === "/" ? path === "/" : path === href || (path.startsWith(href) && href.length > 1);
+  const active = path === href;
 
   return (
-    <Link href={href}>
-      <a
-        data-testid={testId}
-        onClick={onClick}
-        className={
-          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors " +
-          (active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")
-        }
-      >
-        <Icon className="h-4 w-4 shrink-0" />
-        {label}
-      </a>
+    <Link
+      href={href}
+      data-testid={testId}
+      className={
+        "px-4 py-2 text-sm font-medium transition-colors " +
+        (active
+          ? "text-foreground border-b-2 border-primary"
+          : "text-muted-foreground hover:text-foreground")
+      }
+    >
+      {label}
     </Link>
   );
 }
+
+const publicNavLinks = [
+  { href: "/", label: "Home", testId: "link-mobile-home" },
+  { href: "/store", label: "Parts", testId: "link-mobile-parts" },
+  { href: "/contact", label: "Contact", testId: "link-mobile-contact" },
+];
+const adminNavLink = { href: "/admin", label: "Admin", testId: "link-mobile-admin" };
 
 export default function SiteLayout({
   children,
@@ -72,9 +66,7 @@ export default function SiteLayout({
   const [searchQuery, setSearchQuery] = React.useState("");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [showBackToTop, setShowBackToTop] = React.useState(false);
-  const [headerPhone, setHeaderPhone] = React.useState(DEFAULT_HEADER_PHONE);
-  const [whatsappNumber, setWhatsappNumber] = React.useState<string | null>(null);
-  const navItems = user ? [...publicNavItems, adminNavItem] : publicNavItems;
+  const mobileNavLinks = user ? [...publicNavLinks, adminNavLink] : publicNavLinks;
 
   React.useEffect(() => {
     const onScroll = () => setShowBackToTop(window.scrollY > 400);
@@ -87,25 +79,6 @@ export default function SiteLayout({
     const q = new URLSearchParams(search).get("q") ?? "";
     setSearchQuery(q);
   }, [loc]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/config");
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
-        if (cancelled) return;
-        if (typeof data.supportPhone === "string" && data.supportPhone.trim()) setHeaderPhone(data.supportPhone);
-        if (typeof data.whatsappNumber === "string" && data.whatsappNumber.trim()) setWhatsappNumber(data.whatsappNumber);
-      } catch {
-        // Keep defaults.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +101,7 @@ export default function SiteLayout({
         description: "Your trusted online source for motorcycle parts in the UK. Genuine parts and expert advice.",
         contactPoint: {
           "@type": "ContactPoint",
-          telephone: "+44-7597-783587",
+          telephone: "+44-7597-783584",
           contactType: "customer service",
           email: "support@smokecitysupplies.com",
           areaServed: "GB",
@@ -159,10 +132,8 @@ export default function SiteLayout({
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 md:px-6 lg:px-8 md:flex-row md:items-center md:justify-between md:gap-6 md:py-4">
           <div className="flex items-center justify-between gap-4 md:justify-start">
             <Link href="/" data-testid="link-home" className="group shrink-0 transition-opacity hover:opacity-80">
-              <a>
-                <span className="hidden sm:inline-flex"><Logo size="md" showText /></span>
-                <span className="sm:hidden inline-flex"><Logo size="sm" showText={false} /></span>
-              </a>
+              <Logo size="md" showText className="hidden sm:flex" />
+              <Logo size="sm" showText={false} className="sm:hidden" />
             </Link>
 
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -177,24 +148,32 @@ export default function SiteLayout({
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[260px] p-0">
-                <SheetHeader className="p-4 pb-0">
+              <SheetContent side="left" className="w-[280px]">
+                <SheetHeader>
                   <SheetTitle>Menu</SheetTitle>
                 </SheetHeader>
-                <nav className="flex flex-col gap-1 p-3">
-                  {navItems.map(({ href, label, icon, testId }) => (
-                    <StoreNavItem
+                <nav className="mt-8 flex flex-col gap-1">
+                  {mobileNavLinks.map(({ href, label, testId }) => (
+                    <Link
                       key={href}
                       href={href}
-                      label={label}
-                      icon={icon}
-                      testId={testId}
+                      data-testid={testId}
+                      className="block rounded-lg px-4 py-3 text-base font-medium transition-colors hover:bg-muted"
                       onClick={() => setMobileNavOpen(false)}
-                    />
+                    >
+                      {label}
+                    </Link>
                   ))}
                 </nav>
               </SheetContent>
             </Sheet>
+
+            <nav className="hidden items-center gap-1 md:flex">
+              <NavLink href="/" label="Home" testId="link-home-nav" />
+              <NavLink href="/store" label="Parts" testId="link-parts" />
+              <NavLink href="/contact" label="Contact" testId="link-contact" />
+              {user && <NavLink href="/admin" label="Admin" testId="link-admin" />}
+            </nav>
           </div>
 
           <form
@@ -217,24 +196,13 @@ export default function SiteLayout({
 
           <div className="flex items-center justify-end gap-2 md:gap-3 shrink-0">
             <a
-              href={`tel:${headerPhone.replace(/\s/g, "")}`}
+              href={`tel:${HEADER_PHONE.replace(/\s/g, "")}`}
               className="hidden md:flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
               data-testid="link-phone"
             >
               <Phone className="h-4 w-4" />
-              <span>{headerPhone}</span>
+              <span>{HEADER_PHONE}</span>
             </a>
-            {whatsappNumber ? (
-              <a
-                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hi, I need help with parts.")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden md:flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span>WhatsApp</span>
-              </a>
-            ) : null}
             {right}
             <Link href="/cart">
               <Button
@@ -271,18 +239,7 @@ export default function SiteLayout({
         </div>
       </header>
 
-      <div className="flex">
-        <aside className="hidden w-56 shrink-0 border-r bg-muted/30 md:block">
-          <div className="sticky top-14 py-4">
-            <nav className="flex flex-col gap-1 p-3">
-              {navItems.map(({ href, label, icon, testId }) => (
-                <StoreNavItem key={href} href={href} label={label} icon={icon} testId={testId} />
-              ))}
-            </nav>
-          </div>
-        </aside>
-        <main className="flex-1 min-w-0 mx-auto max-w-5xl px-4 py-8 md:px-6 lg:px-8 md:py-12">{children}</main>
-      </div>
+      <main className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8 md:py-12">{children}</main>
 
       {showBackToTop && (
         <Button
@@ -301,15 +258,15 @@ export default function SiteLayout({
           <div className="md:col-span-2">
             <Logo size="md" />
             <p className="text-sm text-muted-foreground max-w-md mt-4 mb-3">
-              Your trusted online source for motorcycle parts in the UK. Genuine parts from quality brands with expert support.
+              Run by Karl, bringing back old-fashioned service to the motorcycle parts industry. Genuine parts, real expertise, and personal care.
             </p>
             <p className="text-xs text-muted-foreground">
               UK delivery only. All prices in GBP (£).
             </p>
             <div className="mt-5 grid grid-cols-2 gap-4 text-sm text-muted-foreground max-w-xs">
               <div>
-                <div className="font-medium text-foreground mb-1">Online only</div>
-                <div>UK delivery — no physical store</div>
+                <div className="font-medium text-foreground mb-1">Hours</div>
+                <div>Mon–Sat 9am–6pm</div>
               </div>
               <div>
                 <div className="font-medium text-foreground mb-1">Delivery</div>
@@ -322,24 +279,28 @@ export default function SiteLayout({
             <div className="font-semibold text-sm mb-4">Customer Service</div>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/shipping">
-                  <a className="hover:text-foreground transition-colors">
-                    Shipping & Delivery
-                  </a>
+                <Link href="/shipping" className="hover:text-foreground transition-colors">
+                  Shipping & Delivery
                 </Link>
               </li>
               <li>
-                <Link href="/returns">
-                  <a className="hover:text-foreground transition-colors">
-                    Returns & Refunds
-                  </a>
+                <Link href="/returns" className="hover:text-foreground transition-colors">
+                  Returns & Refunds
                 </Link>
               </li>
               <li>
-                <Link href="/contact">
-                  <a className="hover:text-foreground transition-colors">
-                    Contact Support
-                  </a>
+                <Link href="/contact" className="hover:text-foreground transition-colors">
+                  Contact Support
+                </Link>
+              </li>
+              <li>
+                <Link href="/privacy" className="hover:text-foreground transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="hover:text-foreground transition-colors">
+                  Terms of Service
                 </Link>
               </li>
             </ul>
@@ -350,24 +311,18 @@ export default function SiteLayout({
               <div className="font-semibold text-sm mb-4">Admin</div>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <Link href="/admin">
-                    <a className="hover:text-foreground transition-colors">
-                      Dashboard
-                    </a>
+                  <Link href="/admin" className="hover:text-foreground transition-colors">
+                    Dashboard
                   </Link>
                 </li>
                 <li>
-                  <Link href="/admin/parts">
-                    <a className="hover:text-foreground transition-colors">
-                      Inventory
-                    </a>
+                  <Link href="/admin/parts" className="hover:text-foreground transition-colors">
+                    Inventory
                   </Link>
                 </li>
                 <li>
-                  <Link href="/admin/orders">
-                    <a className="hover:text-foreground transition-colors">
-                      Orders
-                    </a>
+                  <Link href="/admin/orders" className="hover:text-foreground transition-colors">
+                    Orders
                   </Link>
                 </li>
               </ul>
@@ -375,9 +330,14 @@ export default function SiteLayout({
           )}
         </div>
         <div className="border-t mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-          <p className="text-xs text-muted-foreground text-center">
-            © {new Date().getFullYear()} Smoke City Supplies. All rights reserved.
-          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground text-center sm:text-left">
+              © {new Date().getFullYear()} Smoke City Supplies. All rights reserved.
+            </p>
+            <p className="text-xs text-muted-foreground text-center sm:text-right">
+              Built with care by Karl. Real service, every time.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

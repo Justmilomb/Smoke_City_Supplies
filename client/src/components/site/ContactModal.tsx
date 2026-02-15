@@ -1,24 +1,21 @@
 import React from "react";
-import { createPortal } from "react-dom";
-import { Phone, Mail, MapPin, MessageSquare } from "lucide-react";
+import { Phone, Mail, MessageSquare, MapPin, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
-const REAL_PHONE = "07597783587";
-const FAKE_EMAIL = "help@smokecitysupplies.example";
-const ONLINE_ONLY = "Online only - UK delivery";
-
-function whatsAppUrl(number: string | null, text = ""): string {
-  if (!number) return "#";
-  const base = `https://wa.me/${number}`;
-  if (!text.trim()) return base;
-  return `${base}?text=${encodeURIComponent(text.trim())}`;
-}
+const SUPPORT_PHONE = "07597783584";
+const SUPPORT_EMAIL = "support@smokecitysupplies.com";
+const OPENING_HOURS = "Mon–Sat 9am–6pm, Sun Closed";
+const ONLINE_ONLY = "Online only — UK delivery";
 
 export type ContactModalContextValue = {
   openWithPartNumber: (partNumber: string) => void;
@@ -46,27 +43,18 @@ export function ContactModalProvider({ children }: { children: React.ReactNode }
     () => ({ openWithPartNumber, open: openModal }),
     [openWithPartNumber, openModal]
   );
-  const fab = (
-    <div
-      className="fixed z-[100]"
-      style={{ position: "fixed", left: "auto", right: "1.5rem", bottom: "1.5rem", top: "auto" }}
-    >
+  return (
+    <ContactModalContext.Provider value={value}>
+      {children}
       <Button
         data-testid="button-contact-fab"
         size="icon"
-        className="h-14 w-14 rounded-full shadow-lg ring-2 ring-primary/20 hover:ring-primary/40 md:h-12 md:w-12"
+        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-lg md:h-12 md:w-12"
         aria-label="Contact support"
         onClick={openModal}
       >
         <MessageSquare className="h-6 w-6 md:h-5 md:w-5" />
       </Button>
-    </div>
-  );
-
-  return (
-    <ContactModalContext.Provider value={value}>
-      {children}
-      {typeof document !== "undefined" && createPortal(fab, document.body)}
       <ContactModalContent
         open={open}
         onOpenChange={setOpen}
@@ -85,30 +73,51 @@ function ContactModalContent({
   onOpenChange: (open: boolean) => void;
   initialPartNumber?: string;
 }) {
-  const [whatsappNumber, setWhatsappNumber] = React.useState<string | null>(null);
-  const message = initialPartNumber
-    ? `Hi, question about part ${initialPartNumber}.`
-    : "Hi, I need help.";
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [partNumber, setPartNumber] = React.useState(initialPartNumber);
+  const [message, setMessage] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/config");
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
-        if (cancelled) return;
-        if (typeof data.whatsappNumber === "string" && data.whatsappNumber.trim()) {
-          setWhatsappNumber(data.whatsappNumber);
-        }
-      } catch {
-        // Keep WhatsApp hidden if unavailable.
+    setPartNumber(initialPartNumber);
+  }, [initialPartNumber, open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      toast.error("Please fill in name, email, and message.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          subject: partNumber ? `Part: ${partNumber}` : "General enquiry",
+          message: message.trim() + (partNumber ? `\n\nPart number: ${partNumber}` : ""),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.message ?? "Something went wrong.");
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      toast.success(data.message ?? "Message sent. We'll get back to you soon.");
+      setName("");
+      setEmail("");
+      setPartNumber("");
+      setMessage("");
+      onOpenChange(false);
+    } catch {
+      toast.error("Failed to send message. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,42 +125,88 @@ function ContactModalContent({
         <DialogHeader>
           <DialogTitle>Contact Support</DialogTitle>
         </DialogHeader>
-
-        <div className="space-y-4">
-          <a
-            href={`tel:${REAL_PHONE.replace(/\s/g, "")}`}
-            className="flex items-center gap-2 font-medium text-foreground hover:text-primary"
-          >
-            <Phone className="h-4 w-4" />
-            {REAL_PHONE}
-          </a>
-
-          {whatsappNumber ? (
+        <div className="space-y-6">
+          <div className="grid gap-3 text-sm">
             <a
-              href={whatsAppUrl(whatsappNumber, message)}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={`tel:${SUPPORT_PHONE.replace(/\s/g, "")}`}
               className="flex items-center gap-2 font-medium text-foreground hover:text-primary"
             >
-              <MessageSquare className="h-4 w-4" />
-              Message us directly on WhatsApp
+              <Phone className="h-4 w-4" />
+              {SUPPORT_PHONE}
             </a>
-          ) : (
-            <div className="text-sm text-muted-foreground">WhatsApp temporarily unavailable</div>
-          )}
-
-          <div className="rounded-md border border-border bg-muted/40 p-3">
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="flex items-center gap-2 font-medium text-foreground hover:text-primary"
+            >
               <Mail className="h-4 w-4" />
-              <span className="font-medium">Email (Disabled)</span>
+              {SUPPORT_EMAIL}
+            </a>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MessageSquare className="h-4 w-4" />
+              <span>Live Chat — Coming soon</span>
             </div>
-            <div className="mt-1 text-sm text-muted-foreground">{FAKE_EMAIL}</div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>{OPENING_HOURS}</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              <span>{ONLINE_ONLY}</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <MapPin className="h-4 w-4" />
-            <span>{ONLINE_ONLY}</span>
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="modal-name">Name</Label>
+                <Input
+                  id="modal-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  required
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="modal-email">Email</Label>
+                <Input
+                  id="modal-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="modal-part">Part number (optional)</Label>
+              <Input
+                id="modal-part"
+                value={partNumber}
+                onChange={(e) => setPartNumber(e.target.value)}
+                placeholder="e.g. MCP-1001"
+                className="rounded-lg"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="modal-message">Message</Label>
+              <Textarea
+                id="modal-message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="How can we help?"
+                rows={3}
+                required
+                className="rounded-lg"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Sending…" : "Send message"}
+            </Button>
+          </form>
         </div>
       </DialogContent>
     </Dialog>

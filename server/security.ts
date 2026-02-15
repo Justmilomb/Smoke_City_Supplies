@@ -2,8 +2,10 @@ import type { Request, Response, NextFunction } from "express";
 
 // Security headers middleware
 export function securityHeaders(req: Request, res: Response, next: NextFunction) {
-  // Prevent clickjacking
-  res.setHeader("X-Frame-Options", "DENY");
+  // Allow framing for Replit preview (don't set X-Frame-Options in dev)
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("X-Frame-Options", "DENY");
+  }
   
   // Prevent MIME type sniffing
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -14,24 +16,24 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   // Referrer policy
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   
-  // Content Security Policy (Stripe: script/connect/frame for js.stripe.com and api.stripe.com)
+  // Content Security Policy - allow Google Fonts, Stripe, and WebSockets
   const csp = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
-    "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self' https://api.stripe.com https://hooks.stripe.com",
-    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
-    "frame-ancestors 'none'",
+    "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com",
+    "connect-src 'self' ws: wss: https://api.stripe.com",
+    "frame-src https://js.stripe.com",
+    process.env.NODE_ENV === "production" ? "frame-ancestors 'none'" : "frame-ancestors *",
   ].join("; ");
-  
+
   res.setHeader("Content-Security-Policy", csp);
-  
-  // Permissions Policy
+
+  // Permissions Policy - allow payment for Stripe
   res.setHeader(
     "Permissions-Policy",
-    "geolocation=(), microphone=(), camera=(), payment=()"
+    "geolocation=(), microphone=(), camera=()"
   );
   
   next();
@@ -41,30 +43,23 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
 export function corsConfig(req: Request, res: Response, next: NextFunction) {
   const origin = req.headers.origin;
   const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+    ? process.env.ALLOWED_ORIGINS.split(",")
     : [];
-
-  // Same-origin: origin matches this host (so cookies work when no ALLOWED_ORIGINS set)
-  const host = req.get("host");
-  const protocol = req.protocol || "https";
-  const sameOrigin = origin && host && origin === `${protocol}://${host}`;
-
-  if (process.env.NODE_ENV === "production") {
-    if (origin && (allowedOrigins.includes(origin) || (sameOrigin && allowedOrigins.length === 0))) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    }
-  } else {
+  
+  if (process.env.NODE_ENV === "production" && origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  } else if (process.env.NODE_ENV !== "production") {
     // Allow all origins in development
     res.setHeader("Access-Control-Allow-Origin", origin || "*");
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
-
+  
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
-
+  
   next();
 }
