@@ -42,6 +42,7 @@ export default function CartPage() {
   const [shippingRates, setShippingRates] = useState<Array<{
     rateId: string;
     provider: string;
+    carrier: string;
     serviceName: string;
     amountPence: number;
     estimatedDays?: number;
@@ -442,7 +443,7 @@ export default function CartPage() {
                     </Button>
                   </div>
                   {shippingRates.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">Enter address details and fetch live rates from Shippo.</div>
+                    <div className="text-sm text-muted-foreground">Enter address details and fetch live Sendcloud shipping rates.</div>
                   ) : (
                     <div className="space-y-2">
                       {shippingRates.map((rate) => (
@@ -454,7 +455,7 @@ export default function CartPage() {
                               checked={selectedRateId === rate.rateId}
                               onChange={() => setSelectedRateId(rate.rateId)}
                             />
-                            <span>{rate.serviceName}</span>
+                            <span>{rate.carrier} - {rate.serviceName}</span>
                             {rate.estimatedDays ? <span className="text-muted-foreground">({rate.estimatedDays} day)</span> : null}
                           </div>
                           <span className="font-semibold">£{(rate.amountPence / 100).toFixed(2)}</span>

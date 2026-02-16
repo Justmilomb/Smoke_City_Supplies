@@ -9,8 +9,8 @@ E-commerce site for motorcycle and scooter parts, run by Karl. Bringing back old
 - **Product Catalog** - Comprehensive filtering and search
 - **Admin Panel** - Full CRUD for products, orders, categories
 - **Barcode Inventory Tools** - Admin can link/scan barcodes for stock-in workflows (mobile-first)
-- **Invoice + Shipping Ops** - Automatic invoice email pipeline and manual Shippo label generation
-- **Live UK Shipping Rates** - Checkout quotes live Shippo rates and includes shipping in Stripe total
+- **Invoice + Shipping Ops** - Automatic invoice email pipeline and manual shipping label generation
+- **Live UK Shipping Rates** - Checkout quotes live Sendcloud rates and includes shipping in Stripe total
 - **Security** - Rate limiting, input sanitization, CSRF protection
 - **Brand Story** - Personal touch throughout the customer journey
 
@@ -74,10 +74,14 @@ npm run start
 - `INVOICE_FROM_EMAIL` - Sender address for invoices (e.g. billing@yourdomain.com)
 - `INVOICE_REPLY_TO` - Reply address customers use when replying to invoice emails (defaults to `smokecitycycles@gmail.com`)
 - `ADMIN_ORDER_ALERT_EMAIL` - Admin alert recipient for new paid orders (default `support@smokecitysupplies.com`)
-- `SHIPPO_API_KEY` - Shippo API token for label generation
+- `SENDCLOUD_API_BASE_URL` - Sendcloud API base URL (default `https://panel.sendcloud.sc/api/v2`)
+- `SENDCLOUD_PUBLIC_KEY` - Sendcloud public key
+- `SENDCLOUD_SECRET_KEY` - Sendcloud secret key
 - `SHIP_FROM_NAME` - Sender name for shipping labels
 - `SHIP_FROM_ADDRESS_LINE1` - Sender street for shipping labels
+- `SHIP_FROM_ADDRESS_LINE2` - Sender address line 2
 - `SHIP_FROM_CITY` - Sender city for shipping labels
+- `SHIP_FROM_COUNTY` - Sender county for shipping labels
 - `SHIP_FROM_POSTCODE` - Sender postcode for shipping labels
 - `SHIP_FROM_COUNTRY` - Sender country code (default `GB`)
 - `PUBLIC_BASE_URL` - Public site URL used when generating product links in the Merchant feed file
@@ -109,8 +113,13 @@ npm run start
 - On successful payment, customer confirmation and admin order-alert emails are sent (Resend).
 - Admin order actions include:
   - resend invoice (`/api/admin/orders/:id/invoice/resend`)
-  - generate shipping label via Shippo (`/api/admin/orders/:id/shipping-label`)
+  - generate shipping label (`/api/admin/orders/:id/shipping-label`)
   - print packing slip (`/api/admin/orders/:id/packing-slip`)
+
+## Sendcloud Mode
+
+- Shipping is Sendcloud-only in production and checkout is strict (no shipping fallback rates).
+- Admin can run `POST /api/admin/test/shipping` (or click **Test Shipping**) to verify Sendcloud quote + label creation.
 
 ## Google Merchant File Feed (Automatic Updates)
 

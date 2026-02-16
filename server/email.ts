@@ -124,3 +124,25 @@ export async function sendAdminOrderAlertEmail(input: {
     html,
   });
 }
+
+export async function sendContactFormEmail(input: {
+  to: string;
+  name: string;
+  email: string;
+  subject?: string;
+  message: string;
+}): Promise<void> {
+  const safeSubject = input.subject?.trim() || "General enquiry";
+  const html = `
+  <h2>New contact form message</h2>
+  <p><strong>From:</strong> ${input.name} (${input.email})</p>
+  <p><strong>Subject:</strong> ${safeSubject}</p>
+  <p><strong>Message:</strong></p>
+  <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;">${input.message}</pre>
+  `;
+  return sendEmail({
+    to: input.to,
+    subject: `Contact form: ${safeSubject}`,
+    html,
+  });
+}

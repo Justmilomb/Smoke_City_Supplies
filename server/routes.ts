@@ -43,9 +43,9 @@ import {
   writeGoogleMerchantFeedFile,
 } from "./googleMerchantFeed";
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
-import { sendAdminOrderAlertEmail, sendInvoiceEmail, sendOrderConfirmationEmail, sendOrderShippedEmail } from "./email";
-import { createShippoLabel, quoteShippoRates } from "./shippo";
-import { buildPackingSlipHtml, buildParcelsForItems, dispatchAdviceNow, fallbackShippingRates } from "./shippingLogic";
+import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderConfirmationEmail, sendOrderShippedEmail } from "./email";
+import { createSendcloudLabel, getSendcloudStatus, quoteSendcloudRates } from "./shipping/sendcloud";
+import { buildPackingSlipHtml, buildParcelsForItems, dispatchAdviceNow } from "./shippingLogic";
 import { z } from "zod";
 
 function escapeXml(s: string): string {
@@ -233,7 +233,7 @@ ${urls
     });
   });
 
-  app.post("/api/contact", contactRateLimiter, (req, res) => {
+  app.post("/api/contact", contactRateLimiter, async (req, res) => {
     const parsed = contactFormSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -242,7 +242,19 @@ ${urls
       });
     }
     const { name, email, subject, message } = parsed.data;
-    console.log("[contact]", { name, email, subject: subject ?? "(no subject)", message });
+    const supportEmail = process.env.SUPPORT_EMAIL || "support@smokecitysupplies.com";
+    try {
+      await sendContactFormEmail({
+        to: supportEmail,
+        name,
+        email,
+        subject,
+        message,
+      });
+    } catch (err) {
+      console.error("[contact] send failed:", err);
+      return res.status(500).json({ message: "We couldn't send your message right now. Please try again shortly." });
+    }
     return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
   });
 
@@ -265,7 +277,7 @@ ${urls
     return res.json({ ok: true, to, message: "Resend test email sent" });
   });
 
-  app.post("/api/admin/test/shippo", requireAuth, apiRateLimiter, async (req, res) => {
+  app.post("/api/admin/test/shipping", requireAuth, apiRateLimiter, async (req, res) => {
     const schema = z.object({
       name: z.string().min(1).optional(),
       email: z.string().email().optional(),
@@ -278,7 +290,7 @@ ${urls
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: "Invalid Shippo test payload", errors: parsed.error.flatten().fieldErrors });
+      return res.status(400).json({ message: "Invalid shipping test payload", errors: parsed.error.flatten().fieldErrors });
     }
 
     const testInput = {
@@ -292,8 +304,32 @@ ${urls
       country: parsed.data.country || process.env.SHIP_FROM_COUNTRY || "GB",
     };
 
-    const label = await createShippoLabel(testInput);
-    return res.json({ ok: true, label });
+    const parcels = [{ lengthCm: 20, widthCm: 15, heightCm: 10, weightGrams: 1000 }];
+    const status = getSendcloudStatus();
+    if (!status.configured) {
+      return res.status(400).json({ message: "Sendcloud is not configured", status });
+    }
+    let rates;
+    try {
+      rates = await quoteSendcloudRates({
+        ...testInput,
+        parcels,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Shipping test failed";
+      return res.status(400).json({ message, status });
+    }
+    if (!rates.length) {
+      return res.status(400).json({ message: "No Sendcloud rates available for test payload", status });
+    }
+    const chosen = rates[0];
+    const label = await createSendcloudLabel({
+      ...testInput,
+      parcels,
+      selectedRateId: chosen.rateId,
+      selectedServiceCode: chosen.serviceCode,
+    });
+    return res.json({ ok: true, status, rates, chosenRate: chosen, label });
   });
 
   app.post("/api/upload", requireAuth, apiRateLimiter, uploadMiddleware.single("image"), async (req, res) => {
@@ -570,23 +606,26 @@ Rules:
     const parcels = buildParcelsForItems(productMap, parsed.data.items);
     const dispatchInfo = dispatchAdviceNow();
 
-    let rates = fallbackShippingRates();
-    if (process.env.SHIPPO_API_KEY) {
-      try {
-        rates = await quoteShippoRates({
-          name: parsed.data.customerName,
-          email: parsed.data.customerEmail,
-          addressLine1: parsed.data.addressLine1,
-          addressLine2: parsed.data.addressLine2,
-          city: parsed.data.city,
-          county: parsed.data.county,
-          postcode: parsed.data.postcode,
-          country: parsed.data.country || "GB",
-          parcels,
-        });
-      } catch (err) {
-        console.warn("[shippo] quote failed, using fallback rates:", err);
-      }
+    let rates;
+    try {
+      rates = await quoteSendcloudRates({
+        name: parsed.data.customerName,
+        email: parsed.data.customerEmail,
+        addressLine1: parsed.data.addressLine1,
+        addressLine2: parsed.data.addressLine2,
+        city: parsed.data.city,
+        county: parsed.data.county,
+        postcode: parsed.data.postcode,
+        country: parsed.data.country || "GB",
+        parcels,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to quote shipping";
+      return res.status(400).json({ message });
+    }
+
+    if (!rates.length) {
+      return res.status(400).json({ message: "No shipping options available for this address." });
     }
 
     return res.json({
@@ -619,8 +658,9 @@ Rules:
     let selectedShippingServiceLevel = parsed.data.shippingServiceLevel;
     let selectedShippingEstimatedDays = parsed.data.shippingEstimatedDays;
 
-    if (process.env.SHIPPO_API_KEY) {
-      const liveRates = await quoteShippoRates({
+    let liveRates;
+    try {
+      liveRates = await quoteSendcloudRates({
         name: parsed.data.customerName,
         email: parsed.data.customerEmail,
         addressLine1: parsed.data.addressLine1,
@@ -631,15 +671,28 @@ Rules:
         country: parsed.data.country || "GB",
         parcels,
       });
-      const selectedRate = liveRates.find((rate) => rate.rateId === parsed.data.shippingRateId);
-      if (!selectedRate) {
-        return res.status(400).json({ message: "Selected shipping rate is no longer available. Please refresh shipping options." });
-      }
-      selectedShippingAmountPence = selectedRate.amountPence;
-      selectedShippingProvider = selectedRate.provider;
-      selectedShippingServiceLevel = selectedRate.serviceName;
-      selectedShippingEstimatedDays = selectedRate.estimatedDays;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to quote shipping";
+      return res.status(400).json({ message });
     }
+
+    if (!liveRates.length) {
+      return res.status(400).json({ message: "No shipping options available for this address." });
+    }
+    const selectedRate =
+      liveRates.find((rate) => rate.rateId === parsed.data.shippingRateId) ??
+      liveRates.find(
+        (rate) =>
+          rate.provider.toLowerCase() === parsed.data.shippingProvider.toLowerCase() &&
+          rate.serviceName.toLowerCase() === parsed.data.shippingServiceLevel.toLowerCase()
+      );
+    if (!selectedRate) {
+      return res.status(400).json({ message: "Selected shipping rate is no longer available. Please refresh shipping options." });
+    }
+    selectedShippingAmountPence = selectedRate.amountPence;
+    selectedShippingProvider = selectedRate.provider;
+    selectedShippingServiceLevel = selectedRate.serviceName;
+    selectedShippingEstimatedDays = selectedRate.estimatedDays;
 
     const amountPence = subtotalPence + selectedShippingAmountPence;
 
@@ -905,37 +958,59 @@ Rules:
       priceEach: item.priceEach,
     })));
 
-    const label = await createShippoLabel({
-      name: order.customerName,
-      email: order.customerEmail,
-      addressLine1: order.addressLine1,
-      addressLine2: order.addressLine2,
-      city: order.city,
-      county: order.county,
-      postcode: order.postcode,
-      country: order.country || "GB",
-      parcels,
-      preferredRateId: order.shippingRateId,
-    });
-
-    let shippingLabelUrl = label.labelUrl;
-    let shippingLabelFileId: string | undefined;
+    let label;
     try {
-      const fetched = await fetch(label.labelUrl);
-      if (fetched.ok) {
-        const mimeType = fetched.headers.get("content-type") || "application/pdf";
-        const buffer = Buffer.from(await fetched.arrayBuffer());
-        const stored = await storage.createStoredFile({
-          kind: "shipping_label_pdf",
-          filename: `${label.labelId}.pdf`,
-          mimeType,
-          content: buffer,
-        });
-        shippingLabelFileId = stored.id;
-        shippingLabelUrl = `/api/files/${stored.id}`;
-      }
+      label = await createSendcloudLabel({
+        name: order.customerName,
+        email: order.customerEmail,
+        addressLine1: order.addressLine1,
+        addressLine2: order.addressLine2,
+        city: order.city,
+        county: order.county,
+        postcode: order.postcode,
+        country: order.country || "GB",
+        parcels,
+        selectedRateId: order.shippingRateId,
+        selectedServiceCode: order.shippingRateId || order.shippingServiceLevel,
+      });
     } catch (err) {
-      console.warn("[shippo] could not mirror label file to database:", err);
+      const message = err instanceof Error ? err.message : "Shipping label generation failed";
+      return res.status(400).json({ message });
+    }
+
+    let shippingLabelUrl = label.labelUrl || "";
+    let shippingLabelFileId: string | undefined;
+    if (label.labelContentBase64) {
+      const stored = await storage.createStoredFile({
+        kind: "shipping_label_pdf",
+        filename: label.labelFilename || `${label.labelId}.html`,
+        mimeType: label.labelMimeType || "text/html; charset=utf-8",
+        content: Buffer.from(label.labelContentBase64, "base64"),
+      });
+      shippingLabelFileId = stored.id;
+      shippingLabelUrl = `/api/files/${stored.id}`;
+    } else if (label.labelUrl) {
+      try {
+        const fetched = await fetch(label.labelUrl);
+        if (fetched.ok) {
+          const mimeType = fetched.headers.get("content-type") || "application/pdf";
+          const buffer = Buffer.from(await fetched.arrayBuffer());
+          const stored = await storage.createStoredFile({
+            kind: "shipping_label_pdf",
+            filename: `${label.labelId}.pdf`,
+            mimeType,
+            content: buffer,
+          });
+          shippingLabelFileId = stored.id;
+          shippingLabelUrl = `/api/files/${stored.id}`;
+        }
+      } catch (err) {
+        console.warn("[shipping] could not mirror label file to database:", err);
+      }
+    }
+
+    if (!shippingLabelUrl) {
+      return res.status(500).json({ message: "Shipping provider did not return a usable label" });
     }
 
     const updated = await storage.recordShippingLabel(order.id, {

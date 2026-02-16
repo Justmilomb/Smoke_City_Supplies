@@ -1,5 +1,5 @@
 import type { ApiOrder, ApiProduct, ShippingRatesQuoteInput } from "@shared/schema";
-import type { ShippoParcel, ShippoRate } from "./shippo";
+import type { ShippingParcel } from "./shipping/sendcloud";
 
 const LONDON_TIMEZONE = "Europe/London";
 const CUTOFF_HOUR_24 = 18;
@@ -7,8 +7,8 @@ const CUTOFF_HOUR_24 = 18;
 export function buildParcelsForItems(
   productsById: Map<string, ApiProduct>,
   items: ShippingRatesQuoteInput["items"]
-): ShippoParcel[] {
-  const parcels: ShippoParcel[] = [];
+): ShippingParcel[] {
+  const parcels: ShippingParcel[] = [];
   for (const item of items) {
     const product = productsById.get(item.productId);
     for (let i = 0; i < item.quantity; i += 1) {
@@ -88,31 +88,6 @@ export function dispatchAdviceNow(date = new Date()): { dispatchAdvice: string; 
     cutoffLocal: "18:00 Europe/London",
     expectedShipDate,
   };
-}
-
-export function fallbackShippingRates(): ShippoRate[] {
-  return [
-    {
-      rateId: "fallback-standard",
-      provider: "shippo",
-      carrier: "Smoke City Supplies",
-      serviceName: "Standard UK",
-      serviceToken: "standard",
-      amountPence: 599,
-      currency: "GBP",
-      estimatedDays: 2,
-    },
-    {
-      rateId: "fallback-nextday",
-      provider: "shippo",
-      carrier: "Smoke City Supplies",
-      serviceName: "Next Day UK",
-      serviceToken: "nextday",
-      amountPence: 999,
-      currency: "GBP",
-      estimatedDays: 1,
-    },
-  ];
 }
 
 export function buildPackingSlipHtml(order: ApiOrder): string {

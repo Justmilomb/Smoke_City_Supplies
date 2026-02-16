@@ -46,10 +46,14 @@ A full-stack e-commerce application for motorcycle and scooter parts and accesso
 - `INVOICE_FROM_EMAIL` - Invoice sender email
 - `INVOICE_REPLY_TO` - Invoice reply-to email
 - `ADMIN_ORDER_ALERT_EMAIL` - Admin alert recipient for new paid orders
-- `SHIPPO_API_KEY` - Shippo API key (when enabling labels)
+- `SENDCLOUD_API_BASE_URL` - Sendcloud API base URL
+- `SENDCLOUD_PUBLIC_KEY` - Sendcloud public key
+- `SENDCLOUD_SECRET_KEY` - Sendcloud secret key
 - `SHIP_FROM_NAME` - Sender name for labels
 - `SHIP_FROM_ADDRESS_LINE1` - Sender address line 1
+- `SHIP_FROM_ADDRESS_LINE2` - Sender address line 2
 - `SHIP_FROM_CITY` - Sender city
+- `SHIP_FROM_COUNTY` - Sender county
 - `SHIP_FROM_POSTCODE` - Sender postcode
 - `SHIP_FROM_COUNTRY` - Sender country code
 - `PUBLIC_BASE_URL` - Public site URL used in generated feed product links

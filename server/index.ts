@@ -9,6 +9,9 @@ import { UPLOADS_DIR } from "./upload";
 import { pool } from "./db";
 import "./auth"; // Passport strategies
 import { securityHeaders, corsConfig } from "./security";
+import { assertSendcloudConfigurationOrThrow } from "./shipping/sendcloud";
+
+assertSendcloudConfigurationOrThrow();
 
 const PgSession = connectPgSimple(session);
 const MemSessionStore = createMemoryStore(session);

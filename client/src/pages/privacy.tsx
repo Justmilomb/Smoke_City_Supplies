@@ -77,7 +77,7 @@ export default function PrivacyPage() {
               <li>Request data portability</li>
             </ul>
             <p className="text-muted-foreground leading-relaxed mt-4">
-              To exercise any of these rights, email us at <a href="mailto:privacy@smokecitysupplies.com" className="text-primary hover:underline">privacy@smokecitysupplies.com</a> or call 07597783584.
+              To exercise any of these rights, email us at <a href="mailto:privacy@smokecitysupplies.com" className="text-primary hover:underline">privacy@smokecitysupplies.com</a> or call 07950 827584.
             </p>
           </section>
 
@@ -102,7 +102,7 @@ export default function PrivacyPage() {
             </p>
             <div className="mt-4 space-y-2 text-muted-foreground">
               <p><strong className="text-foreground">Email:</strong> <a href="mailto:support@smokecitysupplies.com" className="text-primary hover:underline">support@smokecitysupplies.com</a></p>
-              <p><strong className="text-foreground">Phone:</strong> <a href="tel:07597783584" className="text-primary hover:underline">07597783584</a></p>
+              <p><strong className="text-foreground">Phone:</strong> <a href="tel:07950827584" className="text-primary hover:underline">07950 827584</a></p>
               <p><strong className="text-foreground">Business:</strong> Smoke City Supplies, United Kingdom</p>
             </div>
           </section>

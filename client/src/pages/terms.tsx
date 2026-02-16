@@ -113,7 +113,7 @@ export default function TermsPage() {
             </p>
             <div className="space-y-2 text-muted-foreground">
               <p><strong className="text-foreground">Email:</strong> <a href="mailto:support@smokecitysupplies.com" className="text-primary hover:underline">support@smokecitysupplies.com</a></p>
-              <p><strong className="text-foreground">Phone:</strong> <a href="tel:07597783584" className="text-primary hover:underline">07597783584</a></p>
+              <p><strong className="text-foreground">Phone:</strong> <a href="tel:07950827584" className="text-primary hover:underline">07950 827584</a></p>
               <p><strong className="text-foreground">Hours:</strong> Mon-Sat 9am-6pm GMT</p>
             </div>
           </section>

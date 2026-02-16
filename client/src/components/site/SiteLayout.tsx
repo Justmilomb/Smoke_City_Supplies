@@ -15,7 +15,7 @@ import { useCartCount } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "./Logo";
 
-const HEADER_PHONE = "07597783584";
+const HEADER_PHONE = "07950 827584";
 
 function NavLink({
   href,
@@ -100,7 +100,7 @@ export default function SiteLayout({
         description: "Your trusted online source for motorcycle parts in the UK. Genuine parts and expert advice.",
         contactPoint: {
           "@type": "ContactPoint",
-          telephone: "+44-7597-783584",
+          telephone: "+44-7950-827584",
           contactType: "customer service",
           email: "support@smokecitysupplies.com",
           areaServed: "GB",

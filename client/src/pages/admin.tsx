@@ -60,9 +60,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const testShippo = async () => {
+  const testShipping = async () => {
     try {
-      const res = await fetch("/api/admin/test/shippo", {
+      const res = await fetch("/api/admin/test/shipping", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -70,12 +70,12 @@ export default function AdminDashboard() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Shippo test failed");
+        throw new Error(data.message || "Shipping test failed");
       }
       const data = await res.json();
-      toast.success(`Shippo test label created${data?.label?.trackingNumber ? ` (${data.label.trackingNumber})` : ""}`);
+      toast.success(`Shipping test label created${data?.label?.trackingNumber ? ` (${data.label.trackingNumber})` : ""}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Shippo test failed");
+      toast.error(err instanceof Error ? err.message : "Shipping test failed");
     }
   };
 
@@ -108,8 +108,8 @@ export default function AdminDashboard() {
           <Button variant="outline" onClick={testResend}>
             Test Resend
           </Button>
-          <Button variant="outline" onClick={testShippo}>
-            Test Shippo
+          <Button variant="outline" onClick={testShipping}>
+            Test Shipping
           </Button>
         </div>
 
