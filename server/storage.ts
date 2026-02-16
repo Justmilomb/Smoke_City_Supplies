@@ -515,8 +515,8 @@ export class MemStorage implements IStorage {
 }
 
 if (!db && process.env.NODE_ENV === "production") {
-  throw new Error(
-    "DATABASE_URL is required in production. Falling back to in-memory storage would lose admin/product/order data on restart."
+  console.warn(
+    "[storage] DATABASE_URL is not set in production. Using in-memory storage; data will reset on deploy/restart."
   );
 }
 

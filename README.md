@@ -58,7 +58,7 @@ npm run start
 ```
 
 **Environment Variables:**
-- `DATABASE_URL` - Automatically set when you add a PostgreSQL database
+- `DATABASE_URL` - Optional for temporary/free deployments. Recommended for persistent PostgreSQL storage.
 - `SESSION_SECRET` - Generate with: `openssl rand -base64 32`
 - `NODE_ENV` - Set to `production` (auto-set by Render)
 - `ADMIN_PASSWORD` - (Optional) Override default admin password
@@ -75,7 +75,7 @@ npm run start
 
 **Important Notes:**
 - The server binds to `0.0.0.0` and uses the `PORT` environment variable (set by Render)
-- `DATABASE_URL` is required in production. The app will fail to start without it to prevent data loss from in-memory fallback.
+- If `DATABASE_URL` is not set, the app uses in-memory storage in production. Admin/products/orders will reset on restart/redeploy.
 - Product auto-seeding is disabled by default in production. Use `SEED_PARTS_ON_STARTUP=true` only when you intentionally want to seed.
 - Uploaded images are persisted only if `UPLOADS_DIR` points to persistent storage (for example Render Disk)
 - For cloud-based persistence, consider Cloudinary or S3

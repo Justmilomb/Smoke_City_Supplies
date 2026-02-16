@@ -290,7 +290,9 @@ export async function runSeedParts(): Promise<number> {
   return created;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isDirectRun = /(^|[\\/])seedParts\.(ts|js)$/.test(process.argv[1] ?? "");
+
+if (isDirectRun) {
   runSeedParts()
     .then((n) => process.exit(n >= 0 ? 0 : 1))
     .catch((err) => {
