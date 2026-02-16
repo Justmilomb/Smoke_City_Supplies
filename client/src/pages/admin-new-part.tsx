@@ -39,6 +39,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function AdminNewPart() {
+  usePageMeta({ title: "Add Product", description: "Add a new product to the catalog.", noindex: true });
   const cats = useCategories();
   const createProduct = useCreateProduct();
   const [, setLoc] = useLocation();

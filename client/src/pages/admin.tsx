@@ -39,7 +39,7 @@ function AdminTile({
 }
 
 export default function AdminDashboard() {
-  usePageMeta({ title: "Admin", description: "Store management dashboard." });
+  usePageMeta({ title: "Admin", description: "Store management dashboard.", noindex: true });
   return (
     <SiteLayout>
       <div className="flex flex-col gap-8">

@@ -8,6 +8,7 @@ export default function Home() {
   usePageMeta({
     title: "Smoke City Supplies | Quality Motorcycle Parts with Old-Fashioned Service",
     description: "Run by Karl, a passionate motorcyclist bringing back real, human service to the parts industry. Genuine parts, expert advice, and care that's become rare in today's world.",
+    keywords: "motorcycle parts, bike parts, scooter parts, motorcycle spares, UK motorcycle parts, Smoke City Supplies, genuine motorcycle parts, motorcycle accessories",
   });
 
   return (

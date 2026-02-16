@@ -40,7 +40,7 @@ function slugify(s: string): string {
 }
 
 export default function AdminCategories() {
-  usePageMeta({ title: "Categories", description: "Organize product categories." });
+  usePageMeta({ title: "Categories", description: "Organize product categories.", noindex: true });
   const { data: categories, isLoading } = useCategoriesQuery();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();

@@ -45,7 +45,7 @@ export default function AdminEditPart() {
   const { data: product, isLoading } = useProduct(id);
   const updateProduct = useUpdateProduct();
   const cats = useCategories();
-  usePageMeta({ title: product ? `Edit ${product.name}` : "Edit Product", description: "Edit part details and image." });
+  usePageMeta({ title: product ? `Edit ${product.name}` : "Edit Product", description: "Edit part details and image.", noindex: true });
   const [preview, setPreview] = React.useState<string>("");
 
   const form = useForm<FormValues>({

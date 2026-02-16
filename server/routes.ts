@@ -47,21 +47,56 @@ export async function registerRoutes(
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
   }
 
-  // Sitemap (SEO)
+  // Dynamic robots.txt (overrides static file — uses correct absolute sitemap URL)
+  app.get("/robots.txt", (req, res) => {
+    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const txt = `User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /cart
+Disallow: /api/*
+
+Sitemap: ${base}/sitemap.xml
+`;
+    res.type("text/plain").send(txt);
+  });
+
+  // Sitemap (SEO — Google + Bing compatible)
   app.get("/sitemap.xml", async (req, res) => {
     const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const now = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
     const products = await storage.listProducts();
-    const urls = [
-      { loc: `${base}/`, changefreq: "weekly" as const, priority: "1.0" },
-      { loc: `${base}/store`, changefreq: "daily" as const, priority: "0.9" },
-      { loc: `${base}/contact`, changefreq: "monthly" as const, priority: "0.5" },
-      { loc: `${base}/shipping`, changefreq: "monthly" as const, priority: "0.5" },
-      { loc: `${base}/returns`, changefreq: "monthly" as const, priority: "0.5" },
-      ...products.map((p) => ({ loc: `${base}/product/${p.id}`, changefreq: "weekly" as const, priority: "0.8" })),
+
+    type SitemapUrl = { loc: string; changefreq: string; priority: string; lastmod: string };
+    const urls: SitemapUrl[] = [
+      { loc: `${base}/`, changefreq: "weekly", priority: "1.0", lastmod: now },
+      { loc: `${base}/store`, changefreq: "daily", priority: "0.9", lastmod: now },
+      { loc: `${base}/catalog`, changefreq: "daily", priority: "0.8", lastmod: now },
+      { loc: `${base}/contact`, changefreq: "monthly", priority: "0.5", lastmod: now },
+      { loc: `${base}/shipping`, changefreq: "monthly", priority: "0.4", lastmod: now },
+      { loc: `${base}/returns`, changefreq: "monthly", priority: "0.4", lastmod: now },
+      { loc: `${base}/privacy`, changefreq: "yearly", priority: "0.2", lastmod: now },
+      { loc: `${base}/terms`, changefreq: "yearly", priority: "0.2", lastmod: now },
+      ...products.map((p) => ({
+        loc: `${base}/product/${p.id}`,
+        changefreq: "weekly",
+        priority: "0.8",
+        lastmod: now,
+      })),
     ];
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`).join("\n")}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+${urls.map((u) => `  <url>
+    <loc>${escapeXml(u.loc)}</loc>
+    <lastmod>${u.lastmod}</lastmod>
+    <changefreq>${u.changefreq}</changefreq>
+    <priority>${u.priority}</priority>
+  </url>`).join("\n")}
 </urlset>`;
     res.type("application/xml").send(xml);
   });

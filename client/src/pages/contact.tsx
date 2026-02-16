@@ -12,8 +12,9 @@ import { toast } from "sonner";
 
 export default function ContactPage() {
   usePageMeta({
-    title: "Contact",
+    title: "Contact Us",
     description: "Contact Smoke City Supplies for motorcycle parts enquiries, support and orders. UK-based online store. Email and phone support.",
+    keywords: "contact Smoke City Supplies, motorcycle parts enquiry, customer support, motorcycle parts help",
   });
   const [submitting, setSubmitting] = React.useState(false);
   const [name, setName] = React.useState("");

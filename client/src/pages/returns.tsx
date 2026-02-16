@@ -10,6 +10,7 @@ export default function ReturnsPage() {
   usePageMeta({
     title: "Returns Policy",
     description: "Returns and refunds for motorcycle parts. UK returns policy. Smoke City Supplies — hassle-free returns.",
+    keywords: "motorcycle parts returns, refund policy, return motorcycle parts, Smoke City Supplies returns",
   });
   return (
     <SiteLayout>

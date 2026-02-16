@@ -98,6 +98,7 @@ export default function SiteLayout({
         "@id": `${siteUrl}#organization`,
         name: "Smoke City Supplies",
         url: siteUrl,
+        logo: `${siteUrl}/favicon.png`,
         description: "Your trusted online source for motorcycle parts in the UK. Genuine parts and expert advice.",
         contactPoint: {
           "@type": "ContactPoint",
@@ -105,14 +106,17 @@ export default function SiteLayout({
           contactType: "customer service",
           email: "support@smokecitysupplies.com",
           areaServed: "GB",
+          availableLanguage: "English",
         },
       },
       {
         "@type": "WebSite",
+        "@id": `${siteUrl}#website`,
         name: "Smoke City Supplies",
         url: siteUrl,
         description: "Genuine motorcycle parts, UK delivery. Shop brakes, engine, suspension, exhaust and more.",
         publisher: { "@id": `${siteUrl}#organization` },
+        inLanguage: "en-GB",
         potentialAction: {
           "@type": "SearchAction",
           target: { "@type": "EntryPoint", urlTemplate: `${siteUrl}/store?q={search_term_string}` },

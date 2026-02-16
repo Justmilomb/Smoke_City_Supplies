@@ -42,6 +42,7 @@ export default function StoreHome() {
   usePageMeta({
     title: "Shop Motorcycle Parts",
     description: "Browse motorcycle parts by category, brand and bike model. Brakes, engine, suspension, exhaust, electrical and more. UK delivery.",
+    keywords: "buy motorcycle parts, motorcycle brakes, motorcycle engine parts, motorcycle suspension, motorcycle exhaust, motorcycle tyres, UK motorcycle shop",
   });
   const cats = useCategories();
   const { data: parts = [], isLoading } = useProducts();

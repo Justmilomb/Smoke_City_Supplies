@@ -24,6 +24,7 @@ export default function ProductPage() {
     description: part?.metaDescription || part?.description?.slice(0, 160).trim() || "Motorcycle part from Smoke City Supplies. UK delivery.",
     image: part ? getProductImage(part) : undefined,
     keywords: part?.metaKeywords,
+    ogType: "product",
   });
 
   if (isLoading) {
@@ -62,22 +63,63 @@ export default function ProductPage() {
         ? imageUrl
         : `${window.location.origin}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`
       : undefined;
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const productUrl = `${siteUrl}/product/${part.id}`;
+
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: part.name,
-    description: part.description?.slice(0, 500) ?? part.name,
+    description: part.metaDescription || part.description?.slice(0, 500) || part.name,
     ...(absoluteImage && { image: absoluteImage }),
     ...(part.brand && { brand: { "@type": "Brand", name: part.brand } }),
+    url: productUrl,
     offers: {
       "@type": "Offer",
+      url: productUrl,
       price: part.price,
       priceCurrency: "GBP",
       availability:
         part.stock === "out"
           ? "https://schema.org/OutOfStock"
-          : "https://schema.org/InStock",
+          : part.stock === "low"
+            ? "https://schema.org/LimitedAvailability"
+            : "https://schema.org/InStock",
+      seller: {
+        "@type": "Organization",
+        name: "Smoke City Supplies",
+      },
     },
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: siteUrl || undefined,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Parts",
+        item: `${siteUrl}/store`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: part.category,
+        item: `${siteUrl}/store?category=${encodeURIComponent(part.category)}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 4,
+        name: part.name,
+      },
+    ],
   };
   const stockStatus =
     part.stock === "in-stock"
@@ -93,6 +135,10 @@ export default function ProductPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <div className="flex flex-col gap-6">
         <BackButton fallback="/store" />

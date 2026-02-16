@@ -10,6 +10,7 @@ export default function ShippingPage() {
   usePageMeta({
     title: "Shipping & Delivery",
     description: "UK delivery for motorcycle parts. Fast shipping options and delivery times. Smoke City Supplies — online motorcycle parts.",
+    keywords: "motorcycle parts delivery, UK shipping, motorcycle parts postage, fast delivery motorcycle parts",
   });
   return (
     <SiteLayout>

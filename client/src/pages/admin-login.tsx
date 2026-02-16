@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export default function AdminLogin() {
-  usePageMeta({ title: "Admin Sign In", description: "Sign in to manage your store." });
+  usePageMeta({ title: "Admin Sign In", description: "Sign in to manage your store.", noindex: true });
   const [, setLocation] = useLocation();
   const { user, isLoading, login, isLoggingIn } = useAuth();
   const [username, setUsername] = React.useState("");

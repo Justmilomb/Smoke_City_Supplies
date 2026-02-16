@@ -20,10 +20,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 const API_BASE = "/api";
 
 export default function CartPage() {
+  usePageMeta({ title: "Shopping Cart", description: "Your shopping cart at Smoke City Supplies.", noindex: true });
   const { state, actions } = useCart();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);

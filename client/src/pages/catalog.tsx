@@ -24,7 +24,11 @@ function parseVehicle(loc: string): "all" | "bike" | "scooter" {
 }
 
 export default function CatalogPage() {
-  usePageMeta({ title: "Catalog", description: "Browse motorcycle and bike parts by category. UK delivery." });
+  usePageMeta({
+    title: "Parts Catalog",
+    description: "Full catalog of motorcycle, bike and scooter parts. Filter by category, vehicle type and price. Quality parts with UK delivery from Smoke City Supplies.",
+    keywords: "motorcycle parts catalog, bike parts list, scooter parts, motorcycle spares catalog, UK motorcycle parts, parts by category",
+  });
   const cats = useCategories();
   const { data: parts = [], isLoading } = useProducts();
   const [loc] = useLocation();

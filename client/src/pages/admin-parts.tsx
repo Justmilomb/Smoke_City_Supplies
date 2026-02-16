@@ -19,7 +19,7 @@ function stockTone(stock: string) {
 }
 
 export default function AdminParts() {
-  usePageMeta({ title: "Products", description: "Manage inventory and catalog." });
+  usePageMeta({ title: "Products", description: "Manage inventory and catalog.", noindex: true });
   const { data: parts = [], isLoading } = useProducts();
   const deleteProduct = useDeleteProduct();
   const updateQuantity = useUpdateProductQuantity();

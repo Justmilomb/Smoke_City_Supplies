@@ -92,7 +92,7 @@ function OrderStatusSelect({
 }
 
 export default function AdminOrders() {
-  usePageMeta({ title: "Orders", description: "Track and manage orders." });
+  usePageMeta({ title: "Orders", description: "Track and manage orders.", noindex: true });
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
     queryFn: fetchOrders,
