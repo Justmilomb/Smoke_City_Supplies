@@ -25,6 +25,7 @@ import AdminParts from "@/pages/admin-parts";
 import AdminOrders from "@/pages/admin-orders";
 import AdminCategories from "@/pages/admin-categories";
 import AdminEditPart from "@/pages/admin-edit-part";
+import CookieConsent from "@/components/site/CookieConsent";
 
 function Router() {
   return (
@@ -62,6 +63,7 @@ function App() {
             <Toaster />
             <SonnerToaster position="top-center" richColors />
             <Router />
+            <CookieConsent />
           </ContactModalProvider>
         </TooltipProvider>
       </CartProvider>

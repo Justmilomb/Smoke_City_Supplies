@@ -262,7 +262,7 @@ export default function SiteLayout({
           <div className="md:col-span-2">
             <Logo size="md" />
             <p className="text-sm text-muted-foreground max-w-md mt-4 mb-3">
-              Run by Karl, bringing back old-fashioned service to the motorcycle parts industry. Genuine parts, real expertise, and personal care.
+              Bringing back old-fashioned service to the motorcycle parts industry. Genuine parts, real expertise, and personal care.
             </p>
             <p className="text-xs text-muted-foreground">
               UK delivery only. All prices in GBP (£).
@@ -339,7 +339,7 @@ export default function SiteLayout({
               © {new Date().getFullYear()} Smoke City Supplies. All rights reserved.
             </p>
             <p className="text-xs text-muted-foreground text-center sm:text-right">
-              Built with care by Karl. Real service, every time.
+              Built with care. Real service, every time.
             </p>
           </div>
         </div>

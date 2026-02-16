@@ -7,14 +7,14 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 export default function Home() {
   usePageMeta({
     title: "Smoke City Supplies | Quality Motorcycle Parts with Old-Fashioned Service",
-    description: "Run by Karl, a passionate motorcyclist bringing back real, human service to the parts industry. Genuine parts, expert advice, and care that's become rare in today's world.",
+    description: "A passionate team of motorcyclists bringing back real, human service to the parts industry. Genuine parts, expert advice, and care that's become rare in today's world.",
     keywords: "motorcycle parts, bike parts, scooter parts, motorcycle spares, UK motorcycle parts, Smoke City Supplies, genuine motorcycle parts, motorcycle accessories",
   });
 
   return (
     <SiteLayout>
       <div className="flex flex-col gap-12">
-        {/* Hero Section - Karl's Story */}
+        {/* Hero Section */}
         <section className="grid lg:grid-cols-2 gap-10 items-center py-4">
           <div>
             <div className="inline-flex items-center gap-2 border border-accent bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent mb-5 rounded-md">
@@ -28,13 +28,13 @@ export default function Home() {
             </h1>
             <div className="space-y-4 text-muted-foreground md:text-lg max-w-lg mb-8">
               <p>
-                I'm <span className="font-semibold text-foreground">Karl</span>, and I started Smoke City Supplies because I was tired of seeing the motorcycle parts industry lose its soul.
+                We started <span className="font-semibold text-foreground">Smoke City Supplies</span> because we were tired of seeing the motorcycle parts industry lose its soul.
               </p>
               <p>
                 Every day, it's the same story: automated systems, indifferent corporations, and customers treated like order numbers. That's not service—that's just processing.
               </p>
               <p className="text-foreground font-medium">
-                I'm bringing back <span className="underline decoration-primary decoration-2 underline-offset-4">old-fashioned service</span>—the kind where you talk to a real person who actually cares about your bike, your ride, and getting you the right part the first time.
+                We're bringing back <span className="underline decoration-primary decoration-2 underline-offset-4">old-fashioned service</span>—the kind where you talk to a real person who actually cares about your bike, your ride, and getting you the right part the first time.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-4">
@@ -47,7 +47,7 @@ export default function Home() {
               <Button variant="outline" size="lg" className="gap-2" asChild>
                 <Link href="/contact">
                   <Phone className="h-4 w-4" />
-                  Talk to Karl
+                  Talk to Us
                 </Link>
               </Button>
             </div>
@@ -62,7 +62,7 @@ export default function Home() {
                 <div>
                   <h3 className="font-bold text-lg mb-1">Expert Knowledge</h3>
                   <p className="text-sm text-muted-foreground">
-                    Not sure which part fits your bike? I'll help you find the right one—no automated scripts, just genuine expertise.
+                    Not sure which part fits your bike? We'll help you find the right one—no automated scripts, just genuine expertise.
                   </p>
                 </div>
               </div>
@@ -73,7 +73,7 @@ export default function Home() {
                 <div>
                   <h3 className="font-bold text-lg mb-1">Personal Care</h3>
                   <p className="text-sm text-muted-foreground">
-                    Every order matters. I check each part before it ships and make sure you're getting exactly what you need.
+                    Every order matters. We check each part before it ships and make sure you're getting exactly what you need.
                   </p>
                 </div>
               </div>
@@ -84,7 +84,7 @@ export default function Home() {
                 <div>
                   <h3 className="font-bold text-lg mb-1">Real Answers</h3>
                   <p className="text-sm text-muted-foreground">
-                    Questions? Problems? Pick up the phone or send an email. You'll get me, not a chatbot.
+                    Questions? Problems? Pick up the phone or send an email. You'll get a real person, not a chatbot.
                   </p>
                 </div>
               </div>
@@ -186,7 +186,7 @@ export default function Home() {
               In a world of faceless corporations and automated responses, we're doing things the old way—with actual human care and expertise. When you order from Smoke City, you're not a ticket number in a queue. You're a fellow rider who deserves respect, honest advice, and parts that work.
             </p>
             <p className="text-foreground font-medium md:text-lg">
-              That's not just our promise—that's how Karl runs every single day.
+              That's not just our promise—that's how we run every single day.
             </p>
           </div>
         </section>
@@ -217,10 +217,10 @@ export default function Home() {
             <Phone className="h-8 w-8 text-primary mb-3" />
             <h3 className="font-bold text-xl mb-3">Need Help?</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Not sure which part you need? Reach out directly. Karl can help you find the right components for your specific bike model—with real expertise.
+              Not sure which part you need? Reach out directly. Our team can help you find the right components for your specific bike model—with real expertise.
             </p>
             <Link href="/contact" className="text-primary text-sm font-medium hover:underline inline-flex items-center gap-1">
-              Contact Karl <ArrowRight className="h-3 w-3" />
+              Get in touch <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
         </section>
@@ -243,7 +243,7 @@ export default function Home() {
             <Button variant="outline" size="lg" className="gap-2 border-2 border-background text-background hover:bg-background/10" asChild>
               <Link href="/contact">
                 <Phone className="h-5 w-5" />
-                Talk to Karl
+                Talk to Us
               </Link>
             </Button>
           </div>

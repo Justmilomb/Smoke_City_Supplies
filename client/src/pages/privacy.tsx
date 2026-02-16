@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4">Our Commitment to You</h2>
             <p className="text-muted-foreground leading-relaxed">
-              At Smoke City Supplies, we take your privacy seriously. This isn't just legal boilerplate—it's a promise from Karl that your personal information will be handled with care and respect. We only collect what we need to serve you better, and we'll never sell your data to third parties.
+              At Smoke City Supplies, we take your privacy seriously. This isn't just legal boilerplate—it's our promise that your personal information will be handled with care and respect. We only collect what we need to serve you better, and we'll never sell your data to third parties.
             </p>
           </section>
 

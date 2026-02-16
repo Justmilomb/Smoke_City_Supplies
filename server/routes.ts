@@ -153,6 +153,24 @@ ${urls.map((u) => `  <url>
     return res.status(201).json({ url });
   });
 
+  // IndexNow — notify search engines (Bing, Yandex, etc.) of URL changes
+  const INDEXNOW_KEY = "b805a9eb7ee2426e9fcf9040df864717";
+  function pingIndexNow(req: { protocol: string; get(name: string): string | undefined }, urls: string[]) {
+    const host = req.get("host") ?? "localhost";
+    const base = `${req.protocol}://${host}`;
+    const body = {
+      host,
+      key: INDEXNOW_KEY,
+      keyLocation: `${base}/${INDEXNOW_KEY}.txt`,
+      urlList: urls.map((u) => (u.startsWith("http") ? u : `${base}${u}`)),
+    };
+    fetch("https://api.indexnow.org/IndexNow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(body),
+    }).catch((err) => console.error("[IndexNow] ping failed:", err));
+  }
+
   function paramId(req: { params: { id?: string | string[] } }): string {
     const p = req.params.id;
     return Array.isArray(p) ? (p[0] ?? "") : (p ?? "");
@@ -182,6 +200,7 @@ ${urls.map((u) => `  <url>
       vehicle: (sanitized.vehicle ?? parsed.data.vehicle) as string,
     };
     const product = await storage.createProduct(data);
+    pingIndexNow(req, [`/product/${product.id}`, "/store", "/sitemap.xml"]);
     return res.status(201).json(product);
   });
 
@@ -192,6 +211,7 @@ ${urls.map((u) => `  <url>
     const patch = req.body as Partial<ApiProduct>;
     const sanitized = sanitizeProductInput(patch);
     const updated = await storage.updateProduct(id, { ...patch, ...sanitized });
+    pingIndexNow(req, [`/product/${id}`]);
     return res.json(updated);
   });
 

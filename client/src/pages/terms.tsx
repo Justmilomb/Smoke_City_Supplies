@@ -24,7 +24,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4">Welcome</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Thanks for choosing Smoke City Supplies. These terms are designed to be fair and straightforward—no hidden surprises. By using our site and services, you agree to these terms. If something doesn't make sense, reach out to Karl directly.
+              Thanks for choosing Smoke City Supplies. These terms are designed to be fair and straightforward—no hidden surprises. By using our site and services, you agree to these terms. If something doesn't make sense, reach out to us directly.
             </p>
           </section>
 
@@ -120,7 +120,7 @@ export default function TermsPage() {
 
           <section className="bg-primary/5 p-6 rounded-lg border-2 border-primary/20">
             <p className="text-foreground font-medium">
-              Remember: You're not just a customer—you're a fellow rider. If something goes wrong or you have concerns, talk to Karl. We'll sort it out together.
+              Remember: You're not just a customer—you're a fellow rider. If something goes wrong or you have concerns, get in touch. We'll sort it out together.
             </p>
           </section>
         </Card>
