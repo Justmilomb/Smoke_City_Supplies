@@ -82,11 +82,9 @@ export default function SiteLayout({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const path = loc.indexOf("?") >= 0 ? loc.slice(0, loc.indexOf("?")) : loc;
-    const base = path === "/" ? "/store" : path || "/store";
     const params = new URLSearchParams();
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
-    setLoc(params.toString() ? `${base}?${params.toString()}` : base);
+    setLoc(params.toString() ? `/store?${params.toString()}` : "/store");
   };
 
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "";

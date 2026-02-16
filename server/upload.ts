@@ -2,8 +2,12 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 
-// Use process.cwd() so uploads work when server is bundled as CJS (dist/index.cjs)
-export const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+// Use process.cwd() so uploads work when server is bundled as CJS (dist/index.cjs).
+// Set UPLOADS_DIR to a persistent mount (for example Render Disk) in production.
+const configuredUploadsDir = process.env.UPLOADS_DIR?.trim();
+export const UPLOADS_DIR = configuredUploadsDir
+  ? path.resolve(configuredUploadsDir)
+  : path.join(process.cwd(), "uploads");
 
 try {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -13,7 +17,7 @@ try {
 
 if (process.env.NODE_ENV === "production") {
   console.warn(
-    "[upload] WARNING: Uploads are stored on the local filesystem. On Render (and similar platforms) the filesystem is ephemeral—uploaded images will be lost on every deploy or restart. For persistent storage, use Cloudinary, S3, or Render Disk."
+    `[upload] WARNING: Uploads are being stored in ${UPLOADS_DIR}. If this path is not on persistent storage, uploaded images will be lost on deploy/restart.`
   );
 }
 

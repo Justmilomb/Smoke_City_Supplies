@@ -49,16 +49,32 @@ const DEFAULT_FILTERS: CatalogFilters = {
 function parseQuery(search: string): Partial<CatalogFilters> {
   const p = new URLSearchParams(search);
   const q = p.get("q") ?? "";
-  const vehicle = (p.get("vehicle") ?? "all") as CatalogFilters["vehicle"];
-  const category = (p.get("category") ?? "all") as CatalogFilters["category"];
-  const sort = (p.get("sort") ?? "relevance") as CatalogFilters["sort"];
+  const vehicleRaw = p.get("vehicle");
+  const vehicle: CatalogFilters["vehicle"] =
+    vehicleRaw === "bike" || vehicleRaw === "scooter" || vehicleRaw === "motorcycle"
+      ? vehicleRaw
+      : "all";
+  const categoryRaw = p.get("category");
+  const category: CatalogFilters["category"] =
+    categoryRaw && categoryRaw !== "all" ? (categoryRaw as CatalogFilters["category"]) : "all";
+  const sortRaw = p.get("sort");
+  const sort: CatalogFilters["sort"] =
+    sortRaw === "price-asc" ||
+    sortRaw === "price-desc" ||
+    sortRaw === "rating" ||
+    sortRaw === "newest"
+      ? sortRaw
+      : "relevance";
   const model = p.get("model") ?? "";
   const brandsParam = p.get("brands");
   const brands = brandsParam ? brandsParam.split(",").filter(Boolean) : [];
-  const priceMinRaw = p.get("priceMin");
-  const priceMin = priceMinRaw !== null && priceMinRaw !== "" ? Number(priceMinRaw) : "";
-  const priceMaxRaw = p.get("priceMax");
-  const priceMax = priceMaxRaw !== null && priceMaxRaw !== "" ? Number(priceMaxRaw) : "";
+  const parseOptionalNumber = (value: string | null): number | "" => {
+    if (value === null || value === "") return "";
+    const n = Number(value);
+    return Number.isFinite(n) ? n : "";
+  };
+  const priceMin = parseOptionalNumber(p.get("priceMin"));
+  const priceMax = parseOptionalNumber(p.get("priceMax"));
   const inStockOnly = p.get("inStock") === "1";
   return { q, vehicle, category, sort, model, brands, priceMin, priceMax, inStockOnly };
 }
@@ -102,20 +118,9 @@ export default function FiltersBar({
     const parsed = parseQuery(search);
     onChange({
       ...DEFAULT_FILTERS,
-      ...value,
       ...parsed,
-      q: parsed.q ?? value.q,
-      vehicle: parsed.vehicle ?? value.vehicle,
-      category: parsed.category ?? value.category,
-      sort: parsed.sort ?? value.sort,
-      model: parsed.model ?? value.model,
-      brands: parsed.brands ?? value.brands,
-      priceMin: parsed.priceMin ?? value.priceMin,
-      priceMax: parsed.priceMax ?? value.priceMax,
-      inStockOnly: parsed.inStockOnly ?? value.inStockOnly,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loc, onChange]);
 
   const push = (next: CatalogFilters) => {
     onChange(next);

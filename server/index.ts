@@ -15,6 +15,10 @@ const MemSessionStore = createMemoryStore(session);
 
 const app = express();
 
+// Render and similar platforms terminate TLS at a proxy.
+// Trust the first proxy hop so secure session cookies work in production.
+app.set("trust proxy", 1);
+
 // Serve uploaded images
 app.use("/uploads", express.static(UPLOADS_DIR));
 const httpServer = createServer(app);
@@ -55,6 +59,7 @@ app.use(
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    proxy: process.env.NODE_ENV === "production",
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       httpOnly: true,

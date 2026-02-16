@@ -27,6 +27,7 @@ Then open **http://localhost:3000** in your browser. The dev server serves both 
 - **Replit:** defaults to port 5000 (Replit sets `REPL_ID`).
 - **Admin login:** username `admin`, password `admin` (change in production)
 - **Data:** In-memory (resets when you stop the server). Set `DATABASE_URL` if you want a local PostgreSQL database.
+- **Seed behavior:** In development, startup seeding runs automatically to ensure sample catalog data exists.
 
 **With a local PostgreSQL database (optional):**
 
@@ -61,6 +62,8 @@ npm run start
 - `SESSION_SECRET` - Generate with: `openssl rand -base64 32`
 - `NODE_ENV` - Set to `production` (auto-set by Render)
 - `ADMIN_PASSWORD` - (Optional) Override default admin password
+- `SEED_PARTS_ON_STARTUP` - Optional. Set to `true` only if you want to auto-seed products on every boot
+- `UPLOADS_DIR` - Optional path for uploaded files. In production, set this to a persistent mount (for example a Render Disk path) to keep images across redeploys
 - `STRIPE_SECRET_KEY` - Your Stripe secret key (required for payments)
 - `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key (required for payments)
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (for payment confirmations)
@@ -72,8 +75,10 @@ npm run start
 
 **Important Notes:**
 - The server binds to `0.0.0.0` and uses the `PORT` environment variable (set by Render)
-- Uploaded images are stored in the ephemeral filesystem (lost on restart/deploy)
-- For persistent image storage, consider Cloudinary, S3, or Render Disk
+- `DATABASE_URL` is required in production. The app will fail to start without it to prevent data loss from in-memory fallback.
+- Product auto-seeding is disabled by default in production. Use `SEED_PARTS_ON_STARTUP=true` only when you intentionally want to seed.
+- Uploaded images are persisted only if `UPLOADS_DIR` points to persistent storage (for example Render Disk)
+- For cloud-based persistence, consider Cloudinary or S3
 
 ## Scripts
 

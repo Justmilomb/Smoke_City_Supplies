@@ -8,7 +8,7 @@ if (!process.env.STRIPE_SECRET_KEY && process.env.NODE_ENV === "production") {
 const stripeKey = process.env.STRIPE_SECRET_KEY || "sk_test_placeholder";
 
 export const stripe = new Stripe(stripeKey, {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2026-01-28.clover",
   typescript: true,
 });
 

@@ -36,7 +36,11 @@ export async function registerRoutes(
 ): Promise<Server> {
   await seedAdminIfNeeded();
   await seedCategoriesIfNeeded();
-  await runSeedParts();
+  const shouldSeedPartsOnStartup =
+    process.env.SEED_PARTS_ON_STARTUP === "true" || process.env.NODE_ENV !== "production";
+  if (shouldSeedPartsOnStartup) {
+    await runSeedParts();
+  }
 
   // Health check (for Render monitoring)
   app.get("/health", (_req, res) => {

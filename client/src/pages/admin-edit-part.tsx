@@ -80,6 +80,7 @@ export default function AdminEditPart() {
       const res = await fetch("/api/generate-seo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ productInfo: info }),
       });
       if (!res.ok) {

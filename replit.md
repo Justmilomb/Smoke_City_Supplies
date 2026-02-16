@@ -38,3 +38,5 @@ A full-stack e-commerce application for motorcycle and scooter parts and accesso
 ## Environment Variables
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Secret for session encryption
+- `SEED_PARTS_ON_STARTUP` - Optional (`true`/`false`), controls startup product seeding (defaults on in dev, off in production)
+- `UPLOADS_DIR` - Optional filesystem path for uploaded images (use a persistent mount in production)

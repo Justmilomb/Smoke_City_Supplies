@@ -514,4 +514,10 @@ export class MemStorage implements IStorage {
   }
 }
 
+if (!db && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "DATABASE_URL is required in production. Falling back to in-memory storage would lose admin/product/order data on restart."
+  );
+}
+
 export const storage = db ? new DbStorage() : new MemStorage();

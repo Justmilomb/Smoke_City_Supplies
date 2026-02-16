@@ -1,6 +1,7 @@
 import productChain from "@/assets/images/product-chain.png";
 import productRotor from "@/assets/images/product-rotor.png";
 import productTire from "@/assets/images/product-tire.png";
+import productPlaceholder from "@/assets/images/product-placeholder.svg";
 
 export type StockStatus = "in-stock" | "low" | "out";
 
@@ -115,7 +116,7 @@ export const productImageFallbacks: Record<string, string> = {
 };
 
 export function getProductImage(part: Part): string {
-  return part.image || productImageFallbacks[part.id] || "";
+  return part.image || productImageFallbacks[part.id] || productPlaceholder;
 }
 
 export const categories: PartCategory[] = [
