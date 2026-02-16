@@ -26,6 +26,23 @@ function absoluteUrl(baseUrl: string, pathOrUrl: string): string {
   return `${baseUrl}${p}`;
 }
 
+function isLikelyImageUrl(value: string): boolean {
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  return [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".avif"].some((ext) =>
+    lower.includes(ext)
+  );
+}
+
+function resolveImageLink(baseUrl: string, productImage: string): string {
+  const fallback = absoluteUrl(baseUrl, "/opengraph.jpg");
+  const trimmed = productImage.trim();
+  if (!trimmed) return fallback;
+  const resolved = absoluteUrl(baseUrl, trimmed);
+  if (!isLikelyImageUrl(resolved)) return fallback;
+  return resolved;
+}
+
 function availability(p: ApiProduct): "in_stock" | "out_of_stock" {
   if (p.quantity <= 0 || p.stock === "out") return "out_of_stock";
   return "in_stock";
@@ -52,7 +69,7 @@ ${products
   .map((p) => {
     const title = p.metaTitle?.trim() || p.name;
     const description = p.metaDescription?.trim() || p.description;
-    const imageLink = absoluteUrl(base, p.image);
+    const imageLink = resolveImageLink(base, p.image);
     const link = `${base}/product/${p.id}`;
     const brand = p.brand?.trim() || "Smoke City Supplies";
     const productType = [p.category, p.subcategory].filter(Boolean).join(" > ");
