@@ -8,6 +8,7 @@ const GOOGLE_MERCHANT_API_BASE = "https://merchantapi.googleapis.com/products/v1
 
 type MerchantConfig = {
   enabled: boolean;
+  rawAccountId: string;
   accountId: string;
   dataSourceName: string;
   contentLanguage: string;
@@ -31,6 +32,11 @@ type SyncState = {
   lastError?: string;
   lastSyncedCount?: number;
   configErrors: string[];
+  effectiveConfig?: {
+    accountId: string;
+    dataSourceName: string;
+    serviceAccountEmail: string;
+  };
 };
 
 type OAuthTokenCache = {
@@ -51,10 +57,13 @@ const syncState: SyncState = {
 
 function parseConfig(): MerchantConfig {
   const enabled = process.env.GOOGLE_MERCHANT_SYNC_ENABLED === "true";
-  const accountId = (process.env.GOOGLE_MERCHANT_ACCOUNT_ID ?? "").trim();
+  const rawAccountId = (process.env.GOOGLE_MERCHANT_ACCOUNT_ID ?? "").trim();
   const dsNameRaw = (process.env.GOOGLE_MERCHANT_DATASOURCE_NAME ?? "").trim();
   const dsIdRaw = (process.env.GOOGLE_MERCHANT_DATASOURCE_ID ?? "").trim();
-  const dataSourceName = dsNameRaw || (dsIdRaw ? `accounts/${accountId}/dataSources/${dsIdRaw}` : "");
+  const dsMatch = dsNameRaw.match(/^accounts\/([^/]+)\/dataSources\/([^/]+)$/);
+  const accountIdFromDataSource = dsMatch?.[1]?.trim() ?? "";
+  const accountId = rawAccountId || accountIdFromDataSource;
+  const dataSourceName = dsNameRaw || (dsIdRaw && accountId ? `accounts/${accountId}/dataSources/${dsIdRaw}` : "");
   const serviceAccountEmail = (process.env.GOOGLE_MERCHANT_SERVICE_ACCOUNT_EMAIL ?? "").trim();
   const serviceAccountPrivateKey = (process.env.GOOGLE_MERCHANT_SERVICE_ACCOUNT_PRIVATE_KEY ?? "")
     .replace(/\\n/g, "\n")
@@ -70,6 +79,7 @@ function parseConfig(): MerchantConfig {
 
   return {
     enabled,
+    rawAccountId,
     accountId,
     dataSourceName,
     contentLanguage,
@@ -84,9 +94,21 @@ function parseConfig(): MerchantConfig {
 
 function getConfigErrors(config: MerchantConfig): string[] {
   const errors: string[] = [];
+  const dsMatch = config.dataSourceName.match(/^accounts\/([^/]+)\/dataSources\/([^/]+)$/);
+  const accountIdFromDataSource = dsMatch?.[1]?.trim() ?? "";
+
   if (!config.accountId) errors.push("GOOGLE_MERCHANT_ACCOUNT_ID is required");
   if (!config.dataSourceName) {
     errors.push("GOOGLE_MERCHANT_DATASOURCE_NAME (or GOOGLE_MERCHANT_DATASOURCE_ID) is required");
+  }
+  if (
+    config.rawAccountId &&
+    accountIdFromDataSource &&
+    config.rawAccountId !== accountIdFromDataSource
+  ) {
+    errors.push(
+      `GOOGLE_MERCHANT_ACCOUNT_ID (${config.rawAccountId}) does not match data source account (${accountIdFromDataSource})`
+    );
   }
   if (!config.serviceAccountEmail) errors.push("GOOGLE_MERCHANT_SERVICE_ACCOUNT_EMAIL is required");
   if (!config.serviceAccountPrivateKey) {
@@ -216,7 +238,16 @@ async function insertOrUpdateProductInput(
 
   if (!response.ok) {
     const txt = await response.text();
-    throw new Error(`Sync failed for ${product.id} (${response.status}): ${txt.slice(0, 700)}`);
+    const base = `Sync failed for ${product.id} (${response.status}): ${txt.slice(0, 1200)}`;
+    if (
+      txt.includes("PERMISSION_DENIED_ACCOUNTS") ||
+      txt.includes("does not have access to the accounts")
+    ) {
+      throw new Error(
+        `${base}\nHint: service account "${config.serviceAccountEmail}" lacks access to Merchant account "${config.accountId}".`
+      );
+    }
+    throw new Error(base);
   }
 }
 
@@ -226,6 +257,11 @@ export function getGoogleMerchantStatus(): SyncState {
   syncState.schedulerEnabled = config.enabled;
   syncState.intervalMinutes = config.intervalMinutes;
   syncState.configErrors = configErrors;
+  syncState.effectiveConfig = {
+    accountId: config.accountId,
+    dataSourceName: config.dataSourceName,
+    serviceAccountEmail: config.serviceAccountEmail,
+  };
   return { ...syncState };
 }
 
@@ -241,6 +277,11 @@ export async function runGoogleMerchantSync(reason: string): Promise<{
   syncState.schedulerEnabled = config.enabled;
   syncState.intervalMinutes = config.intervalMinutes;
   syncState.configErrors = configErrors;
+  syncState.effectiveConfig = {
+    accountId: config.accountId,
+    dataSourceName: config.dataSourceName,
+    serviceAccountEmail: config.serviceAccountEmail,
+  };
 
   if (syncState.runInProgress) {
     return { ok: false, reason, syncedCount: 0, failedCount: 0, errors: ["Sync already in progress"] };
