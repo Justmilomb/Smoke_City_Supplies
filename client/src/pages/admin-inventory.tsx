@@ -9,6 +9,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
+type ZXingBrowserGlobal = {
+  BrowserMultiFormatReader: new () => {
+    decodeFromConstraints: (
+      constraints: MediaStreamConstraints,
+      videoEl: HTMLVideoElement,
+      callback: (
+        result: { getText: () => string } | null,
+        error: unknown,
+        controls: { stop: () => void }
+      ) => void
+    ) => Promise<{ stop: () => void }>;
+    reset: () => void;
+  };
+};
+
 type Resolved = {
   barcode: { code: string; format?: string };
   product: { id: string; name: string; quantity: number; stock: string };
@@ -34,6 +49,27 @@ export default function AdminInventory() {
   const [loading, setLoading] = React.useState(false);
   const [transactions, setTransactions] = React.useState<InventoryTx[]>([]);
   const [scanning, setScanning] = React.useState(false);
+  const [scanSource, setScanSource] = React.useState<"native" | "zxing" | "">("");
+
+  const loadZxingBrowser = async (): Promise<ZXingBrowserGlobal> => {
+    const existing = (window as any).ZXingBrowser;
+    if (existing?.BrowserMultiFormatReader) return existing as ZXingBrowserGlobal;
+
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js";
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load scanner fallback library"));
+      document.head.appendChild(script);
+    });
+
+    const loaded = (window as any).ZXingBrowser;
+    if (!loaded?.BrowserMultiFormatReader) {
+      throw new Error("Scanner fallback is unavailable");
+    }
+    return loaded as ZXingBrowserGlobal;
+  };
 
   const loadTransactions = React.useCallback(async () => {
     const res = await fetch("/api/admin/inventory/transactions?limit=12", { credentials: "include" });
@@ -138,54 +174,103 @@ export default function AdminInventory() {
     }
 
     const Detector = (window as any).BarcodeDetector;
-    if (!Detector) {
-      toast.error("Barcode scanning is not supported in this browser. Try Chrome on Android or use manual entry.");
-      return;
-    }
 
     let stream: MediaStream | null = null;
     try {
-      const supported = await Detector.getSupportedFormats?.();
-      const detector = new Detector({ formats: supported || ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"] });
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
-      setScanning(true);
+      if (Detector) {
+        const supported = await Detector.getSupportedFormats?.();
+        const detector = new Detector({ formats: supported || ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"] });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
+        setScanSource("native");
+        setScanning(true);
 
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        await video.play();
 
-      let active = true;
-      const startedAt = Date.now();
-      const tryScan = async () => {
-        if (!active) return;
-        if (Date.now() - startedAt > 20000) {
-          active = false;
-          stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
-          setScanning(false);
-          toast.error("No barcode detected. Try better lighting or manual barcode entry.");
-          return;
-        }
-        const codes = await detector.detect(video);
-        if (codes.length > 0) {
-          const c = codes[0];
-          const raw = c.rawValue || "";
-          if (raw) {
-            setScanValue(raw);
-            setScanFormat(String((c as any).format || "unknown"));
-            await resolveBarcode(raw);
-            stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+        let active = true;
+        const startedAt = Date.now();
+        const tryScan = async () => {
+          if (!active) return;
+          if (Date.now() - startedAt > 20000) {
             active = false;
+            stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
             setScanning(false);
+            setScanSource("");
+            toast.error("No barcode detected. Try better lighting or manual barcode entry.");
             return;
           }
-        }
-        requestAnimationFrame(tryScan);
-      };
+          const codes = await detector.detect(video);
+          if (codes.length > 0) {
+            const c = codes[0];
+            const raw = c.rawValue || "";
+            if (raw) {
+              setScanValue(raw);
+              setScanFormat(String((c as any).format || "unknown"));
+              await resolveBarcode(raw);
+              stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+              active = false;
+              setScanning(false);
+              setScanSource("");
+              return;
+            }
+          }
+          requestAnimationFrame(tryScan);
+        };
 
-      requestAnimationFrame(tryScan);
+        requestAnimationFrame(tryScan);
+        return;
+      }
+
+      // Safari and other browsers fallback.
+      const ZXingBrowser = await loadZxingBrowser();
+      const reader = new ZXingBrowser.BrowserMultiFormatReader();
+      const video = document.createElement("video");
+      video.setAttribute("playsinline", "true");
+      video.muted = true;
+      video.style.position = "fixed";
+      video.style.left = "-9999px";
+      video.style.width = "1px";
+      video.style.height = "1px";
+      document.body.appendChild(video);
+
+      setScanSource("zxing");
+      setScanning(true);
+      let done = false;
+
+      const controls = await reader.decodeFromConstraints(
+        { video: { facingMode: { ideal: "environment" } } },
+        video,
+        async (result, _error, callbackControls) => {
+          if (!result) return;
+          const raw = result.getText?.() || "";
+          if (!raw) return;
+          done = true;
+          callbackControls.stop();
+          reader.reset();
+          setScanValue(raw);
+          setScanFormat("unknown");
+          await resolveBarcode(raw);
+          setScanning(false);
+          setScanSource("");
+          video.remove();
+        }
+      );
+
+      window.setTimeout(() => {
+        if (done) return;
+        done = true;
+        controls.stop();
+        reader.reset();
+        setScanning(false);
+        setScanSource("");
+        video.remove();
+        toast.error("No barcode detected. Try better lighting or manual barcode entry.");
+      }, 20000);
     } catch (err) {
       stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       setScanning(false);
+      setScanSource("");
       const message = err instanceof Error ? err.message : "Camera scan failed";
       if (message.toLowerCase().includes("denied") || message.toLowerCase().includes("notallowed")) {
         toast.error("Camera permission denied. Allow camera access for this site and try again.");
@@ -224,7 +309,7 @@ export default function AdminInventory() {
             />
             <Button className="h-11 gap-2" variant="outline" onClick={startCameraScan} disabled={loading || scanning}>
               <ScanLine className="h-4 w-4" />
-              {scanning ? "Scanning..." : "Scan"}
+              {scanning ? `Scanning (${scanSource || "camera"})...` : "Scan"}
             </Button>
             <Button className="h-11" onClick={() => resolveBarcode()} disabled={loading}>
               Find Product
