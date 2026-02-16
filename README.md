@@ -67,6 +67,7 @@ npm run start
 - `STRIPE_SECRET_KEY` - Your Stripe secret key (required for payments)
 - `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key (required for payments)
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (for payment confirmations)
+- `PUBLIC_BASE_URL` - Public site URL used when generating product links in the Merchant feed file
 
 **PostgreSQL Database:**
 - Create a PostgreSQL database in Render
@@ -91,8 +92,8 @@ npm run start
 
 Use Merchant Center's **Add products from a file** and provide this feed URL:
 
-- `https://<your-domain>/feeds/google-merchant.xml`
-- Local test URL: `http://localhost:3000/feeds/google-merchant.xml`
+- `https://<your-domain>/uploads/google-merchant.xml`
+- Local test URL: `http://localhost:3000/uploads/google-merchant.xml`
 
 Recommended Merchant Center setup:
 1. Products -> Data sources -> **Add products from file**
@@ -100,4 +101,10 @@ Recommended Merchant Center setup:
 3. Paste your feed URL
 4. Set schedule to **every 24 hours at 00:00**
 
-The feed is generated from live product data. Any product create/update/delete in admin appears in the feed automatically on the next fetch.
+How updates work:
+- Feed file is written automatically at server startup.
+- Feed file rewrites every 24 hours automatically.
+- Feed file is also rewritten when admin creates/updates/deletes a product.
+- Fallback live endpoint is available at `https://<your-domain>/feeds/google-merchant.xml`.
+
+If your live feed has only a few products, your production database currently has only those products. Seeded demo products in this repo are not automatically enabled in production unless `SEED_PARTS_ON_STARTUP=true`.

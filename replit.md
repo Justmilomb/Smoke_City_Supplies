@@ -40,7 +40,9 @@ A full-stack e-commerce application for motorcycle and scooter parts and accesso
 - `SESSION_SECRET` - Secret for session encryption
 - `SEED_PARTS_ON_STARTUP` - Optional (`true`/`false`), controls startup product seeding (defaults on in dev, off in production)
 - `UPLOADS_DIR` - Optional filesystem path for uploaded images (use a persistent mount in production)
+- `PUBLIC_BASE_URL` - Public site URL used in generated feed product links
 
 ## Merchant Feed
-- Public file feed URL: `/feeds/google-merchant.xml`
-- Merchant Center can fetch this link on schedule (recommended: daily at 00:00).
+- Public file feed URL: `/uploads/google-merchant.xml`
+- Live fallback feed URL: `/feeds/google-merchant.xml`
+- Feed file is auto-rewritten daily and after product create/update/delete.

@@ -10,6 +10,7 @@
 
 - `server/index.ts`: server bootstrap, sessions, security middleware, and dev/prod wiring.
 - `server/routes.ts`: API route registration (main router/controller surface).
+- `server/googleMerchantFeed.ts`: Google Merchant XML feed builder + feed-file writer scheduler.
 - `server/auth.ts`: Passport strategies and auth wiring.
 - `server/db.ts`: database connection (`pool`), used to decide whether to use Postgres-backed sessions/storage.
 - `server/storage.ts`: data access layer (uses DB when configured; otherwise in-memory).
@@ -43,4 +44,6 @@
 ## Feed Endpoints
 
 - `server/routes.ts` also exposes `GET /feeds/google-merchant.xml`.
-- The XML feed is generated on request from current product storage data (no background sync job).
+- Merchant file path is `/uploads/google-merchant.xml`.
+- The feed file is written on startup, every 24 hours, and after product mutations.
+- `GET /feeds/google-merchant.xml` is kept as a live generated fallback endpoint.
