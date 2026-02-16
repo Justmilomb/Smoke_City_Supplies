@@ -1,16 +1,22 @@
 import type { Express, Request, Response } from "express";
 import { type Server } from "http";
 import {
+  barcodeLinkSchema,
+  barcodeResolveSchema,
+  checkoutPrepareSchema,
   createOrderSchema,
+  fulfillmentScanSchema,
   insertCategorySchema,
   insertProductSchema,
+  stockInSchema,
+  type ApiOrder,
   type ApiProduct,
   type CreateOrderInput,
   type InsertCategory,
   type InsertProduct,
 } from "@shared/schema";
 import { storage } from "./storage";
-import { uploadMiddleware } from "./upload";
+import { persistUploadedImage, uploadMiddleware } from "./upload";
 import { requireAuth } from "./auth";
 import { seedAdminIfNeeded, seedCategoriesIfNeeded } from "./seedAdmin";
 import { runSeedParts } from "./seedParts";
@@ -35,13 +41,34 @@ import {
   startGoogleMerchantFeedScheduler,
   writeGoogleMerchantFeedFile,
 } from "./googleMerchantFeed";
+import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
+import { sendInvoiceEmail } from "./email";
+import { createShippoLabel } from "./shippo";
 
-export async function registerRoutes(
-  httpServer: Server,
-  app: Express
-): Promise<Server> {
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function paramId(req: { params: { id?: string | string[] } }): string {
+  const p = req.params.id;
+  return Array.isArray(p) ? (p[0] ?? "") : (p ?? "");
+}
+
+function orderToAddressText(order: ApiOrder): string {
+  return [order.addressLine1, order.addressLine2, order.city, order.county, order.postcode, order.country]
+    .filter(Boolean)
+    .join(", ");
+}
+
+export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   await seedAdminIfNeeded();
   await seedCategoriesIfNeeded();
+
   const shouldSeedPartsOnStartup =
     process.env.SEED_PARTS_ON_STARTUP === "true" || process.env.NODE_ENV !== "production";
   if (shouldSeedPartsOnStartup) {
@@ -50,16 +77,43 @@ export async function registerRoutes(
 
   startGoogleMerchantFeedScheduler();
 
-  // Health check (for Render monitoring)
+  async function ensureInvoiceSent(order: ApiOrder): Promise<ApiOrder> {
+    const invoiceNumber = order.invoiceNumber || createInvoiceNumber();
+    const withInvoice =
+      order.invoiceNumber === invoiceNumber
+        ? order
+        : ((await storage.recordOrderInvoice(order.id, {
+            invoiceNumber,
+            invoiceUrl: `/api/admin/orders/${order.id}/invoice.pdf`,
+          })) ?? order);
+
+    const html = renderInvoiceHtml({ ...withInvoice, invoiceNumber });
+    const pdf = renderInvoicePdfBuffer({ ...withInvoice, invoiceNumber });
+
+    if (withInvoice.customerEmail) {
+      await sendInvoiceEmail({
+        to: withInvoice.customerEmail,
+        subject: `Invoice ${invoiceNumber} - Smoke City Supplies`,
+        html,
+        pdfBase64: pdf.toString("base64"),
+        pdfFilename: `${invoiceNumber}.pdf`,
+      });
+    }
+
+    const updated = await storage.recordOrderInvoice(withInvoice.id, {
+      invoiceNumber,
+      invoiceUrl: `/api/admin/orders/${withInvoice.id}/invoice.pdf`,
+      invoiceSentAt: new Date().toISOString(),
+    });
+
+    return updated ?? withInvoice;
+  }
+
+  // Health check
   app.get("/health", (_req, res) => {
     return res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  function escapeXml(s: string): string {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-  }
-
-  // Dynamic robots.txt (overrides static file — uses correct absolute sitemap URL)
   app.get("/robots.txt", (req, res) => {
     const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
     const txt = `User-agent: *
@@ -74,10 +128,9 @@ Sitemap: ${base}/sitemap.xml
     res.type("text/plain").send(txt);
   });
 
-  // Sitemap (SEO — Google + Bing compatible)
   app.get("/sitemap.xml", async (req, res) => {
     const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
-    const now = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const now = new Date().toISOString().split("T")[0];
     const products = await storage.listProducts();
 
     type SitemapUrl = { loc: string; changefreq: string; priority: string; lastmod: string };
@@ -103,17 +156,21 @@ Sitemap: ${base}/sitemap.xml
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-${urls.map((u) => `  <url>
+${urls
+  .map(
+    (u) => `  <url>
     <loc>${escapeXml(u.loc)}</loc>
     <lastmod>${u.lastmod}</lastmod>
     <changefreq>${u.changefreq}</changefreq>
     <priority>${u.priority}</priority>
-  </url>`).join("\n")}
+  </url>`
+  )
+  .join("\n")}
 </urlset>`;
+
     res.type("application/xml").send(xml);
   });
 
-  // Google Merchant feed file (XML). Merchant Center can fetch this URL on a schedule.
   async function sendGoogleMerchantFeed(req: Request, res: Response) {
     const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
     const products = await storage.listProducts();
@@ -127,7 +184,7 @@ ${urls.map((u) => `  <url>
   app.get("/google-merchant.xml", sendGoogleMerchantFeed);
   app.get(getGoogleMerchantFeedFileUrlPath(), sendGoogleMerchantFeed);
 
-  // Auth (public)
+  // Auth
   app.get("/api/auth/me", (req, res) => {
     if (req.isAuthenticated?.() && req.user) {
       return res.json({ user: req.user });
@@ -156,7 +213,6 @@ ${urls.map((u) => `  <url>
     });
   });
 
-  // Contact form (public) - with rate limiting and validation
   app.post("/api/contact", contactRateLimiter, (req, res) => {
     const parsed = contactFormSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -170,16 +226,15 @@ ${urls.map((u) => `  <url>
     return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
   });
 
-  // Image upload (camera or file) – admin only
-  app.post("/api/upload", requireAuth, apiRateLimiter, uploadMiddleware.single("image"), (req, res) => {
+  app.post("/api/upload", requireAuth, apiRateLimiter, uploadMiddleware.single("image"), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided" });
     }
-    const url = `/uploads/${req.file.filename}`;
+    const url = await persistUploadedImage(req.file);
     return res.status(201).json({ url });
   });
 
-  // IndexNow — notify search engines (Bing, Yandex, etc.) of URL changes
+  // IndexNow helper
   const INDEXNOW_KEY = "b805a9eb7ee2426e9fcf9040df864717";
   function pingIndexNow(req: { protocol: string; get(name: string): string | undefined }, urls: string[]) {
     const host = req.get("host") ?? "localhost";
@@ -190,16 +245,12 @@ ${urls.map((u) => `  <url>
       keyLocation: `${base}/${INDEXNOW_KEY}.txt`,
       urlList: urls.map((u) => (u.startsWith("http") ? u : `${base}${u}`)),
     };
+
     fetch("https://api.indexnow.org/IndexNow", {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify(body),
     }).catch((err) => console.error("[IndexNow] ping failed:", err));
-  }
-
-  function paramId(req: { params: { id?: string | string[] } }): string {
-    const p = req.params.id;
-    return Array.isArray(p) ? (p[0] ?? "") : (p ?? "");
   }
 
   // Products
@@ -225,6 +276,7 @@ ${urls.map((u) => `  <url>
       ...sanitized,
       vehicle: (sanitized.vehicle ?? parsed.data.vehicle) as string,
     };
+
     const product = await storage.createProduct(data);
     writeGoogleMerchantFeedFile("create-product").catch(() => {});
     pingIndexNow(req, [`/product/${product.id}`, "/store", "/sitemap.xml"]);
@@ -262,7 +314,104 @@ ${urls.map((u) => `  <url>
     return res.status(204).send();
   });
 
-  // SEO generation via NVIDIA API (admin only)
+  // Barcode + inventory admin workflows
+  app.post("/api/admin/barcodes/resolve", requireAuth, apiRateLimiter, async (req, res) => {
+    const parsed = barcodeResolveSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid barcode", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const resolved = await storage.resolveBarcode(parsed.data.code.trim());
+    if (!resolved.product || !resolved.barcode) {
+      return res.status(404).json({
+        message: "Barcode not linked",
+        code: parsed.data.code.trim(),
+        action: "create-product",
+      });
+    }
+
+    return res.json({ barcode: resolved.barcode, product: resolved.product, action: "confirm" });
+  });
+
+  app.post("/api/admin/barcodes/link", requireAuth, apiRateLimiter, async (req, res) => {
+    const parsed = barcodeLinkSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid barcode link", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const product = await storage.getProduct(parsed.data.productId);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const barcode = await storage.linkBarcode(
+      parsed.data.code.trim(),
+      parsed.data.productId,
+      parsed.data.format || "unknown"
+    );
+
+    return res.status(201).json({ barcode });
+  });
+
+  app.post("/api/admin/inventory/stock-in", requireAuth, apiRateLimiter, async (req, res) => {
+    const parsed = stockInSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid stock-in payload", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const updated = await storage.stockInByBarcode({
+      code: parsed.data.code.trim(),
+      quantity: parsed.data.quantity,
+      reason: parsed.data.reason,
+      actor: req.user?.username || "admin",
+    });
+
+    if (!updated) {
+      return res.status(404).json({ message: "Barcode not linked to a product" });
+    }
+
+    writeGoogleMerchantFeedFile("stock-in-by-barcode").catch(() => {});
+    return res.json(updated);
+  });
+
+  app.get("/api/admin/inventory/transactions", requireAuth, async (req, res) => {
+    const limit = Number(req.query.limit ?? 50);
+    const tx = await storage.listInventoryTransactions(Number.isFinite(limit) ? limit : 50);
+    return res.json(tx);
+  });
+
+  app.post("/api/admin/orders/:id/fulfillment/scan", requireAuth, apiRateLimiter, async (req, res) => {
+    const orderId = paramId(req);
+    const parsed = fulfillmentScanSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid fulfillment scan", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const order = await storage.getOrder(orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.paymentStatus !== "paid") {
+      return res.status(400).json({ message: "Order is not paid yet" });
+    }
+
+    const resolved = await storage.resolveBarcode(parsed.data.code.trim());
+    if (!resolved.product) {
+      return res.status(404).json({ message: "Barcode not linked to a product" });
+    }
+
+    const matchingItem = order.items.find((item) => item.productId === resolved.product!.id);
+    if (!matchingItem) {
+      return res.status(400).json({ message: "Scanned barcode does not belong to this order" });
+    }
+
+    // This endpoint is verification-only for paid online orders (no second stock deduction).
+    return res.json({
+      ok: true,
+      orderId,
+      scannedProduct: resolved.product,
+      scannedQty: parsed.data.quantity,
+      note: "Fulfillment scan recorded. Stock was already deducted at payment confirmation.",
+    });
+  });
+
+  // SEO generation via NVIDIA API
   app.post("/api/generate-seo", requireAuth, apiRateLimiter, async (req, res) => {
     const { productInfo } = req.body as { productInfo?: string };
     if (!productInfo || typeof productInfo !== "string" || productInfo.trim().length < 3) {
@@ -277,10 +426,7 @@ ${urls.map((u) => `  <url>
     const model = process.env.NVIDIA_SEO_MODEL || "deepseek-ai/deepseek-v3.1";
 
     try {
-      const client = new OpenAI({
-        baseURL: "https://integrate.api.nvidia.com/v1",
-        apiKey,
-      });
+      const client = new OpenAI({ baseURL: "https://integrate.api.nvidia.com/v1", apiKey });
 
       const completion = await client.chat.completions.create({
         model,
@@ -295,10 +441,7 @@ Rules:
 - metaDescription: max 160 characters, compelling description with key features and UK delivery mention
 - metaKeywords: comma-separated relevant search terms (8-12 keywords)`,
           },
-          {
-            role: "user",
-            content: `Generate SEO metadata for this product: ${productInfo.trim().slice(0, 500)}`,
-          },
+          { role: "user", content: `Generate SEO metadata for this product: ${productInfo.trim().slice(0, 500)}` },
         ],
         temperature: 0.2,
         top_p: 0.7,
@@ -306,18 +449,10 @@ Rules:
       });
 
       const content = completion.choices?.[0]?.message?.content?.trim();
-      if (!content) {
-        return res.status(500).json({ message: "No response from AI model" });
-      }
+      if (!content) return res.status(500).json({ message: "No response from AI model" });
 
-      // Extract JSON from the response (handle possible markdown wrapping)
-      let jsonStr = content;
       const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[0];
-      }
-
-      const seo = JSON.parse(jsonStr) as {
+      const seo = JSON.parse(jsonMatch ? jsonMatch[0] : content) as {
         metaTitle?: string;
         metaDescription?: string;
         metaKeywords?: string;
@@ -335,12 +470,53 @@ Rules:
     }
   });
 
-  // Stripe config endpoint (public)
+  // Stripe config endpoint
   app.get("/api/stripe/config", (_req, res) => {
     return res.json({ publishableKey: STRIPE_PUBLISHABLE_KEY });
   });
 
-  // Create payment intent for checkout
+  // New checkout flow: create order + payment intent together.
+  app.post("/api/checkout/prepare", orderRateLimiter, async (req, res) => {
+    const parsed = checkoutPrepareSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid checkout payload", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const amountPence = Math.round(
+      parsed.data.items.reduce((sum, item) => sum + item.priceEach * item.quantity * 100, 0)
+    );
+
+    if (amountPence <= 0) {
+      return res.status(400).json({ message: "Invalid order amount" });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountPence,
+      currency: "gbp",
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        customerEmail: parsed.data.customerEmail,
+        customerName: parsed.data.customerName,
+      },
+    });
+
+    const order = await storage.prepareCheckoutOrder(parsed.data, paymentIntent.id);
+
+    await stripe.paymentIntents.update(paymentIntent.id, {
+      metadata: {
+        ...paymentIntent.metadata,
+        orderId: order.id,
+      },
+    });
+
+    return res.json({
+      orderId: order.id,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    });
+  });
+
+  // Legacy endpoint kept for compatibility with older clients.
   app.post("/api/stripe/create-payment-intent", orderRateLimiter, async (req, res) => {
     try {
       const { amount, customerEmail, customerName } = req.body;
@@ -349,9 +525,8 @@ Rules:
         return res.status(400).json({ message: "Invalid amount" });
       }
 
-      // Create payment intent with Stripe
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to pence
+        amount: Math.round(amount * 100),
         currency: "gbp",
         automatic_payment_methods: { enabled: true },
         metadata: {
@@ -360,10 +535,48 @@ Rules:
         },
       });
 
-      return res.json({ clientSecret: paymentIntent.client_secret });
+      return res.json({ clientSecret: paymentIntent.client_secret, paymentIntentId: paymentIntent.id });
     } catch (err) {
       console.error("Stripe payment intent error:", err);
       return res.status(500).json({ message: "Payment initialization failed" });
+    }
+  });
+
+  app.post("/api/stripe/webhook", async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!signature || typeof signature !== "string" || !webhookSecret) {
+      return res.status(400).send("Missing webhook signature or secret");
+    }
+
+    try {
+      const rawBody = req.rawBody as Buffer | undefined;
+      if (!rawBody) return res.status(400).send("Missing raw body");
+
+      const event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+
+      if (event.type === "payment_intent.succeeded") {
+        const paymentIntent = event.data.object;
+        const order = await storage.markOrderPaidByPaymentIntent(paymentIntent.id);
+        if (order) {
+          try {
+            await ensureInvoiceSent(order);
+          } catch (invoiceErr) {
+            console.error("[invoice] send failed:", invoiceErr);
+          }
+        }
+      }
+
+      if (event.type === "payment_intent.payment_failed") {
+        const paymentIntent = event.data.object;
+        await storage.markOrderPaymentFailedByPaymentIntent(paymentIntent.id);
+      }
+
+      return res.json({ received: true });
+    } catch (err) {
+      console.error("[stripe webhook] error:", err);
+      return res.status(400).send(`Webhook Error: ${err instanceof Error ? err.message : "unknown"}`);
     }
   });
 
@@ -403,6 +616,79 @@ Rules:
     return res.json(updated);
   });
 
+  app.get("/api/admin/orders/:id/invoice.pdf", requireAuth, async (req, res) => {
+    const order = await storage.getOrder(paramId(req));
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    const invoiceNumber = order.invoiceNumber || createInvoiceNumber();
+    if (!order.invoiceNumber) {
+      await storage.recordOrderInvoice(order.id, {
+        invoiceNumber,
+        invoiceUrl: `/api/admin/orders/${order.id}/invoice.pdf`,
+      });
+    }
+
+    const pdf = renderInvoicePdfBuffer({ ...order, invoiceNumber });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename=\"${invoiceNumber}.pdf\"`);
+    return res.send(pdf);
+  });
+
+  app.post("/api/admin/orders/:id/invoice/resend", requireAuth, apiRateLimiter, async (req, res) => {
+    const order = await storage.getOrder(paramId(req));
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (!order.customerEmail) return res.status(400).json({ message: "Order has no customer email" });
+    if (order.paymentStatus !== "paid") return res.status(400).json({ message: "Invoice can only be sent for paid orders" });
+
+    const updated = await ensureInvoiceSent(order);
+    return res.json({ ok: true, order: updated });
+  });
+
+  app.post("/api/admin/orders/:id/shipping-label", requireAuth, apiRateLimiter, async (req, res) => {
+    const orderId = paramId(req);
+    const order = await storage.getOrder(orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (order.paymentStatus !== "paid") {
+      return res.status(400).json({ message: "Shipping labels can only be generated for paid orders" });
+    }
+
+    if (order.status !== "processing") {
+      return res.status(400).json({ message: "Order status must be processing before creating a label" });
+    }
+
+    if (!order.customerName || !order.addressLine1 || !order.city || !order.postcode) {
+      return res.status(400).json({ message: "Missing shipping address fields on order" });
+    }
+
+    const label = await createShippoLabel({
+      name: order.customerName,
+      email: order.customerEmail,
+      addressLine1: order.addressLine1,
+      addressLine2: order.addressLine2,
+      city: order.city,
+      county: order.county,
+      postcode: order.postcode,
+      country: order.country || "GB",
+    });
+
+    const updated = await storage.recordShippingLabel(order.id, {
+      shippingLabelProvider: label.provider,
+      shippingLabelId: label.labelId,
+      shippingLabelUrl: label.labelUrl,
+      trackingNumber: label.trackingNumber,
+      labelCreatedAt: new Date().toISOString(),
+    });
+
+    return res.json({
+      ok: true,
+      order: updated,
+      shippingLabelUrl: label.labelUrl,
+      trackingNumber: label.trackingNumber,
+      shippingAddress: orderToAddressText(order),
+    });
+  });
+
   // Categories
   app.get("/api/categories", async (_req, res) => {
     const categories = await storage.listCategories();
@@ -418,11 +704,8 @@ Rules:
   app.post("/api/categories", requireAuth, apiRateLimiter, async (req, res) => {
     const parsed = insertCategorySchema.safeParse(req.body);
     if (!parsed.success) {
-      return res
-        .status(400)
-        .json({ message: "Invalid category", errors: parsed.error.flatten() });
+      return res.status(400).json({ message: "Invalid category", errors: parsed.error.flatten() });
     }
-    // Sanitize inputs
     const sanitized = sanitizeCategoryInput(parsed.data);
     const category = await storage.createCategory({ ...parsed.data, ...sanitized });
     return res.status(201).json(category);

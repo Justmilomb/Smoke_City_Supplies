@@ -65,6 +65,27 @@ export const products = pgTable("products", {
   metaKeywords: text("meta_keywords"),
 });
 
+export const barcodes = pgTable("barcodes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  productId: varchar("product_id").notNull(),
+  format: varchar("format", { length: 50 }).notNull().default("unknown"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastScannedAt: timestamp("last_scanned_at"),
+});
+
+export const inventoryTransactions = pgTable("inventory_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull(),
+  barcodeId: varchar("barcode_id"),
+  type: varchar("type", { length: 40 }).notNull(),
+  quantityDelta: integer("quantity_delta").notNull(),
+  reason: text("reason"),
+  actor: text("actor").notNull().default("system"),
+  orderId: varchar("order_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertProductSchema = z.object({
   name: z.string().min(1),
   partNumber: z.string().optional(),
@@ -87,12 +108,13 @@ export const insertProductSchema = z.object({
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
   metaKeywords: z.string().optional(),
+  barcode: z.string().optional(),
+  barcodeFormat: z.string().optional(),
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
-// Orders for customer checkout
 export const orderItems = pgTable("order_items", {
   id: varchar("id").primaryKey(),
   orderId: varchar("order_id").notNull(),
@@ -109,6 +131,24 @@ export const orders = pgTable("orders", {
   totalPence: integer("total_pence").notNull(),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  county: text("county"),
+  postcode: text("postcode"),
+  country: text("country"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  paymentStatus: varchar("payment_status", { length: 30 }).notNull().default("awaiting_payment"),
+  paidAt: text("paid_at"),
+  invoiceNumber: text("invoice_number"),
+  invoiceUrl: text("invoice_url"),
+  invoiceSentAt: text("invoice_sent_at"),
+  shippingLabelProvider: text("shipping_label_provider"),
+  shippingLabelId: text("shipping_label_id"),
+  shippingLabelUrl: text("shipping_label_url"),
+  trackingNumber: text("tracking_number"),
+  labelCreatedAt: text("label_created_at"),
+  stockDeductedAt: text("stock_deducted_at"),
 });
 
 export const createOrderSchema = z.object({
@@ -120,8 +160,78 @@ export const createOrderSchema = z.object({
   })),
   customerEmail: z.string().email().optional(),
   customerName: z.string().optional(),
+  addressLine1: z.string().optional(),
+  addressLine2: z.string().optional(),
+  city: z.string().optional(),
+  county: z.string().optional(),
+  postcode: z.string().optional(),
+  country: z.string().optional(),
+  stripePaymentIntentId: z.string().optional(),
+  paymentStatus: z.enum(["awaiting_payment", "paid", "failed", "refunded"]).optional(),
 });
+
+export const checkoutPrepareSchema = z.object({
+  items: z.array(z.object({
+    productId: z.string(),
+    productName: z.string(),
+    quantity: z.number().int().min(1),
+    priceEach: z.number().positive(),
+  })).min(1),
+  customerEmail: z.string().email(),
+  customerName: z.string().min(1),
+  addressLine1: z.string().min(1),
+  addressLine2: z.string().optional(),
+  city: z.string().min(1),
+  county: z.string().optional(),
+  postcode: z.string().min(1),
+  country: z.string().default("GB"),
+});
+
+export const barcodeResolveSchema = z.object({
+  code: z.string().min(3),
+  format: z.string().optional(),
+});
+
+export const barcodeLinkSchema = z.object({
+  code: z.string().min(3),
+  productId: z.string().min(1),
+  format: z.string().optional(),
+});
+
+export const stockInSchema = z.object({
+  code: z.string().min(3),
+  quantity: z.number().int().min(1),
+  reason: z.string().optional(),
+});
+
+export const fulfillmentScanSchema = z.object({
+  code: z.string().min(3),
+  quantity: z.number().int().min(1).default(1),
+});
+
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type CheckoutPrepareInput = z.infer<typeof checkoutPrepareSchema>;
+
+export type ApiBarcode = {
+  id: string;
+  code: string;
+  productId: string;
+  format: string;
+  createdAt: string;
+  lastScannedAt?: string;
+};
+
+export type ApiInventoryTransaction = {
+  id: string;
+  productId: string;
+  barcodeId?: string;
+  type: string;
+  quantityDelta: number;
+  reason?: string;
+  actor: string;
+  orderId?: string;
+  createdAt: string;
+};
 
 // API shape for product (matches client Part + quantity)
 export type ApiProduct = {
@@ -147,6 +257,8 @@ export type ApiProduct = {
   metaTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
+  barcode?: string;
+  barcodeFormat?: string;
 };
 
 export type ApiOrderItem = {
@@ -164,4 +276,22 @@ export type ApiOrder = {
   items: ApiOrderItem[];
   customerEmail?: string;
   customerName?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  county?: string;
+  postcode?: string;
+  country?: string;
+  stripePaymentIntentId?: string;
+  paymentStatus: string;
+  paidAt?: string;
+  invoiceNumber?: string;
+  invoiceUrl?: string;
+  invoiceSentAt?: string;
+  shippingLabelProvider?: string;
+  shippingLabelId?: string;
+  shippingLabelUrl?: string;
+  trackingNumber?: string;
+  labelCreatedAt?: string;
+  stockDeductedAt?: string;
 };

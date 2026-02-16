@@ -34,6 +34,8 @@ const schema = z.object({
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
   metaKeywords: z.string().optional(),
+  barcode: z.string().optional(),
+  barcodeFormat: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -63,6 +65,8 @@ export default function AdminEditPart() {
       metaTitle: "",
       metaDescription: "",
       metaKeywords: "",
+      barcode: "",
+      barcodeFormat: "",
     },
   });
 
@@ -114,6 +118,8 @@ export default function AdminEditPart() {
         metaTitle: (product as any).metaTitle ?? "",
         metaDescription: (product as any).metaDescription ?? "",
         metaKeywords: (product as any).metaKeywords ?? "",
+        barcode: (product as any).barcode ?? "",
+        barcodeFormat: (product as any).barcodeFormat ?? "",
       });
       setPreview(product.image || "");
     }
@@ -146,6 +152,8 @@ export default function AdminEditPart() {
           metaTitle: v.metaTitle || undefined,
           metaDescription: v.metaDescription || undefined,
           metaKeywords: v.metaKeywords || undefined,
+          barcode: v.barcode || undefined,
+          barcodeFormat: v.barcodeFormat || undefined,
         },
       },
       {
@@ -281,6 +289,32 @@ export default function AdminEditPart() {
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="barcode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Barcode</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Scan or type barcode" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="barcodeFormat"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Barcode format (optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. ean_13, code_128" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="price"

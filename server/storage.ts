@@ -1,8 +1,11 @@
 import type {
+  ApiBarcode,
+  ApiInventoryTransaction,
   ApiOrder,
   ApiOrderItem,
   ApiProduct,
   Category,
+  CheckoutPrepareInput,
   CreateOrderInput,
   InsertCategory,
   InsertProduct,
@@ -10,14 +13,17 @@ import type {
   User,
 } from "@shared/schema";
 import {
+  barcodes,
   categories as categoriesTable,
+  checkoutPrepareSchema,
   createOrderSchema,
+  inventoryTransactions,
   orderItems,
   orders,
   products,
   users,
 } from "@shared/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { seedProducts } from "./seed";
@@ -34,10 +40,35 @@ export interface IStorage {
   deleteProduct(id: string): Promise<boolean>;
   updateProductQuantity(id: string, quantity: number): Promise<ApiProduct | undefined>;
 
+  findBarcode(code: string): Promise<ApiBarcode | undefined>;
+  linkBarcode(code: string, productId: string, format?: string): Promise<ApiBarcode>;
+  resolveBarcode(code: string): Promise<{ barcode?: ApiBarcode; product?: ApiProduct }>;
+  stockInByBarcode(input: { code: string; quantity: number; reason?: string; actor?: string }): Promise<ApiProduct | undefined>;
+
   createOrder(input: CreateOrderInput): Promise<ApiOrder>;
+  prepareCheckoutOrder(input: CheckoutPrepareInput, stripePaymentIntentId: string): Promise<ApiOrder>;
   listOrders(): Promise<ApiOrder[]>;
   getOrder(id: string): Promise<ApiOrder | undefined>;
+  getOrderByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined>;
   updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined>;
+  markOrderPaidByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined>;
+  markOrderPaymentFailedByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined>;
+  recordOrderInvoice(
+    orderId: string,
+    data: { invoiceNumber: string; invoiceUrl?: string; invoiceSentAt?: string }
+  ): Promise<ApiOrder | undefined>;
+  recordShippingLabel(
+    orderId: string,
+    data: {
+      shippingLabelProvider: string;
+      shippingLabelId: string;
+      shippingLabelUrl: string;
+      trackingNumber: string;
+      labelCreatedAt: string;
+    }
+  ): Promise<ApiOrder | undefined>;
+
+  listInventoryTransactions(limit?: number): Promise<ApiInventoryTransaction[]>;
 
   listCategories(): Promise<Category[]>;
   getCategory(id: string): Promise<Category | undefined>;
@@ -46,43 +77,121 @@ export interface IStorage {
   deleteCategory(id: string): Promise<boolean>;
 }
 
-function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
-  return {
-    id: row.id,
-    name: row.name,
-    partNumber: row.partNumber ?? undefined,
-    vehicle: row.vehicle,
-    category: row.category,
-    subcategory: row.subcategory ?? undefined,
-    brand: row.brand ?? undefined,
-    price: row.price / 100,
-    rating: row.rating / 10,
-    reviewCount: row.reviewCount,
-    stock: row.stock,
-    quantity: row.quantity,
-    deliveryEta: row.deliveryEta,
-    compatibility: row.compatibility,
-    tags: row.tags,
-    image: row.image,
-    description: row.description,
-    specs: row.specs,
-    features: row.features ?? undefined,
-    metaTitle: row.metaTitle ?? undefined,
-    metaDescription: row.metaDescription ?? undefined,
-    metaKeywords: row.metaKeywords ?? undefined,
-  };
-}
-
 function stockFromQuantity(quantity: number): "in-stock" | "low" | "out" {
   if (quantity <= 0) return "out";
   if (quantity <= 5) return "low";
   return "in-stock";
 }
 
+function orderToApi(
+  row: typeof orders.$inferSelect,
+  items: ApiOrderItem[]
+): ApiOrder {
+  return {
+    id: row.id,
+    createdAt: row.createdAt,
+    status: row.status,
+    totalPence: row.totalPence,
+    items,
+    customerEmail: row.customerEmail ?? undefined,
+    customerName: row.customerName ?? undefined,
+    addressLine1: row.addressLine1 ?? undefined,
+    addressLine2: row.addressLine2 ?? undefined,
+    city: row.city ?? undefined,
+    county: row.county ?? undefined,
+    postcode: row.postcode ?? undefined,
+    country: row.country ?? undefined,
+    stripePaymentIntentId: row.stripePaymentIntentId ?? undefined,
+    paymentStatus: row.paymentStatus,
+    paidAt: row.paidAt ?? undefined,
+    invoiceNumber: row.invoiceNumber ?? undefined,
+    invoiceUrl: row.invoiceUrl ?? undefined,
+    invoiceSentAt: row.invoiceSentAt ?? undefined,
+    shippingLabelProvider: row.shippingLabelProvider ?? undefined,
+    shippingLabelId: row.shippingLabelId ?? undefined,
+    shippingLabelUrl: row.shippingLabelUrl ?? undefined,
+    trackingNumber: row.trackingNumber ?? undefined,
+    labelCreatedAt: row.labelCreatedAt ?? undefined,
+    stockDeductedAt: row.stockDeductedAt ?? undefined,
+  };
+}
+
 export class DbStorage implements IStorage {
   private getDb() {
     if (!db) throw new Error("Database not initialized");
     return db;
+  }
+
+  private async getBarcodeMapForProducts(productIds: string[]): Promise<Map<string, ApiBarcode>> {
+    if (productIds.length === 0) return new Map();
+    const rows = await this.getDb().select().from(barcodes).where(inArray(barcodes.productId, productIds));
+    const map = new Map<string, ApiBarcode>();
+    for (const row of rows) {
+      if (!map.has(row.productId)) {
+        map.set(row.productId, {
+          id: row.id,
+          code: row.code,
+          productId: row.productId,
+          format: row.format,
+          createdAt: row.createdAt.toISOString(),
+          lastScannedAt: row.lastScannedAt?.toISOString(),
+        });
+      }
+    }
+    return map;
+  }
+
+  private async rowToApiProduct(row: typeof products.$inferSelect): Promise<ApiProduct> {
+    const barcode = await this.getBarcodeByProductId(row.id);
+    return {
+      id: row.id,
+      name: row.name,
+      partNumber: row.partNumber ?? undefined,
+      vehicle: row.vehicle,
+      category: row.category,
+      subcategory: row.subcategory ?? undefined,
+      brand: row.brand ?? undefined,
+      price: row.price / 100,
+      rating: row.rating / 10,
+      reviewCount: row.reviewCount,
+      stock: row.stock,
+      quantity: row.quantity,
+      deliveryEta: row.deliveryEta,
+      compatibility: row.compatibility,
+      tags: row.tags,
+      image: row.image,
+      description: row.description,
+      specs: row.specs,
+      features: row.features ?? undefined,
+      metaTitle: row.metaTitle ?? undefined,
+      metaDescription: row.metaDescription ?? undefined,
+      metaKeywords: row.metaKeywords ?? undefined,
+      barcode: barcode?.code,
+      barcodeFormat: barcode?.format,
+    };
+  }
+
+  private async getBarcodeByProductId(productId: string): Promise<ApiBarcode | undefined> {
+    const [row] = await this.getDb().select().from(barcodes).where(eq(barcodes.productId, productId)).limit(1);
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      code: row.code,
+      productId: row.productId,
+      format: row.format,
+      createdAt: row.createdAt.toISOString(),
+      lastScannedAt: row.lastScannedAt?.toISOString(),
+    };
+  }
+
+  private async listOrderItems(orderId: string): Promise<ApiOrderItem[]> {
+    const itemRows = await this.getDb().select().from(orderItems).where(eq(orderItems.orderId, orderId));
+    return itemRows.map((row) => ({
+      productId: row.productId,
+      productName: row.productName,
+      quantity: row.quantity,
+      priceEach: row.priceEach / 100,
+    }));
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -104,12 +213,42 @@ export class DbStorage implements IStorage {
 
   async listProducts(): Promise<ApiProduct[]> {
     const rows = await this.getDb().select().from(products);
-    return rows.map(rowToApiProduct);
+    const productIds = rows.map((r) => r.id);
+    const barcodeMap = await this.getBarcodeMapForProducts(productIds);
+    return rows.map((row) => {
+      const barcode = barcodeMap.get(row.id);
+      return {
+        id: row.id,
+        name: row.name,
+        partNumber: row.partNumber ?? undefined,
+        vehicle: row.vehicle,
+        category: row.category,
+        subcategory: row.subcategory ?? undefined,
+        brand: row.brand ?? undefined,
+        price: row.price / 100,
+        rating: row.rating / 10,
+        reviewCount: row.reviewCount,
+        stock: row.stock,
+        quantity: row.quantity,
+        deliveryEta: row.deliveryEta,
+        compatibility: row.compatibility,
+        tags: row.tags,
+        image: row.image,
+        description: row.description,
+        specs: row.specs,
+        features: row.features ?? undefined,
+        metaTitle: row.metaTitle ?? undefined,
+        metaDescription: row.metaDescription ?? undefined,
+        metaKeywords: row.metaKeywords ?? undefined,
+        barcode: barcode?.code,
+        barcodeFormat: barcode?.format,
+      };
+    });
   }
 
   async getProduct(id: string): Promise<ApiProduct | undefined> {
     const [row] = await this.getDb().select().from(products).where(eq(products.id, id)).limit(1);
-    return row ? rowToApiProduct(row) : undefined;
+    return row ? this.rowToApiProduct(row) : undefined;
   }
 
   async createProduct(input: InsertProduct): Promise<ApiProduct> {
@@ -142,7 +281,12 @@ export class DbStorage implements IStorage {
       })
       .returning();
     if (!row) throw new Error("Failed to create product");
-    return rowToApiProduct(row);
+
+    if (input.barcode) {
+      await this.linkBarcode(input.barcode, id, input.barcodeFormat);
+    }
+
+    return this.rowToApiProduct(row);
   }
 
   async updateProduct(id: string, patch: Partial<ApiProduct>): Promise<ApiProduct | undefined> {
@@ -150,11 +294,18 @@ export class DbStorage implements IStorage {
     if (!existing) return undefined;
 
     const dbPatch: Record<string, unknown> = { ...patch };
+    delete dbPatch.barcode;
+    delete dbPatch.barcodeFormat;
     if (patch.price !== undefined) dbPatch.price = Math.round(patch.price * 100);
     if (patch.rating !== undefined) dbPatch.rating = Math.round(patch.rating * 10);
 
     const [row] = await this.getDb().update(products).set(dbPatch).where(eq(products.id, id)).returning();
-    return row ? rowToApiProduct(row) : undefined;
+
+    if (patch.barcode) {
+      await this.linkBarcode(patch.barcode, id, patch.barcodeFormat);
+    }
+
+    return row ? this.rowToApiProduct(row) : undefined;
   }
 
   async deleteProduct(id: string): Promise<boolean> {
@@ -171,7 +322,101 @@ export class DbStorage implements IStorage {
       .set({ quantity, stock })
       .where(eq(products.id, id))
       .returning();
-    return row ? rowToApiProduct(row) : undefined;
+    return row ? this.rowToApiProduct(row) : undefined;
+  }
+
+  async findBarcode(code: string): Promise<ApiBarcode | undefined> {
+    const [row] = await this.getDb().select().from(barcodes).where(eq(barcodes.code, code)).limit(1);
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      code: row.code,
+      productId: row.productId,
+      format: row.format,
+      createdAt: row.createdAt.toISOString(),
+      lastScannedAt: row.lastScannedAt?.toISOString(),
+    };
+  }
+
+  async linkBarcode(code: string, productId: string, format = "unknown"): Promise<ApiBarcode> {
+    const existing = await this.findBarcode(code);
+    if (existing && existing.productId !== productId) {
+      throw new Error("Barcode already linked to a different product");
+    }
+
+    const [row] = await this.getDb()
+      .insert(barcodes)
+      .values({ code, productId, format })
+      .onConflictDoUpdate({
+        target: barcodes.code,
+        set: { productId, format, lastScannedAt: new Date() },
+      })
+      .returning();
+
+    if (!row) throw new Error("Failed to link barcode");
+
+    return {
+      id: row.id,
+      code: row.code,
+      productId: row.productId,
+      format: row.format,
+      createdAt: row.createdAt.toISOString(),
+      lastScannedAt: row.lastScannedAt?.toISOString(),
+    };
+  }
+
+  async resolveBarcode(code: string): Promise<{ barcode?: ApiBarcode; product?: ApiProduct }> {
+    const barcode = await this.findBarcode(code);
+    if (!barcode) return {};
+    await this.getDb().update(barcodes).set({ lastScannedAt: new Date() }).where(eq(barcodes.id, barcode.id));
+    const product = await this.getProduct(barcode.productId);
+    return { barcode, product };
+  }
+
+  private async recordInventoryTransaction(input: {
+    productId: string;
+    barcodeId?: string;
+    type: string;
+    quantityDelta: number;
+    reason?: string;
+    actor: string;
+    orderId?: string;
+  }): Promise<void> {
+    await this.getDb().insert(inventoryTransactions).values({
+      id: randomUUID(),
+      productId: input.productId,
+      barcodeId: input.barcodeId ?? null,
+      type: input.type,
+      quantityDelta: input.quantityDelta,
+      reason: input.reason ?? null,
+      actor: input.actor,
+      orderId: input.orderId ?? null,
+    });
+  }
+
+  async stockInByBarcode(input: {
+    code: string;
+    quantity: number;
+    reason?: string;
+    actor?: string;
+  }): Promise<ApiProduct | undefined> {
+    const resolved = await this.resolveBarcode(input.code);
+    if (!resolved.product || !resolved.barcode) return undefined;
+
+    const nextQty = resolved.product.quantity + input.quantity;
+    const updated = await this.updateProductQuantity(resolved.product.id, nextQty);
+    if (!updated) return undefined;
+
+    await this.recordInventoryTransaction({
+      productId: updated.id,
+      barcodeId: resolved.barcode.id,
+      type: "stock_in",
+      quantityDelta: input.quantity,
+      reason: input.reason,
+      actor: input.actor ?? "admin",
+    });
+
+    return updated;
   }
 
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
@@ -192,6 +437,14 @@ export class DbStorage implements IStorage {
       totalPence,
       customerEmail: customerEmail ?? null,
       customerName: customerName ?? null,
+      addressLine1: parsed.data.addressLine1 ?? null,
+      addressLine2: parsed.data.addressLine2 ?? null,
+      city: parsed.data.city ?? null,
+      county: parsed.data.county ?? null,
+      postcode: parsed.data.postcode ?? null,
+      country: parsed.data.country ?? "GB",
+      stripePaymentIntentId: parsed.data.stripePaymentIntentId ?? null,
+      paymentStatus: parsed.data.paymentStatus ?? "awaiting_payment",
     });
 
     const orderItemsToInsert = items.map((i) => ({
@@ -204,83 +457,56 @@ export class DbStorage implements IStorage {
     }));
     await this.getDb().insert(orderItems).values(orderItemsToInsert);
 
-    for (const item of items) {
-      const product = await this.getProduct(item.productId);
-      if (product) {
-        const newQty = Math.max(0, product.quantity - item.quantity);
-        await this.updateProductQuantity(item.productId, newQty);
-      }
+    const created = await this.getOrder(orderId);
+    if (!created) throw new Error("Failed to create order");
+
+    if (created.paymentStatus === "paid") {
+      await this.deductStockForOrder(orderId);
+      return (await this.getOrder(orderId)) ?? created;
     }
 
-    const apiItems: ApiOrderItem[] = items.map((i) => ({
-      productId: i.productId,
-      productName: i.productName,
-      quantity: i.quantity,
-      priceEach: i.priceEach,
-    }));
+    return created;
+  }
 
-    return {
-      id: orderId,
-      createdAt: now,
-      status: "pending",
-      totalPence,
-      items: apiItems,
-      customerEmail,
-      customerName,
-    };
+  async prepareCheckoutOrder(input: CheckoutPrepareInput, stripePaymentIntentId: string): Promise<ApiOrder> {
+    const parsed = checkoutPrepareSchema.safeParse(input);
+    if (!parsed.success) throw new Error("Invalid checkout input");
+
+    return this.createOrder({
+      ...parsed.data,
+      stripePaymentIntentId,
+      paymentStatus: "awaiting_payment",
+    });
   }
 
   async listOrders(): Promise<ApiOrder[]> {
     const orderRows = await this.getDb().select().from(orders).orderBy(desc(orders.createdAt));
     const result: ApiOrder[] = [];
 
-    for (const order of orderRows) {
-      const itemRows = await this.getDb()
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, order.id));
-      const items: ApiOrderItem[] = itemRows.map((row) => ({
-        productId: row.productId,
-        productName: row.productName,
-        quantity: row.quantity,
-        priceEach: row.priceEach / 100,
-      }));
-      result.push({
-        id: order.id,
-        createdAt: order.createdAt,
-        status: order.status,
-        totalPence: order.totalPence,
-        items,
-        customerEmail: order.customerEmail ?? undefined,
-        customerName: order.customerName ?? undefined,
-      });
+    for (const orderRow of orderRows) {
+      const items = await this.listOrderItems(orderRow.id);
+      result.push(orderToApi(orderRow, items));
     }
 
-    result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return result;
   }
 
   async getOrder(id: string): Promise<ApiOrder | undefined> {
-    const [order] = await this.getDb().select().from(orders).where(eq(orders.id, id)).limit(1);
-    if (!order) return undefined;
+    const [orderRow] = await this.getDb().select().from(orders).where(eq(orders.id, id)).limit(1);
+    if (!orderRow) return undefined;
+    const items = await this.listOrderItems(id);
+    return orderToApi(orderRow, items);
+  }
 
-    const itemRows = await this.getDb().select().from(orderItems).where(eq(orderItems.orderId, id));
-    const items: ApiOrderItem[] = itemRows.map((row) => ({
-      productId: row.productId,
-      productName: row.productName,
-      quantity: row.quantity,
-      priceEach: row.priceEach / 100,
-    }));
-
-    return {
-      id: order.id,
-      createdAt: order.createdAt,
-      status: order.status,
-      totalPence: order.totalPence,
-      items,
-      customerEmail: order.customerEmail ?? undefined,
-      customerName: order.customerName ?? undefined,
-    };
+  async getOrderByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined> {
+    const [orderRow] = await this.getDb()
+      .select()
+      .from(orders)
+      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
+      .limit(1);
+    if (!orderRow) return undefined;
+    const items = await this.listOrderItems(orderRow.id);
+    return orderToApi(orderRow, items);
   }
 
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
@@ -291,6 +517,126 @@ export class DbStorage implements IStorage {
       .returning();
     if (!updated) return undefined;
     return this.getOrder(id);
+  }
+
+  private async deductStockForOrder(orderId: string): Promise<void> {
+    const [orderRow] = await this.getDb().select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!orderRow || orderRow.stockDeductedAt) return;
+
+    const items = await this.listOrderItems(orderId);
+    for (const item of items) {
+      const product = await this.getProduct(item.productId);
+      if (!product) continue;
+      const newQty = Math.max(0, product.quantity - item.quantity);
+      await this.updateProductQuantity(item.productId, newQty);
+      await this.recordInventoryTransaction({
+        productId: item.productId,
+        type: "order_reserve",
+        quantityDelta: -item.quantity,
+        actor: "system",
+        orderId,
+        reason: "Paid order stock deduction",
+      });
+    }
+
+    await this.getDb()
+      .update(orders)
+      .set({ stockDeductedAt: new Date().toISOString() })
+      .where(eq(orders.id, orderId));
+  }
+
+  async markOrderPaidByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined> {
+    const [orderRow] = await this.getDb()
+      .select()
+      .from(orders)
+      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
+      .limit(1);
+    if (!orderRow) return undefined;
+
+    if (orderRow.paymentStatus !== "paid") {
+      await this.getDb()
+        .update(orders)
+        .set({
+          paymentStatus: "paid",
+          paidAt: new Date().toISOString(),
+          status: orderRow.status === "pending" ? "processing" : orderRow.status,
+        })
+        .where(eq(orders.id, orderRow.id));
+    }
+
+    await this.deductStockForOrder(orderRow.id);
+    return this.getOrder(orderRow.id);
+  }
+
+  async markOrderPaymentFailedByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined> {
+    const [orderRow] = await this.getDb()
+      .select()
+      .from(orders)
+      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
+      .limit(1);
+    if (!orderRow) return undefined;
+
+    await this.getDb()
+      .update(orders)
+      .set({ paymentStatus: "failed" })
+      .where(eq(orders.id, orderRow.id));
+
+    return this.getOrder(orderRow.id);
+  }
+
+  async recordOrderInvoice(
+    orderId: string,
+    data: { invoiceNumber: string; invoiceUrl?: string; invoiceSentAt?: string }
+  ): Promise<ApiOrder | undefined> {
+    await this.getDb()
+      .update(orders)
+      .set({
+        invoiceNumber: data.invoiceNumber,
+        invoiceUrl: data.invoiceUrl ?? null,
+        invoiceSentAt: data.invoiceSentAt ?? null,
+      })
+      .where(eq(orders.id, orderId));
+
+    return this.getOrder(orderId);
+  }
+
+  async recordShippingLabel(
+    orderId: string,
+    data: {
+      shippingLabelProvider: string;
+      shippingLabelId: string;
+      shippingLabelUrl: string;
+      trackingNumber: string;
+      labelCreatedAt: string;
+    }
+  ): Promise<ApiOrder | undefined> {
+    await this.getDb()
+      .update(orders)
+      .set({
+        shippingLabelProvider: data.shippingLabelProvider,
+        shippingLabelId: data.shippingLabelId,
+        shippingLabelUrl: data.shippingLabelUrl,
+        trackingNumber: data.trackingNumber,
+        labelCreatedAt: data.labelCreatedAt,
+      })
+      .where(eq(orders.id, orderId));
+
+    return this.getOrder(orderId);
+  }
+
+  async listInventoryTransactions(limit = 100): Promise<ApiInventoryTransaction[]> {
+    const rows = await this.getDb().select().from(inventoryTransactions).orderBy(desc(inventoryTransactions.createdAt)).limit(limit);
+    return rows.map((row) => ({
+      id: row.id,
+      productId: row.productId,
+      barcodeId: row.barcodeId ?? undefined,
+      type: row.type,
+      quantityDelta: row.quantityDelta,
+      reason: row.reason ?? undefined,
+      actor: row.actor,
+      orderId: row.orderId ?? undefined,
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
 
   async listCategories(): Promise<Category[]> {
@@ -342,6 +688,8 @@ export class MemStorage implements IStorage {
   private products = new Map<string, ApiProduct>();
   private orders = new Map<string, ApiOrder>();
   private categories = new Map<string, Category>();
+  private barcodeMap = new Map<string, ApiBarcode>(); // code -> barcode
+  private inventoryTx = new Map<string, ApiInventoryTransaction>();
 
   constructor() {
     seedProducts.forEach((p) => this.products.set(p.id, { ...p }));
@@ -395,8 +743,13 @@ export class MemStorage implements IStorage {
       metaTitle: input.metaTitle,
       metaDescription: input.metaDescription,
       metaKeywords: input.metaKeywords,
+      barcode: input.barcode,
+      barcodeFormat: input.barcodeFormat,
     };
     this.products.set(id, product);
+    if (input.barcode) {
+      await this.linkBarcode(input.barcode, id, input.barcodeFormat);
+    }
     return product;
   }
 
@@ -405,6 +758,9 @@ export class MemStorage implements IStorage {
     if (!existing) return undefined;
     const updated: ApiProduct = { ...existing, ...patch };
     this.products.set(id, updated);
+    if (patch.barcode) {
+      await this.linkBarcode(patch.barcode, id, patch.barcodeFormat);
+    }
     return updated;
   }
 
@@ -418,6 +774,92 @@ export class MemStorage implements IStorage {
     const stock = stockFromQuantity(quantity);
     const updated: ApiProduct = { ...existing, quantity, stock };
     this.products.set(id, updated);
+    return updated;
+  }
+
+  async findBarcode(code: string): Promise<ApiBarcode | undefined> {
+    return this.barcodeMap.get(code);
+  }
+
+  async linkBarcode(code: string, productId: string, format = "unknown"): Promise<ApiBarcode> {
+    const existing = this.barcodeMap.get(code);
+    if (existing && existing.productId !== productId) {
+      throw new Error("Barcode already linked to a different product");
+    }
+
+    const now = new Date().toISOString();
+    const barcode: ApiBarcode = {
+      id: existing?.id ?? randomUUID(),
+      code,
+      productId,
+      format,
+      createdAt: existing?.createdAt ?? now,
+      lastScannedAt: now,
+    };
+    this.barcodeMap.set(code, barcode);
+
+    const product = this.products.get(productId);
+    if (product) {
+      this.products.set(productId, { ...product, barcode: code, barcodeFormat: format });
+    }
+
+    return barcode;
+  }
+
+  async resolveBarcode(code: string): Promise<{ barcode?: ApiBarcode; product?: ApiProduct }> {
+    const barcode = this.barcodeMap.get(code);
+    if (!barcode) return {};
+    const product = this.products.get(barcode.productId);
+    return { barcode: { ...barcode, lastScannedAt: new Date().toISOString() }, product };
+  }
+
+  private recordInventoryTransaction(input: {
+    productId: string;
+    barcodeId?: string;
+    type: string;
+    quantityDelta: number;
+    reason?: string;
+    actor: string;
+    orderId?: string;
+  }) {
+    const id = randomUUID();
+    this.inventoryTx.set(id, {
+      id,
+      productId: input.productId,
+      barcodeId: input.barcodeId,
+      type: input.type,
+      quantityDelta: input.quantityDelta,
+      reason: input.reason,
+      actor: input.actor,
+      orderId: input.orderId,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  async stockInByBarcode(input: {
+    code: string;
+    quantity: number;
+    reason?: string;
+    actor?: string;
+  }): Promise<ApiProduct | undefined> {
+    const resolved = await this.resolveBarcode(input.code);
+    if (!resolved.product || !resolved.barcode) return undefined;
+
+    const updated = await this.updateProductQuantity(
+      resolved.product.id,
+      resolved.product.quantity + input.quantity
+    );
+    if (!updated) return undefined;
+
+    this.recordInventoryTransaction({
+      productId: updated.id,
+      barcodeId: resolved.barcode.id,
+      type: "stock_in",
+      quantityDelta: input.quantity,
+      reason: input.reason,
+      actor: input.actor ?? "admin",
+    });
+
     return updated;
   }
 
@@ -437,6 +879,7 @@ export class MemStorage implements IStorage {
       quantity: i.quantity,
       priceEach: i.priceEach,
     }));
+
     const order: ApiOrder = {
       id: orderId,
       createdAt: now,
@@ -445,17 +888,33 @@ export class MemStorage implements IStorage {
       items: apiItems,
       customerEmail,
       customerName,
+      addressLine1: parsed.data.addressLine1,
+      addressLine2: parsed.data.addressLine2,
+      city: parsed.data.city,
+      county: parsed.data.county,
+      postcode: parsed.data.postcode,
+      country: parsed.data.country ?? "GB",
+      stripePaymentIntentId: parsed.data.stripePaymentIntentId,
+      paymentStatus: parsed.data.paymentStatus ?? "awaiting_payment",
     };
 
-    for (const item of items) {
-      const product = this.products.get(item.productId);
-      if (product) {
-        const newQty = Math.max(0, product.quantity - item.quantity);
-        await this.updateProductQuantity(item.productId, newQty);
-      }
-    }
     this.orders.set(orderId, order);
-    return order;
+
+    if (order.paymentStatus === "paid") {
+      await this.deductStockForOrder(orderId);
+    }
+
+    return this.orders.get(orderId)!;
+  }
+
+  async prepareCheckoutOrder(input: CheckoutPrepareInput, stripePaymentIntentId: string): Promise<ApiOrder> {
+    const parsed = checkoutPrepareSchema.safeParse(input);
+    if (!parsed.success) throw new Error("Invalid checkout input");
+    return this.createOrder({
+      ...parsed.data,
+      stripePaymentIntentId,
+      paymentStatus: "awaiting_payment",
+    });
   }
 
   async listOrders(): Promise<ApiOrder[]> {
@@ -468,12 +927,108 @@ export class MemStorage implements IStorage {
     return this.orders.get(id);
   }
 
+  async getOrderByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined> {
+    return Array.from(this.orders.values()).find((o) => o.stripePaymentIntentId === paymentIntentId);
+  }
+
   async updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined> {
     const order = this.orders.get(id);
     if (!order) return undefined;
     const updated = { ...order, status };
     this.orders.set(id, updated);
     return updated;
+  }
+
+  private async deductStockForOrder(orderId: string): Promise<void> {
+    const order = this.orders.get(orderId);
+    if (!order || order.stockDeductedAt) return;
+
+    for (const item of order.items) {
+      const product = this.products.get(item.productId);
+      if (!product) continue;
+      const newQty = Math.max(0, product.quantity - item.quantity);
+      await this.updateProductQuantity(item.productId, newQty);
+      this.recordInventoryTransaction({
+        productId: item.productId,
+        type: "order_reserve",
+        quantityDelta: -item.quantity,
+        actor: "system",
+        orderId,
+        reason: "Paid order stock deduction",
+      });
+    }
+
+    this.orders.set(orderId, {
+      ...order,
+      stockDeductedAt: new Date().toISOString(),
+    });
+  }
+
+  async markOrderPaidByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined> {
+    const order = await this.getOrderByPaymentIntent(paymentIntentId);
+    if (!order) return undefined;
+
+    if (order.paymentStatus !== "paid") {
+      this.orders.set(order.id, {
+        ...order,
+        paymentStatus: "paid",
+        paidAt: new Date().toISOString(),
+        status: order.status === "pending" ? "processing" : order.status,
+      });
+    }
+
+    await this.deductStockForOrder(order.id);
+    return this.orders.get(order.id);
+  }
+
+  async markOrderPaymentFailedByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined> {
+    const order = await this.getOrderByPaymentIntent(paymentIntentId);
+    if (!order) return undefined;
+    const updated = { ...order, paymentStatus: "failed" };
+    this.orders.set(order.id, updated);
+    return updated;
+  }
+
+  async recordOrderInvoice(
+    orderId: string,
+    data: { invoiceNumber: string; invoiceUrl?: string; invoiceSentAt?: string }
+  ): Promise<ApiOrder | undefined> {
+    const order = this.orders.get(orderId);
+    if (!order) return undefined;
+    const updated = {
+      ...order,
+      invoiceNumber: data.invoiceNumber,
+      invoiceUrl: data.invoiceUrl,
+      invoiceSentAt: data.invoiceSentAt,
+    };
+    this.orders.set(orderId, updated);
+    return updated;
+  }
+
+  async recordShippingLabel(
+    orderId: string,
+    data: {
+      shippingLabelProvider: string;
+      shippingLabelId: string;
+      shippingLabelUrl: string;
+      trackingNumber: string;
+      labelCreatedAt: string;
+    }
+  ): Promise<ApiOrder | undefined> {
+    const order = this.orders.get(orderId);
+    if (!order) return undefined;
+    const updated = {
+      ...order,
+      ...data,
+    };
+    this.orders.set(orderId, updated);
+    return updated;
+  }
+
+  async listInventoryTransactions(limit = 100): Promise<ApiInventoryTransaction[]> {
+    return Array.from(this.inventoryTx.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
   }
 
   async listCategories(): Promise<Category[]> {

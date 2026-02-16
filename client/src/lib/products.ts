@@ -62,6 +62,8 @@ async function createProduct(input: CreateProductInput): Promise<Part> {
       description: input.description,
       specs: input.specs,
       features: input.features,
+      barcode: input.barcode,
+      barcodeFormat: input.barcodeFormat,
     }),
   });
   if (!res.ok) {

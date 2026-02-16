@@ -5,8 +5,11 @@ E-commerce site for motorcycle and scooter parts, run by Karl. Bringing back old
 ## Features
 
 - **Stripe Payment Integration** - Secure checkout with credit/debit cards
+- **Webhook-Confirmed Orders** - Orders are finalized by Stripe webhooks for safer stock handling
 - **Product Catalog** - Comprehensive filtering and search
 - **Admin Panel** - Full CRUD for products, orders, categories
+- **Barcode Inventory Tools** - Admin can link/scan barcodes for stock-in workflows (mobile-first)
+- **Invoice + Shipping Ops** - Automatic invoice email pipeline and manual Shippo label generation
 - **Security** - Rate limiting, input sanitization, CSRF protection
 - **Brand Story** - Personal touch throughout the customer journey
 
@@ -63,10 +66,25 @@ npm run start
 - `NODE_ENV` - Set to `production` (auto-set by Render)
 - `ADMIN_PASSWORD` - (Optional) Override default admin password
 - `SEED_PARTS_ON_STARTUP` - Optional. Set to `true` only if you want to auto-seed products on every boot
-- `UPLOADS_DIR` - Optional path for uploaded files. In production, set this to a persistent mount (for example a Render Disk path) to keep images across redeploys
+- `R2_BUCKET` - Cloudflare R2 bucket name for persistent image uploads
+- `R2_ACCESS_KEY_ID` - Cloudflare R2 access key ID
+- `R2_SECRET_ACCESS_KEY` - Cloudflare R2 secret access key
+- `R2_PUBLIC_BASE_URL` - Public base URL for uploaded files (for example your R2 custom domain or `*.r2.dev`)
+- `R2_ACCOUNT_ID` - Cloudflare account ID (required unless `R2_ENDPOINT` is set)
+- `R2_ENDPOINT` - Optional explicit S3 endpoint for R2 (if omitted, built from `R2_ACCOUNT_ID`)
+- `R2_KEY_PREFIX` - Optional folder/prefix for uploaded image keys in the bucket
+- `UPLOADS_DIR` - Optional local fallback path for uploaded files when R2 is not configured
 - `STRIPE_SECRET_KEY` - Your Stripe secret key (required for payments)
 - `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key (required for payments)
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (for payment confirmations)
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (required for payment confirmation)
+- `RESEND_API_KEY` - API key for invoice emails (optional locally, recommended production)
+- `INVOICE_FROM_EMAIL` - Sender address for invoices (e.g. billing@yourdomain.com)
+- `SHIPPO_API_KEY` - Shippo API token for label generation
+- `SHIP_FROM_NAME` - Sender name for shipping labels
+- `SHIP_FROM_ADDRESS_LINE1` - Sender street for shipping labels
+- `SHIP_FROM_CITY` - Sender city for shipping labels
+- `SHIP_FROM_POSTCODE` - Sender postcode for shipping labels
+- `SHIP_FROM_COUNTRY` - Sender country code (default `GB`)
 - `PUBLIC_BASE_URL` - Public site URL used when generating product links in the Merchant feed file
 
 **PostgreSQL Database:**
@@ -78,8 +96,8 @@ npm run start
 - The server binds to `0.0.0.0` and uses the `PORT` environment variable (set by Render)
 - If `DATABASE_URL` is not set, the app uses in-memory storage in production. Admin/products/orders will reset on restart/redeploy.
 - Product auto-seeding is disabled by default in production. Use `SEED_PARTS_ON_STARTUP=true` only when you intentionally want to seed.
-- Uploaded images are persisted only if `UPLOADS_DIR` points to persistent storage (for example Render Disk)
-- For cloud-based persistence, consider Cloudinary or S3
+- Uploaded images persist across redeploys when R2 vars are configured (recommended).
+- If R2 is not configured, uploads fall back to local disk at `UPLOADS_DIR`; use a persistent mount (for example Render Disk) if you need redeploy-safe local files.
 
 ## Scripts
 
@@ -87,6 +105,15 @@ npm run start
 - `npm run build` — build client and server
 - `npm run start` — production server
 - `npm run db:push` — push schema to database (skips if DATABASE_URL not set)
+
+## Checkout + Order Lifecycle
+
+- Frontend calls `POST /api/checkout/prepare` to create the pending order + Stripe PaymentIntent.
+- Stripe webhook `POST /api/stripe/webhook` is the source of truth for marking payment success/failure.
+- On `payment_intent.succeeded`, stock is deducted once, and invoice dispatch is triggered.
+- Admin order actions include:
+  - resend invoice (`/api/admin/orders/:id/invoice/resend`)
+  - generate shipping label via Shippo (`/api/admin/orders/:id/shipping-label`)
 
 ## Google Merchant File Feed (Automatic Updates)
 

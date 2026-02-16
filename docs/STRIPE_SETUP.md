@@ -54,6 +54,7 @@ Webhooks notify your server when payments succeed or fail.
 4. Select events to listen for:
    - `payment_intent.succeeded`
    - `payment_intent.payment_failed`
+   - `payment_intent.canceled` (optional but recommended)
 5. Click "Add endpoint"
 6. Copy the **Signing secret** (starts with `whsec_`)
 7. Add to your Render environment variables:
@@ -96,7 +97,8 @@ Use any future expiry date, any CVC, and any postal code.
 4. Click "Continue to Payment"
 5. Enter test card details
 6. Complete payment
-7. Verify order is created
+7. Verify webhook event is delivered and order status moves to `paid`
+8. Verify invoice email send (or server log fallback when email key is missing)
 
 ## Step 5: Go Live Checklist
 

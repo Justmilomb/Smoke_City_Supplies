@@ -41,6 +41,8 @@ export type Part = {
   metaTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
+  barcode?: string;
+  barcodeFormat?: string;
 };
 
 /** Motorcycle manufacturers for filter grouping */

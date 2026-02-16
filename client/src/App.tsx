@@ -25,6 +25,7 @@ import AdminParts from "@/pages/admin-parts";
 import AdminOrders from "@/pages/admin-orders";
 import AdminCategories from "@/pages/admin-categories";
 import AdminEditPart from "@/pages/admin-edit-part";
+import AdminInventory from "@/pages/admin-inventory";
 import CookieConsent from "@/components/site/CookieConsent";
 
 function Router() {
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/admin/categories" component={withAdminGuard(AdminCategories)} />
       <Route path="/admin/new" component={withAdminGuard(AdminNewPart)} />
       <Route path="/admin/edit/:id" component={withAdminGuard(AdminEditPart)} />
+      <Route path="/admin/inventory" component={withAdminGuard(AdminInventory)} />
 
       <Route component={NotFound} />
     </Switch>

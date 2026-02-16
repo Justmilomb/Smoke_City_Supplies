@@ -5,7 +5,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useCart } from "@/lib/cart";
-import { getStripe, createPaymentIntent } from "@/lib/stripe";
+import { getStripe, prepareCheckout } from "@/lib/stripe";
 import { StripeCheckoutForm } from "@/components/site/StripeCheckout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,8 +22,6 @@ import {
 import { toast } from "sonner";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
-const API_BASE = "/api";
-
 export default function CartPage() {
   usePageMeta({ title: "Shopping Cart", description: "Your shopping cart at Smoke City Supplies.", noindex: true });
   const { state, actions } = useCart();
@@ -39,6 +37,7 @@ export default function CartPage() {
   const [county, setCounty] = useState("");
   const [postcode, setPostcode] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [preparedOrderId, setPreparedOrderId] = useState<string | null>(null);
   const [stripePromise] = useState(() => getStripe());
 
   const total = state.items.reduce(
@@ -58,9 +57,19 @@ export default function CartPage() {
 
     setPlacingOrder(true);
     try {
-      // Create payment intent
-      const { clientSecret: secret } = await createPaymentIntent(total, email, name);
+      const { clientSecret: secret, orderId } = await prepareCheckout({
+        items: state.items,
+        customerEmail: email,
+        customerName: name,
+        addressLine1,
+        addressLine2,
+        city,
+        county,
+        postcode,
+        country: "GB",
+      });
       setClientSecret(secret);
+      setPreparedOrderId(orderId);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to initialize payment");
       setPlacingOrder(false);
@@ -69,32 +78,13 @@ export default function CartPage() {
 
   const handlePaymentSuccess = async () => {
     try {
-      // Create order after successful payment
-      const res = await fetch(`${API_BASE}/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: state.items.map((i) => ({
-            productId: i.productId,
-            productName: i.productName,
-            quantity: i.quantity,
-            priceEach: i.priceEach,
-          })),
-          customerEmail: email || undefined,
-          customerName: name || undefined,
-        }),
-      });
-      if (!res.ok) {
-        throw new Error("Failed to record order");
-      }
-      const order = await res.json();
-      setOrderId(order.id);
+      setOrderId(preparedOrderId);
       actions.clear();
       setOrderPlaced(true);
       setCheckoutOpen(false);
-      toast.success("Payment successful! Your order has been placed.");
+      toast.success("Payment successful! Your order is being confirmed.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Order recording failed");
+      toast.error(err instanceof Error ? err.message : "Checkout completion failed");
     } finally {
       setPlacingOrder(false);
     }
@@ -103,7 +93,6 @@ export default function CartPage() {
   const handlePaymentError = (error: string) => {
     toast.error(error);
     setPlacingOrder(false);
-    setClientSecret(null);
   };
 
   if (state.items.length === 0 && !orderPlaced) {
@@ -146,7 +135,7 @@ export default function CartPage() {
             Thank you for your order, {name}!
           </p>
           <p className="text-sm text-muted-foreground mb-8">
-            We've sent a confirmation email to {email}. Your items will be dispatched shortly and delivered to {city}, {postcode}.
+            We will email your invoice and payment confirmation to {email}. Your items will be dispatched shortly to {city}, {postcode}.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/store">

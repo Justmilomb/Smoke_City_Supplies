@@ -108,6 +108,15 @@ export default function AdminParts() {
                         <Badge data-testid={`badge-admin-stock-${p.id}`} variant="outline" className={`rounded-md text-xs ${stockTone(p.stock)}`}>
                           {p.stock}
                         </Badge>
+                        {p.barcode ? (
+                          <Badge variant="outline" className="rounded-md text-xs">
+                            Barcode linked
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="rounded-md text-xs text-amber-700">
+                            No barcode
+                          </Badge>
+                        )}
                       </div>
                       <div className="mt-2 text-sm font-medium tabular-nums">${p.price.toFixed(2)}</div>
                     </div>
@@ -174,6 +183,7 @@ export default function AdminParts() {
                   <TableHead>Price</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Qty</TableHead>
+                  <TableHead>Barcode</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -226,6 +236,13 @@ export default function AdminParts() {
                           <Plus className="h-3.5 w-3.5" />
                         </Button>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {p.barcode ? (
+                        <span className="font-mono">{p.barcode}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Unlinked</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

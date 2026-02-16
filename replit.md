@@ -39,7 +39,14 @@ A full-stack e-commerce application for motorcycle and scooter parts and accesso
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Secret for session encryption
 - `SEED_PARTS_ON_STARTUP` - Optional (`true`/`false`), controls startup product seeding (defaults on in dev, off in production)
-- `UPLOADS_DIR` - Optional filesystem path for uploaded images (use a persistent mount in production)
+- `R2_BUCKET` - Cloudflare R2 bucket for uploaded images (recommended in production)
+- `R2_ACCESS_KEY_ID` - Cloudflare R2 access key ID
+- `R2_SECRET_ACCESS_KEY` - Cloudflare R2 secret access key
+- `R2_PUBLIC_BASE_URL` - Public base URL for uploaded image files
+- `R2_ACCOUNT_ID` - Cloudflare account ID (unless `R2_ENDPOINT` is set)
+- `R2_ENDPOINT` - Optional explicit R2 endpoint
+- `R2_KEY_PREFIX` - Optional key prefix/folder in the bucket
+- `UPLOADS_DIR` - Optional local filesystem fallback path when R2 is not configured
 - `PUBLIC_BASE_URL` - Public site URL used in generated feed product links
 
 ## Merchant Feed

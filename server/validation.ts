@@ -53,6 +53,8 @@ export function sanitizeProductInput(input: any) {
     partNumber: input.partNumber != null ? sanitizeString(String(input.partNumber)) : undefined,
     subcategory: input.subcategory != null ? sanitizeString(String(input.subcategory)) : undefined,
     brand: input.brand != null ? sanitizeString(String(input.brand)) : undefined,
+    barcode: input.barcode != null ? sanitizeString(String(input.barcode)) : undefined,
+    barcodeFormat: input.barcodeFormat != null ? sanitizeString(String(input.barcodeFormat)) : undefined,
     vehicle: typeof input.vehicle === "string" ? sanitizeString(input.vehicle) : undefined,
     compatibility: Array.isArray(input.compatibility)
       ? input.compatibility.map((c: any) => sanitizeString(c)).filter(Boolean)

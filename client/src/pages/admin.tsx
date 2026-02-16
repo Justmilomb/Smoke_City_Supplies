@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { FolderTree, ImagePlus, LayoutGrid, Package, Plus } from "lucide-react";
+import { FolderTree, ImagePlus, LayoutGrid, Package, Plus, ScanLine } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
@@ -93,6 +93,13 @@ export default function AdminDashboard() {
             description="Add product photos"
             icon={<ImagePlus className="h-6 w-6" />}
             href="/admin/new"
+          />
+          <AdminTile
+            testId="tile-admin-inventory"
+            title="Barcode Scanner"
+            description="Stock in with phone"
+            icon={<ScanLine className="h-6 w-6" />}
+            href="/admin/inventory"
           />
         </div>
       </div>
