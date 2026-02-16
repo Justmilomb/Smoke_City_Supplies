@@ -66,19 +66,12 @@ npm run start
 - `NODE_ENV` - Set to `production` (auto-set by Render)
 - `ADMIN_PASSWORD` - (Optional) Override default admin password
 - `SEED_PARTS_ON_STARTUP` - Optional. Set to `true` only if you want to auto-seed products on every boot
-- `R2_BUCKET` - Cloudflare R2 bucket name for persistent image uploads
-- `R2_ACCESS_KEY_ID` - Cloudflare R2 access key ID
-- `R2_SECRET_ACCESS_KEY` - Cloudflare R2 secret access key
-- `R2_PUBLIC_BASE_URL` - Public base URL for uploaded files (for example your R2 custom domain or `*.r2.dev`)
-- `R2_ACCOUNT_ID` - Cloudflare account ID (required unless `R2_ENDPOINT` is set)
-- `R2_ENDPOINT` - Optional explicit S3 endpoint for R2 (if omitted, built from `R2_ACCOUNT_ID`)
-- `R2_KEY_PREFIX` - Optional folder/prefix for uploaded image keys in the bucket
-- `UPLOADS_DIR` - Optional local fallback path for uploaded files when R2 is not configured
 - `STRIPE_SECRET_KEY` - Your Stripe secret key (required for payments)
 - `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key (required for payments)
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (required for payment confirmation)
 - `RESEND_API_KEY` - API key for invoice emails (optional locally, recommended production)
 - `INVOICE_FROM_EMAIL` - Sender address for invoices (e.g. billing@yourdomain.com)
+- `INVOICE_REPLY_TO` - Reply address customers use when replying to invoice emails (defaults to `smokecitycycles@gmail.com`)
 - `SHIPPO_API_KEY` - Shippo API token for label generation
 - `SHIP_FROM_NAME` - Sender name for shipping labels
 - `SHIP_FROM_ADDRESS_LINE1` - Sender street for shipping labels
@@ -96,8 +89,7 @@ npm run start
 - The server binds to `0.0.0.0` and uses the `PORT` environment variable (set by Render)
 - If `DATABASE_URL` is not set, the app uses in-memory storage in production. Admin/products/orders will reset on restart/redeploy.
 - Product auto-seeding is disabled by default in production. Use `SEED_PARTS_ON_STARTUP=true` only when you intentionally want to seed.
-- Uploaded images persist across redeploys when R2 vars are configured (recommended).
-- If R2 is not configured, uploads fall back to local disk at `UPLOADS_DIR`; use a persistent mount (for example Render Disk) if you need redeploy-safe local files.
+- Uploaded images/invoices/labels are stored in PostgreSQL and served via `/api/files/:id`.
 
 ## Scripts
 

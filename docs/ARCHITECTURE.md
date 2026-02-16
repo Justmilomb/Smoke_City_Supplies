@@ -17,7 +17,7 @@
 - `server/auth.ts`: Passport strategies and auth wiring.
 - `server/db.ts`: database connection (`pool`), used to decide whether to use Postgres-backed sessions/storage.
 - `server/storage.ts`: data access layer (uses DB when configured; otherwise in-memory).
-- `server/upload.ts`: image upload pipeline (Cloudflare R2 when configured, local filesystem fallback at `/uploads`).
+- `server/upload.ts`: image upload intake + validation (stored in PostgreSQL via `server/storage.ts`).
 - `server/security.ts`: CORS + security headers.
 
 ## Frontend
@@ -73,5 +73,5 @@
 ## Upload Storage
 
 - `POST /api/upload` accepts a single `image` file from authenticated admin users.
-- If R2 env vars are configured, the server writes uploads to Cloudflare R2 and stores a public URL in product records.
-- If R2 is not configured, uploads are written to local `UPLOADS_DIR` and served from `/uploads/*`.
+- Upload binaries are saved in PostgreSQL (`stored_files` table) and returned as `/api/files/:id`.
+- Product/order records reference file IDs and expose file URLs through `/api/files/:id`.

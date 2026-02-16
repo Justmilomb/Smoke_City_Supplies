@@ -4,6 +4,7 @@ import type {
   ApiOrder,
   ApiOrderItem,
   ApiProduct,
+  ApiStoredFile,
   Category,
   CheckoutPrepareInput,
   CreateOrderInput,
@@ -21,6 +22,7 @@ import {
   orderItems,
   orders,
   products,
+  storedFiles,
   users,
 } from "@shared/schema";
 import { desc, eq, inArray } from "drizzle-orm";
@@ -39,6 +41,14 @@ export interface IStorage {
   updateProduct(id: string, patch: Partial<ApiProduct>): Promise<ApiProduct | undefined>;
   deleteProduct(id: string): Promise<boolean>;
   updateProductQuantity(id: string, quantity: number): Promise<ApiProduct | undefined>;
+  createStoredFile(input: {
+    kind: string;
+    filename: string;
+    mimeType: string;
+    content: Buffer;
+    checksum?: string;
+  }): Promise<ApiStoredFile>;
+  getStoredFile(id: string): Promise<ApiStoredFile | undefined>;
 
   findBarcode(code: string): Promise<ApiBarcode | undefined>;
   linkBarcode(code: string, productId: string, format?: string): Promise<ApiBarcode>;
@@ -55,7 +65,7 @@ export interface IStorage {
   markOrderPaymentFailedByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined>;
   recordOrderInvoice(
     orderId: string,
-    data: { invoiceNumber: string; invoiceUrl?: string; invoiceSentAt?: string }
+    data: { invoiceNumber: string; invoiceUrl?: string; invoiceFileId?: string; invoiceSentAt?: string }
   ): Promise<ApiOrder | undefined>;
   recordShippingLabel(
     orderId: string,
@@ -63,6 +73,7 @@ export interface IStorage {
       shippingLabelProvider: string;
       shippingLabelId: string;
       shippingLabelUrl: string;
+      shippingLabelFileId?: string;
       trackingNumber: string;
       labelCreatedAt: string;
     }
@@ -81,6 +92,16 @@ function stockFromQuantity(quantity: number): "in-stock" | "low" | "out" {
   if (quantity <= 0) return "out";
   if (quantity <= 5) return "low";
   return "in-stock";
+}
+
+function parseImageFileId(image: string | undefined): string | undefined {
+  if (!image) return undefined;
+  const match = image.match(/^\/api\/files\/([^/?#]+)/);
+  return match?.[1];
+}
+
+function buildFileUrl(fileId: string): string {
+  return `/api/files/${fileId}`;
 }
 
 function orderToApi(
@@ -106,10 +127,12 @@ function orderToApi(
     paidAt: row.paidAt ?? undefined,
     invoiceNumber: row.invoiceNumber ?? undefined,
     invoiceUrl: row.invoiceUrl ?? undefined,
+    invoiceFileId: row.invoiceFileId ?? undefined,
     invoiceSentAt: row.invoiceSentAt ?? undefined,
     shippingLabelProvider: row.shippingLabelProvider ?? undefined,
     shippingLabelId: row.shippingLabelId ?? undefined,
     shippingLabelUrl: row.shippingLabelUrl ?? undefined,
+    shippingLabelFileId: row.shippingLabelFileId ?? undefined,
     trackingNumber: row.trackingNumber ?? undefined,
     labelCreatedAt: row.labelCreatedAt ?? undefined,
     stockDeductedAt: row.stockDeductedAt ?? undefined,
@@ -120,6 +143,53 @@ export class DbStorage implements IStorage {
   private getDb() {
     if (!db) throw new Error("Database not initialized");
     return db;
+  }
+
+  async createStoredFile(input: {
+    kind: string;
+    filename: string;
+    mimeType: string;
+    content: Buffer;
+    checksum?: string;
+  }): Promise<ApiStoredFile> {
+    const [row] = await this.getDb()
+      .insert(storedFiles)
+      .values({
+        id: randomUUID(),
+        kind: input.kind,
+        filename: input.filename,
+        mimeType: input.mimeType,
+        sizeBytes: input.content.length,
+        content: input.content.toString("base64"),
+        checksum: input.checksum ?? null,
+      })
+      .returning();
+    if (!row) throw new Error("Failed to store file");
+    return {
+      id: row.id,
+      kind: row.kind,
+      filename: row.filename,
+      mimeType: row.mimeType,
+      sizeBytes: row.sizeBytes,
+      content: Buffer.from(row.content, "base64"),
+      checksum: row.checksum ?? undefined,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  async getStoredFile(id: string): Promise<ApiStoredFile | undefined> {
+    const [row] = await this.getDb().select().from(storedFiles).where(eq(storedFiles.id, id)).limit(1);
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      kind: row.kind,
+      filename: row.filename,
+      mimeType: row.mimeType,
+      sizeBytes: row.sizeBytes,
+      content: Buffer.from(row.content, "base64"),
+      checksum: row.checksum ?? undefined,
+      createdAt: row.createdAt.toISOString(),
+    };
   }
 
   private async getBarcodeMapForProducts(productIds: string[]): Promise<Map<string, ApiBarcode>> {
@@ -159,7 +229,8 @@ export class DbStorage implements IStorage {
       deliveryEta: row.deliveryEta,
       compatibility: row.compatibility,
       tags: row.tags,
-      image: row.image,
+      image: row.imageFileId ? buildFileUrl(row.imageFileId) : row.image,
+      imageFileId: row.imageFileId ?? undefined,
       description: row.description,
       specs: row.specs,
       features: row.features ?? undefined,
@@ -233,7 +304,8 @@ export class DbStorage implements IStorage {
         deliveryEta: row.deliveryEta,
         compatibility: row.compatibility,
         tags: row.tags,
-        image: row.image,
+        image: row.imageFileId ? buildFileUrl(row.imageFileId) : row.image,
+        imageFileId: row.imageFileId ?? undefined,
         description: row.description,
         specs: row.specs,
         features: row.features ?? undefined,
@@ -272,6 +344,7 @@ export class DbStorage implements IStorage {
         compatibility: input.compatibility,
         tags: input.tags,
         image: input.image,
+        imageFileId: input.imageFileId ?? parseImageFileId(input.image) ?? null,
         description: input.description,
         specs: input.specs,
         features: input.features ?? null,
@@ -298,6 +371,10 @@ export class DbStorage implements IStorage {
     delete dbPatch.barcodeFormat;
     if (patch.price !== undefined) dbPatch.price = Math.round(patch.price * 100);
     if (patch.rating !== undefined) dbPatch.rating = Math.round(patch.rating * 10);
+    if (patch.imageFileId !== undefined) dbPatch.imageFileId = patch.imageFileId;
+    if (patch.image !== undefined && patch.imageFileId === undefined) {
+      dbPatch.imageFileId = parseImageFileId(patch.image) ?? null;
+    }
 
     const [row] = await this.getDb().update(products).set(dbPatch).where(eq(products.id, id)).returning();
 
@@ -586,13 +663,14 @@ export class DbStorage implements IStorage {
 
   async recordOrderInvoice(
     orderId: string,
-    data: { invoiceNumber: string; invoiceUrl?: string; invoiceSentAt?: string }
+    data: { invoiceNumber: string; invoiceUrl?: string; invoiceFileId?: string; invoiceSentAt?: string }
   ): Promise<ApiOrder | undefined> {
     await this.getDb()
       .update(orders)
       .set({
         invoiceNumber: data.invoiceNumber,
         invoiceUrl: data.invoiceUrl ?? null,
+        invoiceFileId: data.invoiceFileId ?? null,
         invoiceSentAt: data.invoiceSentAt ?? null,
       })
       .where(eq(orders.id, orderId));
@@ -606,6 +684,7 @@ export class DbStorage implements IStorage {
       shippingLabelProvider: string;
       shippingLabelId: string;
       shippingLabelUrl: string;
+      shippingLabelFileId?: string;
       trackingNumber: string;
       labelCreatedAt: string;
     }
@@ -616,6 +695,7 @@ export class DbStorage implements IStorage {
         shippingLabelProvider: data.shippingLabelProvider,
         shippingLabelId: data.shippingLabelId,
         shippingLabelUrl: data.shippingLabelUrl,
+        shippingLabelFileId: data.shippingLabelFileId ?? null,
         trackingNumber: data.trackingNumber,
         labelCreatedAt: data.labelCreatedAt,
       })
@@ -688,6 +768,7 @@ export class MemStorage implements IStorage {
   private products = new Map<string, ApiProduct>();
   private orders = new Map<string, ApiOrder>();
   private categories = new Map<string, Category>();
+  private files = new Map<string, ApiStoredFile>();
   private barcodeMap = new Map<string, ApiBarcode>(); // code -> barcode
   private inventoryTx = new Map<string, ApiInventoryTransaction>();
 
@@ -708,6 +789,32 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  async createStoredFile(input: {
+    kind: string;
+    filename: string;
+    mimeType: string;
+    content: Buffer;
+    checksum?: string;
+  }): Promise<ApiStoredFile> {
+    const id = randomUUID();
+    const file: ApiStoredFile = {
+      id,
+      kind: input.kind,
+      filename: input.filename,
+      mimeType: input.mimeType,
+      sizeBytes: input.content.length,
+      content: input.content,
+      checksum: input.checksum,
+      createdAt: new Date().toISOString(),
+    };
+    this.files.set(id, file);
+    return file;
+  }
+
+  async getStoredFile(id: string): Promise<ApiStoredFile | undefined> {
+    return this.files.get(id);
   }
 
   async listProducts(): Promise<ApiProduct[]> {
@@ -736,7 +843,12 @@ export class MemStorage implements IStorage {
       deliveryEta: input.deliveryEta,
       compatibility: input.compatibility,
       tags: input.tags,
-      image: input.image,
+      image: input.imageFileId
+        ? buildFileUrl(input.imageFileId)
+        : parseImageFileId(input.image)
+          ? buildFileUrl(parseImageFileId(input.image)!)
+          : input.image,
+      imageFileId: input.imageFileId ?? parseImageFileId(input.image),
       description: input.description,
       specs: input.specs,
       features: input.features,
@@ -756,7 +868,21 @@ export class MemStorage implements IStorage {
   async updateProduct(id: string, patch: Partial<ApiProduct>): Promise<ApiProduct | undefined> {
     const existing = this.products.get(id);
     if (!existing) return undefined;
-    const updated: ApiProduct = { ...existing, ...patch };
+    const resolvedImageFileId =
+      patch.imageFileId !== undefined
+        ? patch.imageFileId
+        : patch.image !== undefined
+          ? parseImageFileId(patch.image)
+          : existing.imageFileId;
+    const updated: ApiProduct = {
+      ...existing,
+      ...patch,
+      imageFileId: resolvedImageFileId,
+      image:
+        resolvedImageFileId
+          ? buildFileUrl(resolvedImageFileId)
+          : (patch.image ?? existing.image),
+    };
     this.products.set(id, updated);
     if (patch.barcode) {
       await this.linkBarcode(patch.barcode, id, patch.barcodeFormat);
@@ -991,7 +1117,7 @@ export class MemStorage implements IStorage {
 
   async recordOrderInvoice(
     orderId: string,
-    data: { invoiceNumber: string; invoiceUrl?: string; invoiceSentAt?: string }
+    data: { invoiceNumber: string; invoiceUrl?: string; invoiceFileId?: string; invoiceSentAt?: string }
   ): Promise<ApiOrder | undefined> {
     const order = this.orders.get(orderId);
     if (!order) return undefined;
@@ -999,6 +1125,7 @@ export class MemStorage implements IStorage {
       ...order,
       invoiceNumber: data.invoiceNumber,
       invoiceUrl: data.invoiceUrl,
+      invoiceFileId: data.invoiceFileId,
       invoiceSentAt: data.invoiceSentAt,
     };
     this.orders.set(orderId, updated);
@@ -1011,6 +1138,7 @@ export class MemStorage implements IStorage {
       shippingLabelProvider: string;
       shippingLabelId: string;
       shippingLabelUrl: string;
+      shippingLabelFileId?: string;
       trackingNumber: string;
       labelCreatedAt: string;
     }

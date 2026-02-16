@@ -35,6 +35,7 @@ export type Part = {
   compatibility: string[];
   tags: string[];
   image: string;
+  imageFileId?: string;
   description: string;
   specs: { label: string; value: string }[];
   features?: string[];

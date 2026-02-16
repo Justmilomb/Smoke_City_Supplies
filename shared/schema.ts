@@ -40,6 +40,17 @@ export type Category = typeof categories.$inferSelect;
 export const productSpecSchema = z.object({ label: z.string(), value: z.string() });
 export type ProductSpec = z.infer<typeof productSpecSchema>;
 
+export const storedFiles = pgTable("stored_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  kind: varchar("kind", { length: 40 }).notNull(),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  content: text("content").notNull(),
+  checksum: text("checksum"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const products = pgTable("products", {
   id: varchar("id").primaryKey(),
   name: text("name").notNull(),
@@ -57,6 +68,7 @@ export const products = pgTable("products", {
   compatibility: jsonb("compatibility").$type<string[]>().notNull(),
   tags: jsonb("tags").$type<string[]>().notNull(),
   image: text("image").notNull(),
+  imageFileId: varchar("image_file_id"),
   description: text("description").notNull(),
   specs: jsonb("specs").$type<ProductSpec[]>().notNull(),
   features: jsonb("features").$type<string[]>(),
@@ -102,6 +114,7 @@ export const insertProductSchema = z.object({
   compatibility: z.array(z.string()),
   tags: z.array(z.string()),
   image: z.string(),
+  imageFileId: z.string().optional(),
   description: z.string(),
   specs: z.array(productSpecSchema),
   features: z.array(z.string()).optional(),
@@ -142,10 +155,12 @@ export const orders = pgTable("orders", {
   paidAt: text("paid_at"),
   invoiceNumber: text("invoice_number"),
   invoiceUrl: text("invoice_url"),
+  invoiceFileId: varchar("invoice_file_id"),
   invoiceSentAt: text("invoice_sent_at"),
   shippingLabelProvider: text("shipping_label_provider"),
   shippingLabelId: text("shipping_label_id"),
   shippingLabelUrl: text("shipping_label_url"),
+  shippingLabelFileId: varchar("shipping_label_file_id"),
   trackingNumber: text("tracking_number"),
   labelCreatedAt: text("label_created_at"),
   stockDeductedAt: text("stock_deducted_at"),
@@ -212,6 +227,17 @@ export const fulfillmentScanSchema = z.object({
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type CheckoutPrepareInput = z.infer<typeof checkoutPrepareSchema>;
 
+export type ApiStoredFile = {
+  id: string;
+  kind: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  content: Buffer;
+  checksum?: string;
+  createdAt: string;
+};
+
 export type ApiBarcode = {
   id: string;
   code: string;
@@ -251,6 +277,7 @@ export type ApiProduct = {
   compatibility: string[];
   tags: string[];
   image: string;
+  imageFileId?: string;
   description: string;
   specs: ProductSpec[];
   features?: string[];
@@ -287,10 +314,12 @@ export type ApiOrder = {
   paidAt?: string;
   invoiceNumber?: string;
   invoiceUrl?: string;
+  invoiceFileId?: string;
   invoiceSentAt?: string;
   shippingLabelProvider?: string;
   shippingLabelId?: string;
   shippingLabelUrl?: string;
+  shippingLabelFileId?: string;
   trackingNumber?: string;
   labelCreatedAt?: string;
   stockDeductedAt?: string;

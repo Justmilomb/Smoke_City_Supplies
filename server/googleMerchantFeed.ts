@@ -29,6 +29,7 @@ function absoluteUrl(baseUrl: string, pathOrUrl: string): string {
 function isLikelyImageUrl(value: string): boolean {
   if (!value) return false;
   const lower = value.toLowerCase();
+  if (lower.includes("/api/files/")) return true;
   return [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".avif"].some((ext) =>
     lower.includes(ext)
   );

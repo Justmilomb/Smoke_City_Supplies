@@ -7,6 +7,7 @@ export async function sendInvoiceEmail(input: {
 }): Promise<void> {
   const resendKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.INVOICE_FROM_EMAIL || process.env.SMTP_FROM || "no-reply@smokecitysupplies.com";
+  const replyTo = process.env.INVOICE_REPLY_TO || "smokecitycycles@gmail.com";
 
   if (!resendKey) {
     console.warn("[email] RESEND_API_KEY missing; logging invoice email instead of sending", {
@@ -19,6 +20,7 @@ export async function sendInvoiceEmail(input: {
   const payload: Record<string, unknown> = {
     from: fromEmail,
     to: [input.to],
+    reply_to: replyTo,
     subject: input.subject,
     html: input.html,
   };

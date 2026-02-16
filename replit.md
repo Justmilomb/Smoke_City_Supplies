@@ -39,14 +39,18 @@ A full-stack e-commerce application for motorcycle and scooter parts and accesso
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Secret for session encryption
 - `SEED_PARTS_ON_STARTUP` - Optional (`true`/`false`), controls startup product seeding (defaults on in dev, off in production)
-- `R2_BUCKET` - Cloudflare R2 bucket for uploaded images (recommended in production)
-- `R2_ACCESS_KEY_ID` - Cloudflare R2 access key ID
-- `R2_SECRET_ACCESS_KEY` - Cloudflare R2 secret access key
-- `R2_PUBLIC_BASE_URL` - Public base URL for uploaded image files
-- `R2_ACCOUNT_ID` - Cloudflare account ID (unless `R2_ENDPOINT` is set)
-- `R2_ENDPOINT` - Optional explicit R2 endpoint
-- `R2_KEY_PREFIX` - Optional key prefix/folder in the bucket
-- `UPLOADS_DIR` - Optional local filesystem fallback path when R2 is not configured
+- `STRIPE_SECRET_KEY` - Stripe secret key
+- `STRIPE_PUBLISHABLE_KEY` - Stripe publishable key
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
+- `RESEND_API_KEY` - Resend API key for invoices
+- `INVOICE_FROM_EMAIL` - Invoice sender email
+- `INVOICE_REPLY_TO` - Invoice reply-to email
+- `SHIPPO_API_KEY` - Shippo API key (when enabling labels)
+- `SHIP_FROM_NAME` - Sender name for labels
+- `SHIP_FROM_ADDRESS_LINE1` - Sender address line 1
+- `SHIP_FROM_CITY` - Sender city
+- `SHIP_FROM_POSTCODE` - Sender postcode
+- `SHIP_FROM_COUNTRY` - Sender country code
 - `PUBLIC_BASE_URL` - Public site URL used in generated feed product links
 
 ## Merchant Feed

@@ -16,7 +16,7 @@ import {
   type InsertProduct,
 } from "@shared/schema";
 import { storage } from "./storage";
-import { persistUploadedImage, uploadMiddleware } from "./upload";
+import { prepareUploadedImage, uploadMiddleware } from "./upload";
 import { requireAuth } from "./auth";
 import { seedAdminIfNeeded, seedCategoriesIfNeeded } from "./seedAdmin";
 import { runSeedParts } from "./seedParts";
@@ -79,16 +79,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   async function ensureInvoiceSent(order: ApiOrder): Promise<ApiOrder> {
     const invoiceNumber = order.invoiceNumber || createInvoiceNumber();
+    const pdf = renderInvoicePdfBuffer({ ...order, invoiceNumber });
+    let invoiceFileId = order.invoiceFileId;
+    if (!invoiceFileId) {
+      const savedFile = await storage.createStoredFile({
+        kind: "invoice_pdf",
+        filename: `${invoiceNumber}.pdf`,
+        mimeType: "application/pdf",
+        content: pdf,
+      });
+      invoiceFileId = savedFile.id;
+    }
     const withInvoice =
       order.invoiceNumber === invoiceNumber
         ? order
         : ((await storage.recordOrderInvoice(order.id, {
             invoiceNumber,
-            invoiceUrl: `/api/admin/orders/${order.id}/invoice.pdf`,
+            invoiceUrl: `/api/files/${invoiceFileId}`,
+            invoiceFileId,
           })) ?? order);
 
     const html = renderInvoiceHtml({ ...withInvoice, invoiceNumber });
-    const pdf = renderInvoicePdfBuffer({ ...withInvoice, invoiceNumber });
 
     if (withInvoice.customerEmail) {
       await sendInvoiceEmail({
@@ -102,7 +113,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
     const updated = await storage.recordOrderInvoice(withInvoice.id, {
       invoiceNumber,
-      invoiceUrl: `/api/admin/orders/${withInvoice.id}/invoice.pdf`,
+      invoiceUrl: `/api/files/${invoiceFileId}`,
+      invoiceFileId,
       invoiceSentAt: new Date().toISOString(),
     });
 
@@ -230,8 +242,23 @@ ${urls
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided" });
     }
-    const url = await persistUploadedImage(req.file);
-    return res.status(201).json({ url });
+    const prepared = prepareUploadedImage(req.file);
+    const stored = await storage.createStoredFile({
+      kind: "product_image",
+      filename: prepared.filename,
+      mimeType: prepared.mimeType,
+      content: prepared.content,
+    });
+    return res.status(201).json({ url: `/api/files/${stored.id}`, fileId: stored.id });
+  });
+
+  app.get("/api/files/:id", async (req, res) => {
+    const file = await storage.getStoredFile(paramId(req));
+    if (!file) return res.status(404).json({ message: "File not found" });
+    res.setHeader("Content-Type", file.mimeType);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.setHeader("Content-Disposition", `inline; filename="${file.filename}"`);
+    return res.send(file.content);
   });
 
   // IndexNow helper
@@ -620,15 +647,29 @@ Rules:
     const order = await storage.getOrder(paramId(req));
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    const invoiceNumber = order.invoiceNumber || createInvoiceNumber();
-    if (!order.invoiceNumber) {
-      await storage.recordOrderInvoice(order.id, {
-        invoiceNumber,
-        invoiceUrl: `/api/admin/orders/${order.id}/invoice.pdf`,
-      });
+    if (order.invoiceFileId) {
+      const existing = await storage.getStoredFile(order.invoiceFileId);
+      if (existing) {
+        res.setHeader("Content-Type", existing.mimeType);
+        res.setHeader("Content-Disposition", `inline; filename="${existing.filename}"`);
+        return res.send(existing.content);
+      }
     }
 
+    const invoiceNumber = order.invoiceNumber || createInvoiceNumber();
     const pdf = renderInvoicePdfBuffer({ ...order, invoiceNumber });
+    const savedFile = await storage.createStoredFile({
+      kind: "invoice_pdf",
+      filename: `${invoiceNumber}.pdf`,
+      mimeType: "application/pdf",
+      content: pdf,
+    });
+    await storage.recordOrderInvoice(order.id, {
+      invoiceNumber,
+      invoiceUrl: `/api/files/${savedFile.id}`,
+      invoiceFileId: savedFile.id,
+    });
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename=\"${invoiceNumber}.pdf\"`);
     return res.send(pdf);
@@ -672,10 +713,31 @@ Rules:
       country: order.country || "GB",
     });
 
+    let shippingLabelUrl = label.labelUrl;
+    let shippingLabelFileId: string | undefined;
+    try {
+      const fetched = await fetch(label.labelUrl);
+      if (fetched.ok) {
+        const mimeType = fetched.headers.get("content-type") || "application/pdf";
+        const buffer = Buffer.from(await fetched.arrayBuffer());
+        const stored = await storage.createStoredFile({
+          kind: "shipping_label_pdf",
+          filename: `${label.labelId}.pdf`,
+          mimeType,
+          content: buffer,
+        });
+        shippingLabelFileId = stored.id;
+        shippingLabelUrl = `/api/files/${stored.id}`;
+      }
+    } catch (err) {
+      console.warn("[shippo] could not mirror label file to database:", err);
+    }
+
     const updated = await storage.recordShippingLabel(order.id, {
       shippingLabelProvider: label.provider,
       shippingLabelId: label.labelId,
-      shippingLabelUrl: label.labelUrl,
+      shippingLabelUrl,
+      shippingLabelFileId,
       trackingNumber: label.trackingNumber,
       labelCreatedAt: new Date().toISOString(),
     });
@@ -683,7 +745,7 @@ Rules:
     return res.json({
       ok: true,
       order: updated,
-      shippingLabelUrl: label.labelUrl,
+      shippingLabelUrl,
       trackingNumber: label.trackingNumber,
       shippingAddress: orderToAddressText(order),
     });
