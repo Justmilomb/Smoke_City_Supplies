@@ -134,7 +134,7 @@ function toProductInput(product: ApiProduct, config: MerchantConfig): Record<str
     offerId: product.id,
     contentLanguage: config.contentLanguage,
     feedLabel: config.feedLabel,
-    attributes: productAttributes,
+    productAttributes,
   };
 }
 
