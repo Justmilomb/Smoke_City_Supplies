@@ -30,10 +30,10 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
 
   res.setHeader("Content-Security-Policy", csp);
 
-  // Permissions Policy - allow payment for Stripe
+  // Permissions Policy - allow camera for admin barcode scanning and payment for Stripe
   res.setHeader(
     "Permissions-Policy",
-    "geolocation=(), microphone=(), camera=()"
+    "geolocation=(), microphone=(), camera=(self)"
   );
   
   next();

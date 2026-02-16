@@ -44,6 +44,7 @@ import {
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
 import { sendInvoiceEmail } from "./email";
 import { createShippoLabel } from "./shippo";
+import { z } from "zod";
 
 function escapeXml(s: string): string {
   return s
@@ -236,6 +237,56 @@ ${urls
     const { name, email, subject, message } = parsed.data;
     console.log("[contact]", { name, email, subject: subject ?? "(no subject)", message });
     return res.status(201).json({ ok: true, message: "Thanks for reaching out. We'll get back to you soon." });
+  });
+
+  app.post("/api/admin/test/resend", requireAuth, apiRateLimiter, async (req, res) => {
+    const schema = z.object({
+      to: z.string().email().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid email", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const to = parsed.data.to || "support@smokecitysupplies.com";
+    await sendInvoiceEmail({
+      to,
+      subject: "Smoke City Supplies - Resend Test",
+      html: `<p>This is a test invoice email from Smoke City Supplies.</p><p>Sent at ${new Date().toISOString()}</p>`,
+    });
+
+    return res.json({ ok: true, to, message: "Resend test email sent" });
+  });
+
+  app.post("/api/admin/test/shippo", requireAuth, apiRateLimiter, async (req, res) => {
+    const schema = z.object({
+      name: z.string().min(1).optional(),
+      email: z.string().email().optional(),
+      addressLine1: z.string().min(1).optional(),
+      addressLine2: z.string().optional(),
+      city: z.string().min(1).optional(),
+      county: z.string().optional(),
+      postcode: z.string().min(1).optional(),
+      country: z.string().default("GB").optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid Shippo test payload", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const testInput = {
+      name: parsed.data.name || "Smoke City Supplies Test Recipient",
+      email: parsed.data.email || process.env.INVOICE_FROM_EMAIL || "support@smokecitysupplies.com",
+      addressLine1: parsed.data.addressLine1 || process.env.SHIP_FROM_ADDRESS_LINE1 || "1 Test Street",
+      addressLine2: parsed.data.addressLine2 || "",
+      city: parsed.data.city || process.env.SHIP_FROM_CITY || "Manchester",
+      county: parsed.data.county || "",
+      postcode: parsed.data.postcode || process.env.SHIP_FROM_POSTCODE || "M1 1AA",
+      country: parsed.data.country || process.env.SHIP_FROM_COUNTRY || "GB",
+    };
+
+    const label = await createShippoLabel(testInput);
+    return res.json({ ok: true, label });
   });
 
   app.post("/api/upload", requireAuth, apiRateLimiter, uploadMiddleware.single("image"), async (req, res) => {

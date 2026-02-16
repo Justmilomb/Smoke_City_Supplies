@@ -5,6 +5,7 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 function AdminTile({
   title,
@@ -40,6 +41,44 @@ function AdminTile({
 
 export default function AdminDashboard() {
   usePageMeta({ title: "Admin", description: "Store management dashboard.", noindex: true });
+
+  const testResend = async () => {
+    try {
+      const res = await fetch("/api/admin/test/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ to: "support@smokecitysupplies.com" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Resend test failed");
+      }
+      toast.success("Resend test email sent");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Resend test failed");
+    }
+  };
+
+  const testShippo = async () => {
+    try {
+      const res = await fetch("/api/admin/test/shippo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Shippo test failed");
+      }
+      const data = await res.json();
+      toast.success(`Shippo test label created${data?.label?.trackingNumber ? ` (${data.label.trackingNumber})` : ""}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Shippo test failed");
+    }
+  };
+
   return (
     <SiteLayout>
       <div className="flex flex-col gap-8">
@@ -63,6 +102,15 @@ export default function AdminDashboard() {
               </a>
             </Button>
           </Link>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={testResend}>
+            Test Resend
+          </Button>
+          <Button variant="outline" onClick={testShippo}>
+            Test Shippo
+          </Button>
         </div>
 
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">

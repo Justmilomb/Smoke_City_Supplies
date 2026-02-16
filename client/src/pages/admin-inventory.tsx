@@ -128,16 +128,26 @@ export default function AdminInventory() {
   };
 
   const startCameraScan = async () => {
-    const Detector = (window as any).BarcodeDetector;
-    if (!Detector) {
-      toast.error("Phone camera barcode scan is not available in this browser. Use manual entry.");
+    if (!window.isSecureContext) {
+      toast.error("Camera scanning requires HTTPS (or localhost). Open the site over a secure connection.");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error("This browser does not support camera access. Try Chrome on your phone.");
       return;
     }
 
+    const Detector = (window as any).BarcodeDetector;
+    if (!Detector) {
+      toast.error("Barcode scanning is not supported in this browser. Try Chrome on Android or use manual entry.");
+      return;
+    }
+
+    let stream: MediaStream | null = null;
     try {
       const supported = await Detector.getSupportedFormats?.();
       const detector = new Detector({ formats: supported || ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"] });
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
       setScanning(true);
 
       const video = document.createElement("video");
@@ -145,8 +155,16 @@ export default function AdminInventory() {
       await video.play();
 
       let active = true;
+      const startedAt = Date.now();
       const tryScan = async () => {
         if (!active) return;
+        if (Date.now() - startedAt > 20000) {
+          active = false;
+          stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+          setScanning(false);
+          toast.error("No barcode detected. Try better lighting or manual barcode entry.");
+          return;
+        }
         const codes = await detector.detect(video);
         if (codes.length > 0) {
           const c = codes[0];
@@ -155,7 +173,7 @@ export default function AdminInventory() {
             setScanValue(raw);
             setScanFormat(String((c as any).format || "unknown"));
             await resolveBarcode(raw);
-            stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+            stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
             active = false;
             setScanning(false);
             return;
@@ -166,8 +184,18 @@ export default function AdminInventory() {
 
       requestAnimationFrame(tryScan);
     } catch (err) {
+      stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       setScanning(false);
-      toast.error(err instanceof Error ? err.message : "Camera scan failed");
+      const message = err instanceof Error ? err.message : "Camera scan failed";
+      if (message.toLowerCase().includes("denied") || message.toLowerCase().includes("notallowed")) {
+        toast.error("Camera permission denied. Allow camera access for this site and try again.");
+        return;
+      }
+      if (message.toLowerCase().includes("notfound")) {
+        toast.error("No camera found on this device.");
+        return;
+      }
+      toast.error(message);
     }
   };
 
