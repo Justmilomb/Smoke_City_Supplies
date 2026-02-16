@@ -10,6 +10,7 @@
 
 - `server/index.ts`: server bootstrap, sessions, security middleware, and dev/prod wiring.
 - `server/routes.ts`: API route registration (main router/controller surface).
+- `server/googleMerchant.ts`: Google Merchant API sync (service-account auth, product upload, and 15-minute scheduler).
 - `server/auth.ts`: Passport strategies and auth wiring.
 - `server/db.ts`: database connection (`pool`), used to decide whether to use Postgres-backed sessions/storage.
 - `server/storage.ts`: data access layer (uses DB when configured; otherwise in-memory).
@@ -40,3 +41,8 @@
   - sessions use an in-memory store (`memorystore`)
   - data is in-memory and resets when the process restarts
 
+## Background Jobs
+
+- Google Merchant sync scheduler is started during route registration.
+- Default interval is every 15 minutes (`GOOGLE_MERCHANT_SYNC_INTERVAL_MINUTES`).
+- Scheduler only runs when `GOOGLE_MERCHANT_SYNC_ENABLED=true` and required Merchant env vars are present.

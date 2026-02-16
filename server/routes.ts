@@ -29,6 +29,11 @@ import {
 } from "./rateLimit";
 import { stripe, STRIPE_PUBLISHABLE_KEY } from "./stripe";
 import OpenAI from "openai";
+import {
+  getGoogleMerchantStatus,
+  runGoogleMerchantSync,
+  startGoogleMerchantSyncScheduler,
+} from "./googleMerchant";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -41,6 +46,8 @@ export async function registerRoutes(
   if (shouldSeedPartsOnStartup) {
     await runSeedParts();
   }
+
+  startGoogleMerchantSyncScheduler();
 
   // Health check (for Render monitoring)
   app.get("/health", (_req, res) => {
@@ -132,6 +139,16 @@ ${urls.map((u) => `  <url>
         return res.json({ ok: true });
       });
     });
+  });
+
+  // Google Merchant API integration (admin only)
+  app.get("/api/integrations/google-merchant/status", requireAuth, (_req, res) => {
+    return res.json(getGoogleMerchantStatus());
+  });
+
+  app.post("/api/integrations/google-merchant/sync", requireAuth, apiRateLimiter, async (_req, res) => {
+    const result = await runGoogleMerchantSync("manual");
+    return res.status(result.ok ? 200 : 500).json(result);
   });
 
   // Contact form (public) - with rate limiting and validation

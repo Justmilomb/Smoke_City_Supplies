@@ -67,6 +67,16 @@ npm run start
 - `STRIPE_SECRET_KEY` - Your Stripe secret key (required for payments)
 - `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key (required for payments)
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (for payment confirmations)
+- `PUBLIC_BASE_URL` - Public site base URL (for SEO/canonical URLs and Merchant product links)
+- `GOOGLE_MERCHANT_SYNC_ENABLED` - Set `true` to enable Merchant API sync scheduler
+- `GOOGLE_MERCHANT_SYNC_INTERVAL_MINUTES` - Sync interval; default is `15`
+- `GOOGLE_MERCHANT_ACCOUNT_ID` - Merchant Center account ID
+- `GOOGLE_MERCHANT_DATASOURCE_NAME` - Full resource name, e.g. `accounts/123456789/dataSources/987654321`
+- `GOOGLE_MERCHANT_CONTENT_LANGUAGE` - Feed language, default `en`
+- `GOOGLE_MERCHANT_FEED_LABEL` - Feed label/target market, default `GB`
+- `GOOGLE_MERCHANT_CURRENCY_CODE` - Feed currency, default `GBP`
+- `GOOGLE_MERCHANT_SERVICE_ACCOUNT_EMAIL` - Google service account email with Merchant Center access
+- `GOOGLE_MERCHANT_SERVICE_ACCOUNT_PRIVATE_KEY` - Service account private key (single env var, keep `\n` escapes)
 
 **PostgreSQL Database:**
 - Create a PostgreSQL database in Render
@@ -86,3 +96,18 @@ npm run start
 - `npm run build` — build client and server
 - `npm run start` — production server
 - `npm run db:push` — push schema to database (skips if DATABASE_URL not set)
+
+## Google Merchant API (15-minute sync)
+
+1. In Merchant Center, go to **Products > Data sources > Add products using API**.
+2. Set a clear data source name, for example: `Smoke City Supplies API`.
+3. Save the data source, then copy its full resource name into `GOOGLE_MERCHANT_DATASOURCE_NAME`:
+   - format: `accounts/<merchant-account-id>/dataSources/<data-source-id>`
+4. Configure the Google Merchant env vars listed above.
+5. Enable scheduler:
+   - `GOOGLE_MERCHANT_SYNC_ENABLED=true`
+   - `GOOGLE_MERCHANT_SYNC_INTERVAL_MINUTES=15`
+
+Admin endpoints:
+- `GET /api/integrations/google-merchant/status` - config/scheduler/sync status
+- `POST /api/integrations/google-merchant/sync` - run an immediate manual sync
