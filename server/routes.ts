@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { type Server } from "http";
 import {
   createOrderSchema,
@@ -29,11 +29,6 @@ import {
 } from "./rateLimit";
 import { stripe, STRIPE_PUBLISHABLE_KEY } from "./stripe";
 import OpenAI from "openai";
-import {
-  getGoogleMerchantStatus,
-  runGoogleMerchantSync,
-  startGoogleMerchantSyncScheduler,
-} from "./googleMerchant";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -47,8 +42,6 @@ export async function registerRoutes(
     await runSeedParts();
   }
 
-  startGoogleMerchantSyncScheduler();
-
   // Health check (for Render monitoring)
   app.get("/health", (_req, res) => {
     return res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -56,6 +49,17 @@ export async function registerRoutes(
 
   function escapeXml(s: string): string {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  }
+
+  function absoluteUrl(base: string, pathOrUrl: string): string {
+    if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) return pathOrUrl;
+    const path = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+    return `${base}${path}`;
+  }
+
+  function merchantAvailability(product: ApiProduct): "in stock" | "out of stock" {
+    if (product.quantity <= 0 || product.stock === "out") return "out of stock";
+    return "in stock";
   }
 
   // Dynamic robots.txt (overrides static file — uses correct absolute sitemap URL)
@@ -112,6 +116,50 @@ ${urls.map((u) => `  <url>
     res.type("application/xml").send(xml);
   });
 
+  // Google Merchant feed file (XML). Merchant Center can fetch this URL on a schedule.
+  async function sendGoogleMerchantFeed(req: Request, res: Response) {
+    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const products = await storage.listProducts();
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
+  <channel>
+    <title>Smoke City Supplies Product Feed</title>
+    <link>${escapeXml(base)}</link>
+    <description>Auto-generated product feed for Google Merchant Center.</description>
+${products.map((p) => {
+  const title = p.metaTitle?.trim() || p.name;
+  const description = p.metaDescription?.trim() || p.description;
+  const imageLink = absoluteUrl(base, p.image);
+  const link = `${base}/product/${p.id}`;
+  const brand = p.brand?.trim() || "Smoke City Supplies";
+  const productType = [p.category, p.subcategory].filter(Boolean).join(" > ");
+  const keywords = p.metaKeywords?.trim() || p.tags.join(", ");
+  return `    <item>
+      <g:id>${escapeXml(p.id)}</g:id>
+      <g:title>${escapeXml(title)}</g:title>
+      <g:description>${escapeXml(description)}</g:description>
+      <g:link>${escapeXml(link)}</g:link>
+      <g:image_link>${escapeXml(imageLink)}</g:image_link>
+      <g:availability>${merchantAvailability(p)}</g:availability>
+      <g:condition>new</g:condition>
+      <g:price>${p.price.toFixed(2)} GBP</g:price>
+      <g:brand>${escapeXml(brand)}</g:brand>
+      <g:mpn>${escapeXml(p.partNumber?.trim() || p.id)}</g:mpn>
+      <g:product_type>${escapeXml(productType || p.category)}</g:product_type>
+      <g:custom_label_0>${escapeXml(p.vehicle)}</g:custom_label_0>
+      <g:custom_label_1>${escapeXml(keywords)}</g:custom_label_1>
+    </item>`;
+}).join("\n")}
+  </channel>
+</rss>`;
+    res.set("Cache-Control", "no-store");
+    res.type("application/xml; charset=utf-8").send(xml);
+  }
+
+  app.get("/feeds/google-merchant.xml", sendGoogleMerchantFeed);
+  app.get("/feeds/google-merchant", sendGoogleMerchantFeed);
+  app.get("/google-merchant.xml", sendGoogleMerchantFeed);
+
   // Auth (public)
   app.get("/api/auth/me", (req, res) => {
     if (req.isAuthenticated?.() && req.user) {
@@ -139,16 +187,6 @@ ${urls.map((u) => `  <url>
         return res.json({ ok: true });
       });
     });
-  });
-
-  // Google Merchant API integration (admin only)
-  app.get("/api/integrations/google-merchant/status", requireAuth, (_req, res) => {
-    return res.json(getGoogleMerchantStatus());
-  });
-
-  app.post("/api/integrations/google-merchant/sync", requireAuth, apiRateLimiter, async (_req, res) => {
-    const result = await runGoogleMerchantSync("manual");
-    return res.status(result.ok ? 200 : 500).json(result);
   });
 
   // Contact form (public) - with rate limiting and validation

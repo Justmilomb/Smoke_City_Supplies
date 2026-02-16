@@ -40,13 +40,7 @@ A full-stack e-commerce application for motorcycle and scooter parts and accesso
 - `SESSION_SECRET` - Secret for session encryption
 - `SEED_PARTS_ON_STARTUP` - Optional (`true`/`false`), controls startup product seeding (defaults on in dev, off in production)
 - `UPLOADS_DIR` - Optional filesystem path for uploaded images (use a persistent mount in production)
-- `PUBLIC_BASE_URL` - Public base URL (used for canonical/product links)
-- `GOOGLE_MERCHANT_SYNC_ENABLED` - Optional (`true`/`false`), enables Merchant API scheduler
-- `GOOGLE_MERCHANT_SYNC_INTERVAL_MINUTES` - Optional, defaults to `15`
-- `GOOGLE_MERCHANT_ACCOUNT_ID` - Merchant Center account id
-- `GOOGLE_MERCHANT_DATASOURCE_NAME` - Merchant data source resource name (`accounts/<id>/dataSources/<id>`)
-- `GOOGLE_MERCHANT_CONTENT_LANGUAGE` - Optional, defaults to `en`
-- `GOOGLE_MERCHANT_FEED_LABEL` - Optional, defaults to `GB`
-- `GOOGLE_MERCHANT_CURRENCY_CODE` - Optional, defaults to `GBP`
-- `GOOGLE_MERCHANT_SERVICE_ACCOUNT_EMAIL` - Service account email for Google auth
-- `GOOGLE_MERCHANT_SERVICE_ACCOUNT_PRIVATE_KEY` - Service account private key
+
+## Merchant Feed
+- Public file feed URL: `/feeds/google-merchant.xml`
+- Merchant Center can fetch this link on schedule (recommended: daily at 00:00).
