@@ -75,6 +75,10 @@ export const products = pgTable("products", {
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
   metaKeywords: text("meta_keywords"),
+  shippingWeightGrams: integer("shipping_weight_grams"),
+  shippingLengthCm: integer("shipping_length_cm"),
+  shippingWidthCm: integer("shipping_width_cm"),
+  shippingHeightCm: integer("shipping_height_cm"),
 });
 
 export const barcodes = pgTable("barcodes", {
@@ -121,6 +125,10 @@ export const insertProductSchema = z.object({
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
   metaKeywords: z.string().optional(),
+  shippingWeightGrams: z.number().int().min(1).optional(),
+  shippingLengthCm: z.number().int().min(1).optional(),
+  shippingWidthCm: z.number().int().min(1).optional(),
+  shippingHeightCm: z.number().int().min(1).optional(),
   barcode: z.string().optional(),
   barcodeFormat: z.string().optional(),
 });
@@ -164,6 +172,18 @@ export const orders = pgTable("orders", {
   trackingNumber: text("tracking_number"),
   labelCreatedAt: text("label_created_at"),
   stockDeductedAt: text("stock_deducted_at"),
+  subtotalPence: integer("subtotal_pence"),
+  shippingAmountPence: integer("shipping_amount_pence"),
+  shippingRateId: text("shipping_rate_id"),
+  shippingProvider: text("shipping_provider"),
+  shippingServiceLevel: text("shipping_service_level"),
+  shippingEstimatedDays: integer("shipping_estimated_days"),
+  dispatchCutoffLocal: text("dispatch_cutoff_local"),
+  dispatchAdvice: text("dispatch_advice"),
+  expectedShipDate: text("expected_ship_date"),
+  customerOrderEmailSentAt: text("customer_order_email_sent_at"),
+  customerShippedEmailSentAt: text("customer_shipped_email_sent_at"),
+  adminAlertEmailSentAt: text("admin_alert_email_sent_at"),
 });
 
 export const createOrderSchema = z.object({
@@ -183,6 +203,15 @@ export const createOrderSchema = z.object({
   country: z.string().optional(),
   stripePaymentIntentId: z.string().optional(),
   paymentStatus: z.enum(["awaiting_payment", "paid", "failed", "refunded"]).optional(),
+  subtotalPence: z.number().int().min(0).optional(),
+  shippingAmountPence: z.number().int().min(0).optional(),
+  shippingRateId: z.string().optional(),
+  shippingProvider: z.string().optional(),
+  shippingServiceLevel: z.string().optional(),
+  shippingEstimatedDays: z.number().int().min(1).max(30).optional(),
+  dispatchCutoffLocal: z.string().optional(),
+  dispatchAdvice: z.string().optional(),
+  expectedShipDate: z.string().optional(),
 });
 
 export const checkoutPrepareSchema = z.object({
@@ -194,6 +223,28 @@ export const checkoutPrepareSchema = z.object({
   })).min(1),
   customerEmail: z.string().email(),
   customerName: z.string().min(1),
+  addressLine1: z.string().min(1),
+  addressLine2: z.string().optional(),
+  city: z.string().min(1),
+  county: z.string().optional(),
+  postcode: z.string().min(1),
+  country: z.string().default("GB"),
+  shippingRateId: z.string().min(1),
+  shippingAmountPence: z.number().int().min(0),
+  shippingProvider: z.string().min(1),
+  shippingServiceLevel: z.string().min(1),
+  shippingEstimatedDays: z.number().int().min(1).max(30).optional(),
+});
+
+export const shippingRatesQuoteSchema = z.object({
+  items: z.array(z.object({
+    productId: z.string(),
+    productName: z.string(),
+    quantity: z.number().int().min(1),
+    priceEach: z.number().positive(),
+  })).min(1),
+  customerName: z.string().min(1),
+  customerEmail: z.string().email().optional(),
   addressLine1: z.string().min(1),
   addressLine2: z.string().optional(),
   city: z.string().min(1),
@@ -226,6 +277,7 @@ export const fulfillmentScanSchema = z.object({
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type CheckoutPrepareInput = z.infer<typeof checkoutPrepareSchema>;
+export type ShippingRatesQuoteInput = z.infer<typeof shippingRatesQuoteSchema>;
 
 export type ApiStoredFile = {
   id: string;
@@ -284,6 +336,10 @@ export type ApiProduct = {
   metaTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
+  shippingWeightGrams?: number;
+  shippingLengthCm?: number;
+  shippingWidthCm?: number;
+  shippingHeightCm?: number;
   barcode?: string;
   barcodeFormat?: string;
 };
@@ -323,4 +379,16 @@ export type ApiOrder = {
   trackingNumber?: string;
   labelCreatedAt?: string;
   stockDeductedAt?: string;
+  subtotalPence?: number;
+  shippingAmountPence?: number;
+  shippingRateId?: string;
+  shippingProvider?: string;
+  shippingServiceLevel?: string;
+  shippingEstimatedDays?: number;
+  dispatchCutoffLocal?: string;
+  dispatchAdvice?: string;
+  expectedShipDate?: string;
+  customerOrderEmailSentAt?: string;
+  customerShippedEmailSentAt?: string;
+  adminAlertEmailSentAt?: string;
 };

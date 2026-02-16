@@ -8,6 +8,7 @@ import {
   fulfillmentScanSchema,
   insertCategorySchema,
   insertProductSchema,
+  shippingRatesQuoteSchema,
   stockInSchema,
   type ApiOrder,
   type ApiProduct,
@@ -42,8 +43,9 @@ import {
   writeGoogleMerchantFeedFile,
 } from "./googleMerchantFeed";
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
-import { sendInvoiceEmail } from "./email";
-import { createShippoLabel } from "./shippo";
+import { sendAdminOrderAlertEmail, sendInvoiceEmail, sendOrderConfirmationEmail, sendOrderShippedEmail } from "./email";
+import { createShippoLabel, quoteShippoRates } from "./shippo";
+import { buildPackingSlipHtml, buildParcelsForItems, dispatchAdviceNow, fallbackShippingRates } from "./shippingLogic";
 import { z } from "zod";
 
 function escapeXml(s: string): string {
@@ -64,6 +66,11 @@ function orderToAddressText(order: ApiOrder): string {
   return [order.addressLine1, order.addressLine2, order.city, order.county, order.postcode, order.country]
     .filter(Boolean)
     .join(", ");
+}
+
+async function getProductMap(): Promise<Map<string, ApiProduct>> {
+  const products = await storage.listProducts();
+  return new Map(products.map((p) => [p.id, p]));
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
@@ -553,6 +560,46 @@ Rules:
     return res.json({ publishableKey: STRIPE_PUBLISHABLE_KEY });
   });
 
+  app.post("/api/shipping/rates", orderRateLimiter, async (req, res) => {
+    const parsed = shippingRatesQuoteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid shipping quote payload", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const productMap = await getProductMap();
+    const parcels = buildParcelsForItems(productMap, parsed.data.items);
+    const dispatchInfo = dispatchAdviceNow();
+
+    let rates = fallbackShippingRates();
+    if (process.env.SHIPPO_API_KEY) {
+      try {
+        rates = await quoteShippoRates({
+          name: parsed.data.customerName,
+          email: parsed.data.customerEmail,
+          addressLine1: parsed.data.addressLine1,
+          addressLine2: parsed.data.addressLine2,
+          city: parsed.data.city,
+          county: parsed.data.county,
+          postcode: parsed.data.postcode,
+          country: parsed.data.country || "GB",
+          parcels,
+        });
+      } catch (err) {
+        console.warn("[shippo] quote failed, using fallback rates:", err);
+      }
+    }
+
+    return res.json({
+      rates: rates.map((rate) => ({
+        ...rate,
+        nextDayEligibleNow: Boolean(rate.estimatedDays === 1 && dispatchInfo.dispatchAdvice.includes("before 6:00 PM")),
+      })),
+      dispatchAdvice: dispatchInfo.dispatchAdvice,
+      dispatchCutoffLocal: dispatchInfo.cutoffLocal,
+      expectedShipDate: dispatchInfo.expectedShipDate,
+    });
+  });
+
   // New checkout flow: create order + payment intent together.
   app.post("/api/checkout/prepare", orderRateLimiter, async (req, res) => {
     const parsed = checkoutPrepareSchema.safeParse(req.body);
@@ -560,9 +607,41 @@ Rules:
       return res.status(400).json({ message: "Invalid checkout payload", errors: parsed.error.flatten().fieldErrors });
     }
 
-    const amountPence = Math.round(
+    const subtotalPence = Math.round(
       parsed.data.items.reduce((sum, item) => sum + item.priceEach * item.quantity * 100, 0)
     );
+    const productMap = await getProductMap();
+    const parcels = buildParcelsForItems(productMap, parsed.data.items);
+    const dispatchInfo = dispatchAdviceNow();
+
+    let selectedShippingAmountPence = parsed.data.shippingAmountPence;
+    let selectedShippingProvider = parsed.data.shippingProvider;
+    let selectedShippingServiceLevel = parsed.data.shippingServiceLevel;
+    let selectedShippingEstimatedDays = parsed.data.shippingEstimatedDays;
+
+    if (process.env.SHIPPO_API_KEY) {
+      const liveRates = await quoteShippoRates({
+        name: parsed.data.customerName,
+        email: parsed.data.customerEmail,
+        addressLine1: parsed.data.addressLine1,
+        addressLine2: parsed.data.addressLine2,
+        city: parsed.data.city,
+        county: parsed.data.county,
+        postcode: parsed.data.postcode,
+        country: parsed.data.country || "GB",
+        parcels,
+      });
+      const selectedRate = liveRates.find((rate) => rate.rateId === parsed.data.shippingRateId);
+      if (!selectedRate) {
+        return res.status(400).json({ message: "Selected shipping rate is no longer available. Please refresh shipping options." });
+      }
+      selectedShippingAmountPence = selectedRate.amountPence;
+      selectedShippingProvider = selectedRate.provider;
+      selectedShippingServiceLevel = selectedRate.serviceName;
+      selectedShippingEstimatedDays = selectedRate.estimatedDays;
+    }
+
+    const amountPence = subtotalPence + selectedShippingAmountPence;
 
     if (amountPence <= 0) {
       return res.status(400).json({ message: "Invalid order amount" });
@@ -578,12 +657,26 @@ Rules:
       },
     });
 
-    const order = await storage.prepareCheckoutOrder(parsed.data, paymentIntent.id);
+    const order = await storage.createOrder({
+      ...parsed.data,
+      stripePaymentIntentId: paymentIntent.id,
+      paymentStatus: "awaiting_payment",
+      subtotalPence,
+      shippingAmountPence: selectedShippingAmountPence,
+      shippingProvider: selectedShippingProvider,
+      shippingServiceLevel: selectedShippingServiceLevel,
+      shippingEstimatedDays: selectedShippingEstimatedDays,
+      dispatchAdvice: dispatchInfo.dispatchAdvice,
+      dispatchCutoffLocal: dispatchInfo.cutoffLocal,
+      expectedShipDate: dispatchInfo.expectedShipDate,
+    });
 
     await stripe.paymentIntents.update(paymentIntent.id, {
       metadata: {
         ...paymentIntent.metadata,
         orderId: order.id,
+        shippingRateId: parsed.data.shippingRateId,
+        shippingServiceLevel: selectedShippingServiceLevel,
       },
     });
 
@@ -591,6 +684,13 @@ Rules:
       orderId: order.id,
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
+      amountPence,
+      subtotalPence,
+      shippingAmountPence: selectedShippingAmountPence,
+      shippingServiceLevel: selectedShippingServiceLevel,
+      dispatchAdvice: dispatchInfo.dispatchAdvice,
+      dispatchCutoffLocal: dispatchInfo.cutoffLocal,
+      expectedShipDate: dispatchInfo.expectedShipDate,
     });
   });
 
@@ -639,9 +739,32 @@ Rules:
         const order = await storage.markOrderPaidByPaymentIntent(paymentIntent.id);
         if (order) {
           try {
-            await ensureInvoiceSent(order);
+            const withInvoice = await ensureInvoiceSent(order);
+            if (withInvoice.customerEmail && !withInvoice.customerOrderEmailSentAt) {
+              await sendOrderConfirmationEmail({
+                to: withInvoice.customerEmail,
+                orderId: withInvoice.id,
+                totalPence: withInvoice.totalPence,
+                shippingServiceLevel: withInvoice.shippingServiceLevel,
+                dispatchAdvice: withInvoice.dispatchAdvice,
+              });
+            }
+            const adminEmail = process.env.ADMIN_ORDER_ALERT_EMAIL || "support@smokecitysupplies.com";
+            if (!withInvoice.adminAlertEmailSentAt) {
+              await sendAdminOrderAlertEmail({
+                to: adminEmail,
+                orderId: withInvoice.id,
+                customerName: withInvoice.customerName,
+                customerEmail: withInvoice.customerEmail,
+                totalPence: withInvoice.totalPence,
+              });
+            }
+            await storage.recordOrderEmailEvents(withInvoice.id, {
+              customerOrderEmailSentAt: withInvoice.customerOrderEmailSentAt ?? (withInvoice.customerEmail ? new Date().toISOString() : undefined),
+              adminAlertEmailSentAt: withInvoice.adminAlertEmailSentAt ?? new Date().toISOString(),
+            });
           } catch (invoiceErr) {
-            console.error("[invoice] send failed:", invoiceErr);
+            console.error("[order confirmation] send failed:", invoiceErr);
           }
         }
       }
@@ -691,6 +814,19 @@ Rules:
     }
     const updated = await storage.updateOrderStatus(id, parsed.data.status);
     if (!updated) return res.status(404).json({ message: "Order not found" });
+    if (parsed.data.status === "shipped" && updated.customerEmail && !updated.customerShippedEmailSentAt) {
+      try {
+        await sendOrderShippedEmail({
+          to: updated.customerEmail,
+          orderId: updated.id,
+          trackingNumber: updated.trackingNumber,
+          shippingLabelUrl: updated.shippingLabelUrl,
+        });
+        await storage.recordOrderEmailEvents(updated.id, { customerShippedEmailSentAt: new Date().toISOString() });
+      } catch (err) {
+        console.error("[order shipped email] failed:", err);
+      }
+    }
     return res.json(updated);
   });
 
@@ -736,6 +872,14 @@ Rules:
     return res.json({ ok: true, order: updated });
   });
 
+  app.get("/api/admin/orders/:id/packing-slip", requireAuth, async (req, res) => {
+    const order = await storage.getOrder(paramId(req));
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    const html = buildPackingSlipHtml(order);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.send(html);
+  });
+
   app.post("/api/admin/orders/:id/shipping-label", requireAuth, apiRateLimiter, async (req, res) => {
     const orderId = paramId(req);
     const order = await storage.getOrder(orderId);
@@ -753,6 +897,14 @@ Rules:
       return res.status(400).json({ message: "Missing shipping address fields on order" });
     }
 
+    const productMap = await getProductMap();
+    const parcels = buildParcelsForItems(productMap, order.items.map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      priceEach: item.priceEach,
+    })));
+
     const label = await createShippoLabel({
       name: order.customerName,
       email: order.customerEmail,
@@ -762,6 +914,8 @@ Rules:
       county: order.county,
       postcode: order.postcode,
       country: order.country || "GB",
+      parcels,
+      preferredRateId: order.shippingRateId,
     });
 
     let shippingLabelUrl = label.labelUrl;

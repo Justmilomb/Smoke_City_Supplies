@@ -35,6 +35,8 @@ export function renderInvoiceHtml(order: ApiOrder): string {
       </tr>`;
     })
     .join("\n");
+  const subtotalPence = order.subtotalPence ?? order.totalPence;
+  const shippingPence = order.shippingAmountPence ?? Math.max(0, order.totalPence - subtotalPence);
 
   return `<!doctype html>
 <html>
@@ -72,7 +74,11 @@ export function renderInvoiceHtml(order: ApiOrder): string {
       <tbody>${rows}</tbody>
     </table>
 
-    <p style="text-align:right;margin-top:16px;font-size:18px;"><strong>Grand Total: GBP ${penceToGbp(order.totalPence)}</strong></p>
+    <table style="width:100%;margin-top:12px;">
+      <tr><td style="text-align:right;">Subtotal:</td><td style="text-align:right;width:140px;">GBP ${penceToGbp(subtotalPence)}</td></tr>
+      <tr><td style="text-align:right;">Shipping:</td><td style="text-align:right;">GBP ${penceToGbp(shippingPence)}</td></tr>
+      <tr><td style="text-align:right;font-size:18px;"><strong>Grand Total:</strong></td><td style="text-align:right;font-size:18px;"><strong>GBP ${penceToGbp(order.totalPence)}</strong></td></tr>
+    </table>
 
     <p style="margin-top:24px;color:#666;font-size:13px;">
       Payment processed securely by Stripe. This document is an automatic invoice/receipt for your records.
@@ -94,6 +100,8 @@ export function renderInvoicePdfBuffer(order: ApiOrder): Buffer {
     "",
     ...order.items.map((item) => `${item.productName} x${item.quantity} @ GBP ${item.priceEach.toFixed(2)}`),
     "",
+    `Subtotal: GBP ${((order.subtotalPence ?? order.totalPence) / 100).toFixed(2)}`,
+    `Shipping: GBP ${((order.shippingAmountPence ?? Math.max(0, order.totalPence - (order.subtotalPence ?? order.totalPence))) / 100).toFixed(2)}`,
     `Total: GBP ${(order.totalPence / 100).toFixed(2)}`,
   ];
 

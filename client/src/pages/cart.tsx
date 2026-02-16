@@ -5,7 +5,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useCart } from "@/lib/cart";
-import { getStripe, prepareCheckout } from "@/lib/stripe";
+import { getStripe, prepareCheckout, quoteShippingRates } from "@/lib/stripe";
 import { StripeCheckoutForm } from "@/components/site/StripeCheckout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,12 +38,24 @@ export default function CartPage() {
   const [postcode, setPostcode] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [preparedOrderId, setPreparedOrderId] = useState<string | null>(null);
+  const [checkoutAmountPence, setCheckoutAmountPence] = useState<number | null>(null);
+  const [shippingRates, setShippingRates] = useState<Array<{
+    rateId: string;
+    provider: string;
+    serviceName: string;
+    amountPence: number;
+    estimatedDays?: number;
+  }>>([]);
+  const [selectedRateId, setSelectedRateId] = useState("");
+  const [dispatchAdvice, setDispatchAdvice] = useState("");
+  const [expectedShipDate, setExpectedShipDate] = useState("");
   const [stripePromise] = useState(() => getStripe());
 
   const total = state.items.reduce(
     (sum, i) => sum + i.priceEach * i.quantity,
     0
   );
+  const selectedRate = shippingRates.find((r) => r.rateId === selectedRateId);
 
   const handleInitiateCheckout = async () => {
     if (state.items.length === 0) {
@@ -54,10 +66,14 @@ export default function CartPage() {
       toast.error("Please fill in all required fields");
       return;
     }
+    if (!selectedRate) {
+      toast.error("Please fetch and select a shipping option");
+      return;
+    }
 
     setPlacingOrder(true);
     try {
-      const { clientSecret: secret, orderId } = await prepareCheckout({
+      const payload = await prepareCheckout({
         items: state.items,
         customerEmail: email,
         customerName: name,
@@ -67,11 +83,48 @@ export default function CartPage() {
         county,
         postcode,
         country: "GB",
+        shippingRateId: selectedRate.rateId,
+        shippingAmountPence: selectedRate.amountPence,
+        shippingProvider: selectedRate.provider,
+        shippingServiceLevel: selectedRate.serviceName,
+        shippingEstimatedDays: selectedRate.estimatedDays,
       });
-      setClientSecret(secret);
-      setPreparedOrderId(orderId);
+      setClientSecret(payload.clientSecret);
+      setPreparedOrderId(payload.orderId);
+      setCheckoutAmountPence(payload.amountPence);
+      setDispatchAdvice(payload.dispatchAdvice);
+      setExpectedShipDate(payload.expectedShipDate);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to initialize payment");
+      setPlacingOrder(false);
+    }
+  };
+
+  const fetchRates = async () => {
+    if (!name || !addressLine1 || !city || !postcode) {
+      toast.error("Add delivery name/address first");
+      return;
+    }
+    setPlacingOrder(true);
+    try {
+      const data = await quoteShippingRates({
+        items: state.items,
+        customerName: name,
+        customerEmail: email || undefined,
+        addressLine1,
+        addressLine2,
+        city,
+        county,
+        postcode,
+        country: "GB",
+      });
+      setShippingRates(data.rates);
+      setSelectedRateId(data.rates[0]?.rateId || "");
+      setDispatchAdvice(data.dispatchAdvice || "");
+      setExpectedShipDate(data.expectedShipDate || "");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to fetch shipping rates");
+    } finally {
       setPlacingOrder(false);
     }
   };
@@ -264,12 +317,12 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping (UK)</span>
-                <span className="font-medium text-emerald-600">FREE</span>
+                <span className="font-medium">{selectedRate ? `£${(selectedRate.amountPence / 100).toFixed(2)}` : "Calculated at checkout"}</span>
               </div>
               <div className="border-t pt-4 flex justify-between">
                 <span className="font-semibold">Total</span>
                 <span className="text-xl font-bold tabular-nums">
-                  £{total.toFixed(2)}
+                  £{(total + (selectedRate ? selectedRate.amountPence / 100 : 0)).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -382,21 +435,51 @@ export default function CartPage() {
                   />
                 </div>
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Order total</span>
-                    <span className="font-semibold">£{total.toFixed(2)}</span>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">Shipping options</div>
+                    <Button type="button" variant="outline" size="sm" onClick={fetchRates} disabled={placingOrder}>
+                      {placingOrder ? "Loading…" : "Get live rates"}
+                    </Button>
                   </div>
+                  {shippingRates.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">Enter address details and fetch live rates from Shippo.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {shippingRates.map((rate) => (
+                        <label key={rate.rateId} className="flex cursor-pointer items-center justify-between rounded border border-border/60 px-3 py-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="shipping-rate"
+                              checked={selectedRateId === rate.rateId}
+                              onChange={() => setSelectedRateId(rate.rateId)}
+                            />
+                            <span>{rate.serviceName}</span>
+                            {rate.estimatedDays ? <span className="text-muted-foreground">({rate.estimatedDays} day)</span> : null}
+                          </div>
+                          <span className="font-semibold">£{(rate.amountPence / 100).toFixed(2)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 flex justify-between text-sm">
+                    <span className="text-muted-foreground">Order total</span>
+                    <span className="font-semibold">£{(total + (selectedRate ? selectedRate.amountPence / 100 : 0)).toFixed(2)}</span>
+                  </div>
+                  {dispatchAdvice ? <div className="mt-2 text-xs text-muted-foreground">{dispatchAdvice}</div> : null}
+                  {expectedShipDate ? <div className="mt-1 text-xs text-muted-foreground">Expected dispatch date: {expectedShipDate}</div> : null}
                 </div>
               </>
             ) : (
               <div className="space-y-4">
                 <Elements stripe={stripePromise} options={{ clientSecret }}>
                   <StripeCheckoutForm
-                    amount={total}
+                    amount={(checkoutAmountPence ?? Math.round(total * 100)) / 100}
                     onSuccess={handlePaymentSuccess}
                     onError={handlePaymentError}
                   />
                 </Elements>
+                {dispatchAdvice ? <p className="text-xs text-muted-foreground">{dispatchAdvice}</p> : null}
               </div>
             )}
           </div>

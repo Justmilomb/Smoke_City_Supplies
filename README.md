@@ -10,6 +10,7 @@ E-commerce site for motorcycle and scooter parts, run by Karl. Bringing back old
 - **Admin Panel** - Full CRUD for products, orders, categories
 - **Barcode Inventory Tools** - Admin can link/scan barcodes for stock-in workflows (mobile-first)
 - **Invoice + Shipping Ops** - Automatic invoice email pipeline and manual Shippo label generation
+- **Live UK Shipping Rates** - Checkout quotes live Shippo rates and includes shipping in Stripe total
 - **Security** - Rate limiting, input sanitization, CSRF protection
 - **Brand Story** - Personal touch throughout the customer journey
 
@@ -72,6 +73,7 @@ npm run start
 - `RESEND_API_KEY` - API key for invoice emails (optional locally, recommended production)
 - `INVOICE_FROM_EMAIL` - Sender address for invoices (e.g. billing@yourdomain.com)
 - `INVOICE_REPLY_TO` - Reply address customers use when replying to invoice emails (defaults to `smokecitycycles@gmail.com`)
+- `ADMIN_ORDER_ALERT_EMAIL` - Admin alert recipient for new paid orders (default `support@smokecitysupplies.com`)
 - `SHIPPO_API_KEY` - Shippo API token for label generation
 - `SHIP_FROM_NAME` - Sender name for shipping labels
 - `SHIP_FROM_ADDRESS_LINE1` - Sender street for shipping labels
@@ -101,11 +103,14 @@ npm run start
 ## Checkout + Order Lifecycle
 
 - Frontend calls `POST /api/checkout/prepare` to create the pending order + Stripe PaymentIntent.
+- Frontend fetches live shipping options from `POST /api/shipping/rates`, then submits selected rate to `POST /api/checkout/prepare`.
 - Stripe webhook `POST /api/stripe/webhook` is the source of truth for marking payment success/failure.
 - On `payment_intent.succeeded`, stock is deducted once, and invoice dispatch is triggered.
+- On successful payment, customer confirmation and admin order-alert emails are sent (Resend).
 - Admin order actions include:
   - resend invoice (`/api/admin/orders/:id/invoice/resend`)
   - generate shipping label via Shippo (`/api/admin/orders/:id/shipping-label`)
+  - print packing slip (`/api/admin/orders/:id/packing-slip`)
 
 ## Google Merchant File Feed (Automatic Updates)
 

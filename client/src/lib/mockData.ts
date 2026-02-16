@@ -42,6 +42,10 @@ export type Part = {
   metaTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
+  shippingWeightGrams?: number;
+  shippingLengthCm?: number;
+  shippingWidthCm?: number;
+  shippingHeightCm?: number;
   barcode?: string;
   barcodeFormat?: string;
 };

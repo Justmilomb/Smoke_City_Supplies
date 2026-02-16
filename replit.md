@@ -42,9 +42,10 @@ A full-stack e-commerce application for motorcycle and scooter parts and accesso
 - `STRIPE_SECRET_KEY` - Stripe secret key
 - `STRIPE_PUBLISHABLE_KEY` - Stripe publishable key
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
-- `RESEND_API_KEY` - Resend API key for invoices
+- `RESEND_API_KEY` - Resend API key for transactional emails (invoice + order notifications)
 - `INVOICE_FROM_EMAIL` - Invoice sender email
 - `INVOICE_REPLY_TO` - Invoice reply-to email
+- `ADMIN_ORDER_ALERT_EMAIL` - Admin alert recipient for new paid orders
 - `SHIPPO_API_KEY` - Shippo API key (when enabling labels)
 - `SHIP_FROM_NAME` - Sender name for labels
 - `SHIP_FROM_ADDRESS_LINE1` - Sender address line 1

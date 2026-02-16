@@ -78,6 +78,14 @@ export interface IStorage {
       labelCreatedAt: string;
     }
   ): Promise<ApiOrder | undefined>;
+  recordOrderEmailEvents(
+    orderId: string,
+    data: {
+      customerOrderEmailSentAt?: string;
+      customerShippedEmailSentAt?: string;
+      adminAlertEmailSentAt?: string;
+    }
+  ): Promise<ApiOrder | undefined>;
 
   listInventoryTransactions(limit?: number): Promise<ApiInventoryTransaction[]>;
 
@@ -136,6 +144,18 @@ function orderToApi(
     trackingNumber: row.trackingNumber ?? undefined,
     labelCreatedAt: row.labelCreatedAt ?? undefined,
     stockDeductedAt: row.stockDeductedAt ?? undefined,
+    subtotalPence: row.subtotalPence ?? undefined,
+    shippingAmountPence: row.shippingAmountPence ?? undefined,
+    shippingRateId: row.shippingRateId ?? undefined,
+    shippingProvider: row.shippingProvider ?? undefined,
+    shippingServiceLevel: row.shippingServiceLevel ?? undefined,
+    shippingEstimatedDays: row.shippingEstimatedDays ?? undefined,
+    dispatchCutoffLocal: row.dispatchCutoffLocal ?? undefined,
+    dispatchAdvice: row.dispatchAdvice ?? undefined,
+    expectedShipDate: row.expectedShipDate ?? undefined,
+    customerOrderEmailSentAt: row.customerOrderEmailSentAt ?? undefined,
+    customerShippedEmailSentAt: row.customerShippedEmailSentAt ?? undefined,
+    adminAlertEmailSentAt: row.adminAlertEmailSentAt ?? undefined,
   };
 }
 
@@ -237,6 +257,10 @@ export class DbStorage implements IStorage {
       metaTitle: row.metaTitle ?? undefined,
       metaDescription: row.metaDescription ?? undefined,
       metaKeywords: row.metaKeywords ?? undefined,
+      shippingWeightGrams: row.shippingWeightGrams ?? undefined,
+      shippingLengthCm: row.shippingLengthCm ?? undefined,
+      shippingWidthCm: row.shippingWidthCm ?? undefined,
+      shippingHeightCm: row.shippingHeightCm ?? undefined,
       barcode: barcode?.code,
       barcodeFormat: barcode?.format,
     };
@@ -312,6 +336,10 @@ export class DbStorage implements IStorage {
         metaTitle: row.metaTitle ?? undefined,
         metaDescription: row.metaDescription ?? undefined,
         metaKeywords: row.metaKeywords ?? undefined,
+        shippingWeightGrams: row.shippingWeightGrams ?? undefined,
+        shippingLengthCm: row.shippingLengthCm ?? undefined,
+        shippingWidthCm: row.shippingWidthCm ?? undefined,
+        shippingHeightCm: row.shippingHeightCm ?? undefined,
         barcode: barcode?.code,
         barcodeFormat: barcode?.format,
       };
@@ -351,6 +379,10 @@ export class DbStorage implements IStorage {
         metaTitle: input.metaTitle ?? null,
         metaDescription: input.metaDescription ?? null,
         metaKeywords: input.metaKeywords ?? null,
+        shippingWeightGrams: input.shippingWeightGrams ?? null,
+        shippingLengthCm: input.shippingLengthCm ?? null,
+        shippingWidthCm: input.shippingWidthCm ?? null,
+        shippingHeightCm: input.shippingHeightCm ?? null,
       })
       .returning();
     if (!row) throw new Error("Failed to create product");
@@ -375,6 +407,10 @@ export class DbStorage implements IStorage {
     if (patch.image !== undefined && patch.imageFileId === undefined) {
       dbPatch.imageFileId = parseImageFileId(patch.image) ?? null;
     }
+    if (patch.shippingWeightGrams !== undefined) dbPatch.shippingWeightGrams = patch.shippingWeightGrams;
+    if (patch.shippingLengthCm !== undefined) dbPatch.shippingLengthCm = patch.shippingLengthCm;
+    if (patch.shippingWidthCm !== undefined) dbPatch.shippingWidthCm = patch.shippingWidthCm;
+    if (patch.shippingHeightCm !== undefined) dbPatch.shippingHeightCm = patch.shippingHeightCm;
 
     const [row] = await this.getDb().update(products).set(dbPatch).where(eq(products.id, id)).returning();
 
@@ -503,9 +539,12 @@ export class DbStorage implements IStorage {
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
-    const totalPence = Math.round(
+    const itemsSubtotalPence = Math.round(
       items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
     );
+    const subtotalPence = parsed.data.subtotalPence ?? itemsSubtotalPence;
+    const shippingAmountPence = parsed.data.shippingAmountPence ?? 0;
+    const totalPence = subtotalPence + shippingAmountPence;
 
     await this.getDb().insert(orders).values({
       id: orderId,
@@ -522,6 +561,15 @@ export class DbStorage implements IStorage {
       country: parsed.data.country ?? "GB",
       stripePaymentIntentId: parsed.data.stripePaymentIntentId ?? null,
       paymentStatus: parsed.data.paymentStatus ?? "awaiting_payment",
+      subtotalPence,
+      shippingAmountPence,
+      shippingRateId: parsed.data.shippingRateId ?? null,
+      shippingProvider: parsed.data.shippingProvider ?? null,
+      shippingServiceLevel: parsed.data.shippingServiceLevel ?? null,
+      shippingEstimatedDays: parsed.data.shippingEstimatedDays ?? null,
+      dispatchCutoffLocal: parsed.data.dispatchCutoffLocal ?? null,
+      dispatchAdvice: parsed.data.dispatchAdvice ?? null,
+      expectedShipDate: parsed.data.expectedShipDate ?? null,
     });
 
     const orderItemsToInsert = items.map((i) => ({
@@ -704,6 +752,28 @@ export class DbStorage implements IStorage {
     return this.getOrder(orderId);
   }
 
+  async recordOrderEmailEvents(
+    orderId: string,
+    data: {
+      customerOrderEmailSentAt?: string;
+      customerShippedEmailSentAt?: string;
+      adminAlertEmailSentAt?: string;
+    }
+  ): Promise<ApiOrder | undefined> {
+    const patch: Record<string, string> = {};
+    if (data.customerOrderEmailSentAt) patch.customerOrderEmailSentAt = data.customerOrderEmailSentAt;
+    if (data.customerShippedEmailSentAt) patch.customerShippedEmailSentAt = data.customerShippedEmailSentAt;
+    if (data.adminAlertEmailSentAt) patch.adminAlertEmailSentAt = data.adminAlertEmailSentAt;
+    if (!Object.keys(patch).length) return this.getOrder(orderId);
+
+    await this.getDb()
+      .update(orders)
+      .set(patch)
+      .where(eq(orders.id, orderId));
+
+    return this.getOrder(orderId);
+  }
+
   async listInventoryTransactions(limit = 100): Promise<ApiInventoryTransaction[]> {
     const rows = await this.getDb().select().from(inventoryTransactions).orderBy(desc(inventoryTransactions.createdAt)).limit(limit);
     return rows.map((row) => ({
@@ -855,6 +925,10 @@ export class MemStorage implements IStorage {
       metaTitle: input.metaTitle,
       metaDescription: input.metaDescription,
       metaKeywords: input.metaKeywords,
+      shippingWeightGrams: input.shippingWeightGrams,
+      shippingLengthCm: input.shippingLengthCm,
+      shippingWidthCm: input.shippingWidthCm,
+      shippingHeightCm: input.shippingHeightCm,
       barcode: input.barcode,
       barcodeFormat: input.barcodeFormat,
     };
@@ -996,9 +1070,12 @@ export class MemStorage implements IStorage {
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
-    const totalPence = Math.round(
+    const itemsSubtotalPence = Math.round(
       items.reduce((sum, i) => sum + i.priceEach * i.quantity * 100, 0)
     );
+    const subtotalPence = parsed.data.subtotalPence ?? itemsSubtotalPence;
+    const shippingAmountPence = parsed.data.shippingAmountPence ?? 0;
+    const totalPence = subtotalPence + shippingAmountPence;
     const apiItems: ApiOrderItem[] = items.map((i) => ({
       productId: i.productId,
       productName: i.productName,
@@ -1022,6 +1099,15 @@ export class MemStorage implements IStorage {
       country: parsed.data.country ?? "GB",
       stripePaymentIntentId: parsed.data.stripePaymentIntentId,
       paymentStatus: parsed.data.paymentStatus ?? "awaiting_payment",
+      subtotalPence,
+      shippingAmountPence,
+      shippingRateId: parsed.data.shippingRateId,
+      shippingProvider: parsed.data.shippingProvider,
+      shippingServiceLevel: parsed.data.shippingServiceLevel,
+      shippingEstimatedDays: parsed.data.shippingEstimatedDays,
+      dispatchCutoffLocal: parsed.data.dispatchCutoffLocal,
+      dispatchAdvice: parsed.data.dispatchAdvice,
+      expectedShipDate: parsed.data.expectedShipDate,
     };
 
     this.orders.set(orderId, order);
@@ -1149,6 +1235,21 @@ export class MemStorage implements IStorage {
       ...order,
       ...data,
     };
+    this.orders.set(orderId, updated);
+    return updated;
+  }
+
+  async recordOrderEmailEvents(
+    orderId: string,
+    data: {
+      customerOrderEmailSentAt?: string;
+      customerShippedEmailSentAt?: string;
+      adminAlertEmailSentAt?: string;
+    }
+  ): Promise<ApiOrder | undefined> {
+    const order = this.orders.get(orderId);
+    if (!order) return undefined;
+    const updated = { ...order, ...data };
     this.orders.set(orderId, updated);
     return updated;
   }

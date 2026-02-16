@@ -19,7 +19,7 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   // Content Security Policy - allow Google Fonts, Stripe, and WebSockets
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://unpkg.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
     "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com",

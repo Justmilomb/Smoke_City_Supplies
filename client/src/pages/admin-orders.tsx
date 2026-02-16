@@ -38,6 +38,10 @@ type Order = {
   invoiceSentAt?: string;
   shippingLabelUrl?: string;
   trackingNumber?: string;
+  shippingServiceLevel?: string;
+  shippingAmountPence?: number;
+  dispatchAdvice?: string;
+  expectedShipDate?: string;
   items: { productId: string; productName: string; quantity: number }[];
 };
 
@@ -171,6 +175,10 @@ function ActionButtons({ order }: { order: Order }) {
     }
   };
 
+  const onPrintPackingSlip = () => {
+    window.open(`${API}/admin/orders/${order.id}/packing-slip`, "_blank", "noopener,noreferrer");
+  };
+
   const onFulfillmentScan = async () => {
     const code = window.prompt("Scan or enter barcode for this order:");
     if (!code?.trim()) return;
@@ -208,6 +216,9 @@ function ActionButtons({ order }: { order: Order }) {
         disabled={working || order.paymentStatus !== "paid"}
       >
         Fulfillment Scan
+      </Button>
+      <Button variant="outline" size="sm" className="h-8" onClick={onPrintPackingSlip}>
+        Packing Slip
       </Button>
       {order.shippingLabelUrl && (
         <a href={order.shippingLabelUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
@@ -276,6 +287,11 @@ export default function AdminOrders() {
                         .join(", ")}
                     </div>
                   )}
+                  {order.shippingServiceLevel && (
+                    <div className="text-xs text-muted-foreground">
+                      {order.shippingServiceLevel} · £{((order.shippingAmountPence ?? 0) / 100).toFixed(2)}
+                    </div>
+                  )}
                   <div className="text-sm text-muted-foreground">
                     {order.items?.map((i) => `${i.productName} × ${i.quantity}`).join(", ") ?? "—"}
                   </div>
@@ -312,6 +328,11 @@ export default function AdminOrders() {
                           {[order.addressLine1, order.addressLine2, order.city, order.county, order.postcode, order.country]
                             .filter(Boolean)
                             .join(", ")}
+                        </div>
+                      )}
+                      {order.shippingServiceLevel && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {order.shippingServiceLevel} · £{((order.shippingAmountPence ?? 0) / 100).toFixed(2)}
                         </div>
                       )}
                     </TableCell>

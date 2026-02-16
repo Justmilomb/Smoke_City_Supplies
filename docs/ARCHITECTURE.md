@@ -11,8 +11,9 @@
 - `server/index.ts`: server bootstrap, sessions, security middleware, and dev/prod wiring.
 - `server/routes.ts`: API route registration (main router/controller surface).
 - `server/invoice.ts`: invoice number generation + HTML/PDF rendering helpers.
-- `server/email.ts`: transactional invoice email dispatch (Resend API).
-- `server/shippo.ts`: shipping label creation integration.
+- `server/email.ts`: transactional email dispatch (invoice, order confirmation, shipped, admin alert) via Resend.
+- `server/shippo.ts`: Shippo integration for live rate quotes and shipping labels.
+- `server/shippingLogic.ts`: parcel building, dispatch cutoff advice, and packing slip HTML generation.
 - `server/googleMerchantFeed.ts`: Google Merchant XML feed builder + feed-file writer scheduler.
 - `server/auth.ts`: Passport strategies and auth wiring.
 - `server/db.ts`: database connection (`pool`), used to decide whether to use Postgres-backed sessions/storage.
@@ -46,12 +47,15 @@
 
 ## Checkout and Payment Confirmation
 
-- `POST /api/checkout/prepare` creates a pending order record plus Stripe PaymentIntent.
+- `POST /api/shipping/rates` quotes live shipping options (Shippo or fallback).
+- `POST /api/checkout/prepare` creates a pending order record plus Stripe PaymentIntent (subtotal + selected shipping).
 - `POST /api/stripe/webhook` is the authoritative payment status updater.
 - On successful payment webhook:
   - order payment status is set to `paid`
   - stock is decremented idempotently
   - invoice metadata is stored and invoice email pipeline is triggered
+  - order confirmation email is sent to customer
+  - admin paid-order alert is sent to support inbox
 
 ## Inventory + Barcode Admin Flow
 
@@ -75,3 +79,4 @@
 - `POST /api/upload` accepts a single `image` file from authenticated admin users.
 - Upload binaries are saved in PostgreSQL (`stored_files` table) and returned as `/api/files/:id`.
 - Product/order records reference file IDs and expose file URLs through `/api/files/:id`.
+- Admin can print packing slips from `/api/admin/orders/:id/packing-slip`.

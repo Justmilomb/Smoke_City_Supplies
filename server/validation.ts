@@ -65,6 +65,10 @@ export function sanitizeProductInput(input: any) {
     features: Array.isArray(input.features)
       ? input.features.map((f: any) => sanitizeString(f)).filter(Boolean)
       : undefined,
+    shippingWeightGrams: typeof input.shippingWeightGrams === "number" ? Math.max(1, Math.round(input.shippingWeightGrams)) : undefined,
+    shippingLengthCm: typeof input.shippingLengthCm === "number" ? Math.max(1, Math.round(input.shippingLengthCm)) : undefined,
+    shippingWidthCm: typeof input.shippingWidthCm === "number" ? Math.max(1, Math.round(input.shippingWidthCm)) : undefined,
+    shippingHeightCm: typeof input.shippingHeightCm === "number" ? Math.max(1, Math.round(input.shippingHeightCm)) : undefined,
   };
 }
 

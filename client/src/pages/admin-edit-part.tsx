@@ -34,6 +34,10 @@ const schema = z.object({
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
   metaKeywords: z.string().optional(),
+  shippingWeightGrams: z.coerce.number().int().min(1).optional(),
+  shippingLengthCm: z.coerce.number().int().min(1).optional(),
+  shippingWidthCm: z.coerce.number().int().min(1).optional(),
+  shippingHeightCm: z.coerce.number().int().min(1).optional(),
   barcode: z.string().optional(),
   barcodeFormat: z.string().optional(),
 });
@@ -65,6 +69,10 @@ export default function AdminEditPart() {
       metaTitle: "",
       metaDescription: "",
       metaKeywords: "",
+      shippingWeightGrams: 1000,
+      shippingLengthCm: 20,
+      shippingWidthCm: 15,
+      shippingHeightCm: 10,
       barcode: "",
       barcodeFormat: "",
     },
@@ -118,6 +126,10 @@ export default function AdminEditPart() {
         metaTitle: (product as any).metaTitle ?? "",
         metaDescription: (product as any).metaDescription ?? "",
         metaKeywords: (product as any).metaKeywords ?? "",
+        shippingWeightGrams: (product as any).shippingWeightGrams ?? 1000,
+        shippingLengthCm: (product as any).shippingLengthCm ?? 20,
+        shippingWidthCm: (product as any).shippingWidthCm ?? 15,
+        shippingHeightCm: (product as any).shippingHeightCm ?? 10,
         barcode: (product as any).barcode ?? "",
         barcodeFormat: (product as any).barcodeFormat ?? "",
       });
@@ -152,6 +164,10 @@ export default function AdminEditPart() {
           metaTitle: v.metaTitle || undefined,
           metaDescription: v.metaDescription || undefined,
           metaKeywords: v.metaKeywords || undefined,
+          shippingWeightGrams: v.shippingWeightGrams || undefined,
+          shippingLengthCm: v.shippingLengthCm || undefined,
+          shippingWidthCm: v.shippingWidthCm || undefined,
+          shippingHeightCm: v.shippingHeightCm || undefined,
           barcode: v.barcode || undefined,
           barcodeFormat: v.barcodeFormat || undefined,
         },
@@ -283,6 +299,60 @@ export default function AdminEditPart() {
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="shippingWeightGrams"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Shipping weight (g)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={1} step={1} placeholder="1000" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="shippingLengthCm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parcel length (cm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={1} step={1} placeholder="20" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="shippingWidthCm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parcel width (cm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={1} step={1} placeholder="15" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="shippingHeightCm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parcel height (cm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={1} step={1} placeholder="10" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

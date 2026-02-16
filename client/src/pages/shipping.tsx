@@ -37,7 +37,7 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Delivery Times</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Most orders ship within 1–2 business days. Standard delivery is 3–5 business days from shipment. Next-day delivery is available on popular parts for eligible areas.
+              Orders placed before 6:00 PM (UK time, Mon-Fri) can qualify for next-day delivery where available. Orders placed after 6:00 PM or on weekends dispatch the next business day.
             </p>
           </Card>
 
@@ -47,7 +47,7 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Shipping Costs</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Standard shipping: $5.99. Free shipping on orders over $75. Express options available at checkout.
+              Live UK shipping rates are calculated at checkout based on parcel weight, dimensions, and destination postcode.
             </p>
           </Card>
 
@@ -57,7 +57,7 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Areas We Cover</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              We ship to the continental United States. Alaska, Hawaii, and international shipping may be available—contact us for a quote.
+              We currently ship across the United Kingdom only.
             </p>
           </Card>
 

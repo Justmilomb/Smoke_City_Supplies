@@ -5,7 +5,25 @@ export type ShippoLabelResult = {
   provider: "shippo";
 };
 
-export async function createShippoLabel(input: {
+export type ShippoRate = {
+  rateId: string;
+  provider: "shippo";
+  carrier: string;
+  serviceName: string;
+  serviceToken: string;
+  amountPence: number;
+  currency: string;
+  estimatedDays?: number;
+};
+
+export type ShippoParcel = {
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  weightGrams: number;
+};
+
+type ShippoAddress = {
   name: string;
   email?: string;
   addressLine1: string;
@@ -14,13 +32,32 @@ export async function createShippoLabel(input: {
   county?: string;
   postcode: string;
   country: string;
-}): Promise<ShippoLabelResult> {
-  const apiKey = process.env.SHIPPO_API_KEY;
-  if (!apiKey) {
+};
+
+function getShippoApiKey(): string {
+  const key = process.env.SHIPPO_API_KEY;
+  if (!key) {
     throw new Error("SHIPPO_API_KEY is not configured");
   }
+  return key;
+}
 
-  const fromAddress = {
+function defaultParcel(): ShippoParcel {
+  return { lengthCm: 20, widthCm: 15, heightCm: 10, weightGrams: 1000 };
+}
+
+function normalizeParcels(parcels: ShippoParcel[]): ShippoParcel[] {
+  if (!parcels.length) return [defaultParcel()];
+  return parcels.map((p) => ({
+    lengthCm: Math.max(1, Math.round(p.lengthCm || defaultParcel().lengthCm)),
+    widthCm: Math.max(1, Math.round(p.widthCm || defaultParcel().widthCm)),
+    heightCm: Math.max(1, Math.round(p.heightCm || defaultParcel().heightCm)),
+    weightGrams: Math.max(1, Math.round(p.weightGrams || defaultParcel().weightGrams)),
+  }));
+}
+
+function buildFromAddress() {
+  return {
     name: process.env.SHIP_FROM_NAME || "Smoke City Supplies",
     street1: process.env.SHIP_FROM_ADDRESS_LINE1 || "Warehouse Address",
     city: process.env.SHIP_FROM_CITY || "Manchester",
@@ -28,8 +65,10 @@ export async function createShippoLabel(input: {
     country: process.env.SHIP_FROM_COUNTRY || "GB",
     email: process.env.INVOICE_FROM_EMAIL || "support@smokecitysupplies.com",
   };
+}
 
-  const toAddress = {
+function buildToAddress(input: ShippoAddress) {
+  return {
     name: input.name,
     street1: input.addressLine1,
     street2: input.addressLine2 || "",
@@ -39,26 +78,26 @@ export async function createShippoLabel(input: {
     country: input.country || "GB",
     email: input.email || "",
   };
+}
 
+async function createShippoShipment(input: ShippoAddress & { parcels: ShippoParcel[] }) {
   const shipmentRes = await fetch("https://api.goshippo.com/shipments/", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `ShippoToken ${apiKey}`,
+      Authorization: `ShippoToken ${getShippoApiKey()}`,
     },
     body: JSON.stringify({
-      address_from: fromAddress,
-      address_to: toAddress,
-      parcels: [
-        {
-          length: "20",
-          width: "15",
-          height: "10",
-          distance_unit: "cm",
-          weight: "1",
-          mass_unit: "kg",
-        },
-      ],
+      address_from: buildFromAddress(),
+      address_to: buildToAddress(input),
+      parcels: normalizeParcels(input.parcels).map((parcel) => ({
+        length: String(parcel.lengthCm),
+        width: String(parcel.widthCm),
+        height: String(parcel.heightCm),
+        distance_unit: "cm",
+        weight: String((parcel.weightGrams / 1000).toFixed(3)),
+        mass_unit: "kg",
+      })),
       async: false,
     }),
   });
@@ -68,9 +107,55 @@ export async function createShippoLabel(input: {
     throw new Error(`Shippo shipment failed (${shipmentRes.status}): ${body || "unknown"}`);
   }
 
-  const shipment = (await shipmentRes.json()) as any;
-  const rate = shipment?.rates?.[0];
-  if (!rate?.object_id) {
+  return (await shipmentRes.json()) as any;
+}
+
+function normalizeRate(rate: any): ShippoRate | null {
+  if (!rate?.object_id) return null;
+  const amount = Number(rate.amount);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  const estimatedDays = Number(rate?.estimated_days);
+  return {
+    rateId: String(rate.object_id),
+    provider: "shippo",
+    carrier: String(rate.provider || rate.carrier_account || "carrier"),
+    serviceName: String(rate.servicelevel?.name || "Shipping"),
+    serviceToken: String(rate.servicelevel?.token || ""),
+    amountPence: Math.round(amount * 100),
+    currency: String(rate.currency || "GBP"),
+    estimatedDays: Number.isFinite(estimatedDays) && estimatedDays > 0 ? estimatedDays : undefined,
+  };
+}
+
+export async function quoteShippoRates(input: ShippoAddress & { parcels: ShippoParcel[] }): Promise<ShippoRate[]> {
+  const shipment = await createShippoShipment(input);
+  const rates: unknown[] = Array.isArray(shipment?.rates) ? shipment.rates : [];
+  const normalized: Array<ShippoRate | null> = rates.map((rate) => normalizeRate(rate));
+  return normalized
+    .filter((r: ShippoRate | null): r is ShippoRate => Boolean(r))
+    .sort((a: ShippoRate, b: ShippoRate) => a.amountPence - b.amountPence);
+}
+
+export async function createShippoLabel(input: {
+  name: string;
+  email?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  county?: string;
+  postcode: string;
+  country: string;
+  parcels?: ShippoParcel[];
+  preferredRateId?: string;
+}): Promise<ShippoLabelResult> {
+  const shipment = await createShippoShipment({
+    ...input,
+    parcels: input.parcels ?? [defaultParcel()],
+  });
+  const rateList = Array.isArray(shipment?.rates) ? shipment.rates : [];
+  const selectedRate =
+    rateList.find((r: any) => String(r?.object_id) === input.preferredRateId) ?? rateList[0];
+  if (!selectedRate?.object_id) {
     throw new Error("Shippo returned no available rates");
   }
 
@@ -78,10 +163,10 @@ export async function createShippoLabel(input: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `ShippoToken ${apiKey}`,
+      Authorization: `ShippoToken ${getShippoApiKey()}`,
     },
     body: JSON.stringify({
-      rate: rate.object_id,
+      rate: selectedRate.object_id,
       label_file_type: "PDF",
       async: false,
     }),
