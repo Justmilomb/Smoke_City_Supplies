@@ -67,6 +67,9 @@ function rowToApiProduct(row: typeof products.$inferSelect): ApiProduct {
     description: row.description,
     specs: row.specs,
     features: row.features ?? undefined,
+    metaTitle: row.metaTitle ?? undefined,
+    metaDescription: row.metaDescription ?? undefined,
+    metaKeywords: row.metaKeywords ?? undefined,
   };
 }
 
@@ -133,6 +136,9 @@ export class DbStorage implements IStorage {
         description: input.description,
         specs: input.specs,
         features: input.features ?? null,
+        metaTitle: input.metaTitle ?? null,
+        metaDescription: input.metaDescription ?? null,
+        metaKeywords: input.metaKeywords ?? null,
       })
       .returning();
     if (!row) throw new Error("Failed to create product");
@@ -386,6 +392,9 @@ export class MemStorage implements IStorage {
       description: input.description,
       specs: input.specs,
       features: input.features,
+      metaTitle: input.metaTitle,
+      metaDescription: input.metaDescription,
+      metaKeywords: input.metaKeywords,
     };
     this.products.set(id, product);
     return product;

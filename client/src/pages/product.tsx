@@ -20,9 +20,10 @@ export default function ProductPage() {
   const contactModal = useContactModal();
 
   usePageMeta({
-    title: part?.name ?? "Product",
-    description: part?.description?.slice(0, 160).trim() ?? "Motorcycle part from Smoke City Supplies. UK delivery.",
+    title: part?.metaTitle || part?.name || "Product",
+    description: part?.metaDescription || part?.description?.slice(0, 160).trim() || "Motorcycle part from Smoke City Supplies. UK delivery.",
     image: part ? getProductImage(part) : undefined,
+    keywords: part?.metaKeywords,
   });
 
   if (isLoading) {

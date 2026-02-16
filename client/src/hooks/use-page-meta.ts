@@ -8,6 +8,8 @@ export type PageMeta = {
   description?: string;
   /** Absolute or relative image URL for og:image / twitter:image */
   image?: string;
+  /** Comma-separated keywords for meta keywords tag */
+  keywords?: string;
 };
 
 function setMetaDescription(content: string) {
@@ -46,7 +48,7 @@ function setMetaName(name: string, content: string) {
  * Call once per page (e.g. in the page component).
  */
 export function usePageMeta(meta: PageMeta) {
-  const { title, description, image } = meta;
+  const { title, description, image, keywords } = meta;
 
   useEffect(() => {
     const fullTitle = title.includes(SITE_NAME) ? title : `${title} | ${SITE_NAME}`;
@@ -62,11 +64,15 @@ export function usePageMeta(meta: PageMeta) {
       setMetaName("twitter:image", absoluteImage);
     }
 
+    if (keywords) {
+      setMetaName("keywords", keywords);
+    }
+
     setMetaProperty("og:title", fullTitle);
     setMetaName("twitter:title", fullTitle);
     if (description) {
       setMetaProperty("og:description", description);
       setMetaName("twitter:description", description);
     }
-  }, [title, description, image]);
+  }, [title, description, image, keywords]);
 }

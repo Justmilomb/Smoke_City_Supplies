@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Sparkles, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,6 +31,9 @@ const schema = z.object({
   compatibility: z.string().optional(),
   tags: z.string().optional(),
   description: z.string().min(10, "Add a short description"),
+  metaTitle: z.string().optional(),
+  metaDescription: z.string().optional(),
+  metaKeywords: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -57,8 +60,43 @@ export default function AdminEditPart() {
       compatibility: "",
       tags: "",
       description: "",
+      metaTitle: "",
+      metaDescription: "",
+      metaKeywords: "",
     },
   });
+
+  const [seoPrompt, setSeoPrompt] = React.useState("");
+  const [seoLoading, setSeoLoading] = React.useState(false);
+
+  const generateSeo = async () => {
+    const info = seoPrompt.trim() || form.getValues("name");
+    if (!info || info.length < 3) {
+      toast.error("Describe the product or enter a name first");
+      return;
+    }
+    setSeoLoading(true);
+    try {
+      const res = await fetch("/api/generate-seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productInfo: info }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to generate SEO");
+      }
+      const seo = await res.json();
+      form.setValue("metaTitle", seo.metaTitle || "");
+      form.setValue("metaDescription", seo.metaDescription || "");
+      form.setValue("metaKeywords", seo.metaKeywords || "");
+      toast.success("SEO generated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "SEO generation failed");
+    } finally {
+      setSeoLoading(false);
+    }
+  };
 
   React.useEffect(() => {
     if (product) {
@@ -72,6 +110,9 @@ export default function AdminEditPart() {
         compatibility: product.compatibility?.join(", ") ?? "",
         tags: product.tags?.join(", ") ?? "",
         description: product.description,
+        metaTitle: (product as any).metaTitle ?? "",
+        metaDescription: (product as any).metaDescription ?? "",
+        metaKeywords: (product as any).metaKeywords ?? "",
       });
       setPreview(product.image || "");
     }
@@ -101,6 +142,9 @@ export default function AdminEditPart() {
             .filter(Boolean),
           image: preview || "",
           description: v.description,
+          metaTitle: v.metaTitle || undefined,
+          metaDescription: v.metaDescription || undefined,
+          metaKeywords: v.metaKeywords || undefined,
         },
       },
       {
@@ -324,6 +368,73 @@ export default function AdminEditPart() {
                     </FormItem>
                   )}
                 />
+
+                {/* SEO Generation */}
+                <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">SEO for Search Engines</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Describe the product below and click "Generate SEO" to auto-create meta tags for search engines. This data is not shown on the product page.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g., 10 inch pneumatic tire for electric scooter"
+                      value={seoPrompt}
+                      onChange={(e) => setSeoPrompt(e.target.value)}
+                      className="h-10 rounded-lg flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-10 rounded-lg gap-1.5 shrink-0"
+                      disabled={seoLoading}
+                      onClick={generateSeo}
+                    >
+                      {seoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {seoLoading ? "Generating…" : "Generate SEO"}
+                    </Button>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="metaTitle"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Meta Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="SEO page title (max 60 chars)" {...field} className="h-9 rounded-lg text-sm" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="metaDescription"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Meta Description</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="SEO description (max 160 chars)" {...field} className="min-h-[60px] rounded-lg text-sm" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="metaKeywords"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Meta Keywords</FormLabel>
+                        <FormControl>
+                          <Input placeholder="keyword1, keyword2, keyword3" {...field} className="h-9 rounded-lg text-sm" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <Button
                     type="submit"

@@ -60,6 +60,9 @@ export const products = pgTable("products", {
   description: text("description").notNull(),
   specs: jsonb("specs").$type<ProductSpec[]>().notNull(),
   features: jsonb("features").$type<string[]>(),
+  metaTitle: text("meta_title"),
+  metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
 });
 
 export const insertProductSchema = z.object({
@@ -81,6 +84,9 @@ export const insertProductSchema = z.object({
   description: z.string(),
   specs: z.array(productSpecSchema),
   features: z.array(z.string()).optional(),
+  metaTitle: z.string().optional(),
+  metaDescription: z.string().optional(),
+  metaKeywords: z.string().optional(),
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
@@ -138,6 +144,9 @@ export type ApiProduct = {
   description: string;
   specs: ProductSpec[];
   features?: string[];
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
 };
 
 export type ApiOrderItem = {

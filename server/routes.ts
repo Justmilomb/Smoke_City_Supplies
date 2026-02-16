@@ -28,6 +28,7 @@ import {
   orderRateLimiter,
 } from "./rateLimit";
 import { stripe, STRIPE_PUBLISHABLE_KEY } from "./stripe";
+import OpenAI from "openai";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -174,6 +175,79 @@ ${urls.map((u) => `  <url><loc>${escapeXml(u.loc)}</loc><changefreq>${u.changefr
     const deleted = await storage.deleteProduct(paramId(req));
     if (!deleted) return res.status(404).json({ message: "Product not found" });
     return res.status(204).send();
+  });
+
+  // SEO generation via NVIDIA API (admin only)
+  app.post("/api/generate-seo", requireAuth, apiRateLimiter, async (req, res) => {
+    const { productInfo } = req.body as { productInfo?: string };
+    if (!productInfo || typeof productInfo !== "string" || productInfo.trim().length < 3) {
+      return res.status(400).json({ message: "Please describe the product" });
+    }
+
+    const apiKey = process.env.NVIDIA_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: "NVIDIA API key not configured" });
+    }
+
+    const model = process.env.NVIDIA_SEO_MODEL || "deepseek-ai/deepseek-v3.1";
+
+    try {
+      const client = new OpenAI({
+        baseURL: "https://integrate.api.nvidia.com/v1",
+        apiKey,
+      });
+
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: `You are an SEO expert for Smoke City Supplies, a UK-based motorcycle, bike, and scooter parts shop. Generate SEO metadata for products. Respond ONLY with valid JSON in this exact format, nothing else:
+{"metaTitle":"...","metaDescription":"...","metaKeywords":"..."}
+
+Rules:
+- metaTitle: max 60 characters, include product name and "Smoke City Supplies"
+- metaDescription: max 160 characters, compelling description with key features and UK delivery mention
+- metaKeywords: comma-separated relevant search terms (8-12 keywords)`,
+          },
+          {
+            role: "user",
+            content: `Generate SEO metadata for this product: ${productInfo.trim().slice(0, 500)}`,
+          },
+        ],
+        temperature: 0.2,
+        top_p: 0.7,
+        max_tokens: 1024,
+      });
+
+      const content = completion.choices?.[0]?.message?.content?.trim();
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI model" });
+      }
+
+      // Extract JSON from the response (handle possible markdown wrapping)
+      let jsonStr = content;
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
+
+      const seo = JSON.parse(jsonStr) as {
+        metaTitle?: string;
+        metaDescription?: string;
+        metaKeywords?: string;
+      };
+
+      return res.json({
+        metaTitle: (seo.metaTitle ?? "").slice(0, 120),
+        metaDescription: (seo.metaDescription ?? "").slice(0, 320),
+        metaKeywords: (seo.metaKeywords ?? "").slice(0, 500),
+      });
+    } catch (err) {
+      console.error("[generate-seo] error:", err);
+      const message = err instanceof Error ? err.message : "SEO generation failed";
+      return res.status(500).json({ message });
+    }
   });
 
   // Stripe config endpoint (public)
