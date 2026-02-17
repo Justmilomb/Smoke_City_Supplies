@@ -1,10 +1,15 @@
 import { Link } from "wouter";
-import { Settings, Shield, Truck, Phone, ArrowRight, Package, Heart, Wrench } from "lucide-react";
+import { Settings, Shield, Truck, Phone, ArrowRight, Package, Heart, Wrench, Loader2 } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
+import { useProducts } from "@/lib/products";
+import ProductCard from "@/components/site/ProductCard";
 
 export default function Home() {
+  const { data: products, isLoading } = useProducts();
+  const featuredProducts = products?.filter(p => p.stock !== "out").slice(0, 4) ?? [];
+
   usePageMeta({
     title: "Smoke City Supplies | Quality Motorcycle Parts with Old-Fashioned Service",
     description: "A passionate team of motorcyclists bringing back real, human service to the parts industry. Genuine parts, expert advice, and care that's become rare in today's world.",
@@ -174,6 +179,39 @@ export default function Home() {
             </Link>
           </div>
         </section>
+
+        {/* Featured Products */}
+        {featuredProducts.length > 0 && (
+          <section>
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold tracking-tight md:text-4xl mb-3">
+                Featured Parts
+              </h2>
+              <p className="text-muted-foreground md:text-lg">
+                Quality parts ready to ship today
+              </p>
+            </div>
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {featuredProducts.map(product => (
+                  <ProductCard key={product.id} part={product} />
+                ))}
+              </div>
+            )}
+            <div className="text-center mt-6">
+              <Button size="lg" className="gap-2 font-semibold" asChild>
+                <Link href="/store">
+                  View All Parts
+                  <ArrowRight className="h-5 w-5" />
+                </Link>
+              </Button>
+            </div>
+          </section>
+        )}
 
         {/* Why Different Section */}
         <section className="bg-gradient-to-br from-primary/5 via-accent/5 to-muted/50 border-2 border-primary/20 p-8 md:p-12 rounded-2xl">
