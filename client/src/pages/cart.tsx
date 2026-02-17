@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { Minus, Plus, ShoppingBag, Trash2, CheckCircle2, CreditCard } from "lucide-react";
 import { Elements } from "@stripe/react-stripe-js";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useCart } from "@/lib/cart";
-import { getStripe, prepareCheckout, quoteShippingRates } from "@/lib/stripe";
+import { useProducts } from "@/lib/products";
+import { getStripe, prepareCheckout, quoteShippingRates, StockError } from "@/lib/stripe";
 import { StripeCheckoutForm } from "@/components/site/StripeCheckout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -25,6 +26,16 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 export default function CartPage() {
   usePageMeta({ title: "Shopping Cart", description: "Your shopping cart at Smoke City Supplies.", noindex: true });
   const { state, actions } = useCart();
+  const { data: allProducts } = useProducts();
+  const stockMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (allProducts) {
+      for (const p of allProducts) {
+        map.set(p.id, p.quantity ?? 0);
+      }
+    }
+    return map;
+  }, [allProducts]);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
@@ -96,7 +107,13 @@ export default function CartPage() {
       setDispatchAdvice(payload.dispatchAdvice);
       setExpectedShipDate(payload.expectedShipDate);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to initialize payment");
+      if (err instanceof StockError) {
+        for (const msg of err.stockErrors) {
+          toast.error(msg);
+        }
+      } else {
+        toast.error(err instanceof Error ? err.message : "Failed to initialize payment");
+      }
       setPlacingOrder(false);
     }
   };
@@ -273,13 +290,22 @@ export default function CartPage() {
                         variant="outline"
                         size="icon"
                         className="h-9 w-9"
-                        onClick={() =>
-                          actions.updateQuantity(item.productId, item.quantity + 1)
+                        onClick={() => {
+                          const max = stockMap.get(item.productId);
+                          actions.updateQuantity(item.productId, item.quantity + 1, max);
+                        }}
+                        disabled={
+                          stockMap.has(item.productId) &&
+                          item.quantity >= (stockMap.get(item.productId) ?? 0)
                         }
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
+                    {stockMap.has(item.productId) &&
+                      item.quantity >= (stockMap.get(item.productId) ?? 0) && (
+                        <span className="text-xs text-muted-foreground">Max available</span>
+                      )}
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <div className="text-sm text-muted-foreground">Subtotal</div>

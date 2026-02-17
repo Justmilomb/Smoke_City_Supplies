@@ -16,7 +16,7 @@ import { toast } from "sonner";
 export default function ProductPage() {
   const [, params] = useRoute("/product/:id");
   const { data: part, isLoading } = useProduct(params?.id);
-  const { actions: cartActions } = useCart();
+  const { state: cartState, actions: cartActions } = useCart();
   const contactModal = useContactModal();
 
   usePageMeta({
@@ -127,6 +127,10 @@ export default function ProductPage() {
       : part.stock === "low"
         ? (part.quantity != null && part.quantity > 0 ? `${part.quantity} left` : "Low Stock")
         : "Out of Stock";
+
+  const availableStock = part.quantity ?? 0;
+  const currentInCart = cartState.items.find((i) => i.productId === part.id)?.quantity ?? 0;
+  const atStockLimit = availableStock > 0 && currentInCart >= availableStock;
 
   const vehicleLabel = part.vehicle === "motorcycle" ? "Motorcycle" : part.vehicle === "bike" ? "Bike" : "Scooter";
 
@@ -244,12 +248,17 @@ export default function ProductPage() {
                     priceEach: part.price,
                     quantity: 1,
                     image: imageUrl,
+                    maxStock: availableStock,
                   });
                   toast.success("Added to cart");
                 }}
-                disabled={part.stock === "out"}
+                disabled={part.stock === "out" || atStockLimit}
               >
-                Add to Cart
+                {part.stock === "out"
+                  ? "Out of Stock"
+                  : atStockLimit
+                    ? "Maximum in Cart"
+                    : "Add to Cart"}
               </Button>
               <Button
                 data-testid="button-ask-support"

@@ -6,6 +6,7 @@ export type CartItem = {
   priceEach: number;
   quantity: number;
   image?: string;
+  maxStock?: number;
 };
 
 type CartState = {
@@ -15,7 +16,7 @@ type CartState = {
 type CartActions = {
   add: (item: Omit<CartItem, "quantity"> & { quantity?: number }) => void;
   remove: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  updateQuantity: (productId: string, quantity: number, maxStock?: number) => void;
   clear: () => void;
 };
 
@@ -53,13 +54,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setItems((prev) => {
         const existing = prev.find((i) => i.productId === item.productId);
         if (existing) {
-          return prev.map((i) =>
-            i.productId === item.productId
-              ? { ...i, quantity: i.quantity + qty }
-              : i
-          );
+          return prev.map((i) => {
+            if (i.productId !== item.productId) return i;
+            const cap = item.maxStock;
+            const newQty = cap != null ? Math.min(i.quantity + qty, cap) : i.quantity + qty;
+            return { ...i, quantity: newQty, maxStock: item.maxStock };
+          });
         }
-        return [...prev, { ...item, quantity: qty }];
+        const cap = item.maxStock;
+        const cappedQty = cap != null ? Math.min(qty, cap) : qty;
+        return [...prev, { ...item, quantity: cappedQty }];
       });
     },
     []
@@ -69,13 +73,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
   }, []);
 
-  const updateQuantity = React.useCallback((productId: string, quantity: number) => {
+  const updateQuantity = React.useCallback((productId: string, quantity: number, maxStock?: number) => {
     if (quantity <= 0) {
       setItems((prev) => prev.filter((i) => i.productId !== productId));
       return;
     }
+    const capped = maxStock != null ? Math.min(quantity, maxStock) : quantity;
     setItems((prev) =>
-      prev.map((i) => (i.productId === productId ? { ...i, quantity } : i))
+      prev.map((i) => (i.productId === productId ? { ...i, quantity: capped } : i))
     );
   }, []);
 

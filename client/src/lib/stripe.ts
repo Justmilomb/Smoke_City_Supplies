@@ -1,6 +1,15 @@
 import { loadStripe, Stripe } from "@stripe/stripe-js";
 import type { CartItem } from "@/lib/cart";
 
+export class StockError extends Error {
+  stockErrors: string[];
+  constructor(stockErrors: string[]) {
+    super(stockErrors[0] || "Stock unavailable");
+    this.name = "StockError";
+    this.stockErrors = stockErrors;
+  }
+}
+
 let stripePromise: Promise<Stripe | null> | null = null;
 
 export async function getStripe(): Promise<Stripe | null> {
@@ -71,6 +80,9 @@ export async function prepareCheckout(input: {
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    if (res.status === 409 && Array.isArray(data.stockErrors)) {
+      throw new StockError(data.stockErrors);
+    }
     throw new Error(data.message || "Failed to prepare checkout");
   }
 

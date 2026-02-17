@@ -26,7 +26,7 @@ import {
   storedFiles,
   users,
 } from "@shared/schema";
-import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { seedProducts } from "./seed";
@@ -659,29 +659,54 @@ export class DbStorage implements IStorage {
   }
 
   private async deductStockForOrder(orderId: string): Promise<void> {
-    const [orderRow] = await this.getDb().select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    const database = this.getDb();
+
+    const [orderRow] = await database.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!orderRow || orderRow.stockDeductedAt) return;
 
     const items = await this.listOrderItems(orderId);
-    for (const item of items) {
-      const product = await this.getProduct(item.productId);
-      if (!product) continue;
-      const newQty = Math.max(0, product.quantity - item.quantity);
-      await this.updateProductQuantity(item.productId, newQty);
-      await this.recordInventoryTransaction({
-        productId: item.productId,
-        type: "order_reserve",
-        quantityDelta: -item.quantity,
-        actor: "system",
-        orderId,
-        reason: "Paid order stock deduction",
-      });
-    }
 
-    await this.getDb()
-      .update(orders)
-      .set({ stockDeductedAt: new Date().toISOString() })
-      .where(eq(orders.id, orderId));
+    await database.transaction(async (tx) => {
+      for (const item of items) {
+        // Lock the product row to prevent concurrent reads
+        const [locked] = await tx
+          .select({ id: products.id, quantity: products.quantity })
+          .from(products)
+          .where(eq(products.id, item.productId))
+          .for("update");
+
+        if (!locked) continue;
+
+        const newQty = locked.quantity - item.quantity;
+        if (newQty < 0) {
+          throw new Error(
+            `Insufficient stock for "${item.productName}" (product ${item.productId}): wanted ${item.quantity}, only ${locked.quantity} available`
+          );
+        }
+
+        const stock = stockFromQuantity(newQty);
+        await tx
+          .update(products)
+          .set({ quantity: newQty, stock })
+          .where(eq(products.id, item.productId));
+
+        await tx.insert(inventoryTransactions).values({
+          id: randomUUID(),
+          productId: item.productId,
+          barcodeId: null,
+          type: "order_reserve",
+          quantityDelta: -item.quantity,
+          reason: "Paid order stock deduction",
+          actor: "system",
+          orderId,
+        });
+      }
+
+      await tx
+        .update(orders)
+        .set({ stockDeductedAt: new Date().toISOString() })
+        .where(eq(orders.id, orderId));
+    });
   }
 
   async markOrderPaidByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined> {
@@ -703,7 +728,15 @@ export class DbStorage implements IStorage {
         .where(eq(orders.id, orderRow.id));
     }
 
-    await this.deductStockForOrder(orderRow.id);
+    try {
+      await this.deductStockForOrder(orderRow.id);
+    } catch (err) {
+      console.error(`[stock] deduction failed for order ${orderRow.id}:`, err);
+      await this.getDb()
+        .update(orders)
+        .set({ status: "stock_issue" })
+        .where(eq(orders.id, orderRow.id));
+    }
     return this.getOrder(orderRow.id);
   }
 

@@ -686,10 +686,39 @@ Rules:
       return res.status(400).json({ message: "Invalid checkout payload", errors: parsed.error.flatten().fieldErrors });
     }
 
-    const subtotalPence = Math.round(
-      parsed.data.items.reduce((sum, item) => sum + item.priceEach * item.quantity * 100, 0)
-    );
     const productMap = await getProductMap();
+
+    // Validate stock availability and re-verify prices from DB
+    const stockErrors: string[] = [];
+    for (const item of parsed.data.items) {
+      const dbProduct = productMap.get(item.productId);
+      if (!dbProduct) {
+        stockErrors.push(`Product "${item.productName}" is no longer available.`);
+        continue;
+      }
+      if (dbProduct.quantity < item.quantity) {
+        stockErrors.push(
+          dbProduct.quantity === 0
+            ? `"${dbProduct.name}" is out of stock.`
+            : `Only ${dbProduct.quantity} of "${dbProduct.name}" available (you requested ${item.quantity}).`
+        );
+      }
+      if (Math.round(dbProduct.price * 100) !== Math.round(item.priceEach * 100)) {
+        stockErrors.push(
+          `Price for "${dbProduct.name}" has changed to £${dbProduct.price.toFixed(2)}. Please refresh your cart.`
+        );
+      }
+    }
+    if (stockErrors.length > 0) {
+      return res.status(409).json({ message: "Some items are unavailable", stockErrors });
+    }
+
+    const subtotalPence = Math.round(
+      parsed.data.items.reduce((sum, item) => {
+        const dbProduct = productMap.get(item.productId)!;
+        return sum + dbProduct.price * item.quantity * 100;
+      }, 0)
+    );
     const parcels = buildParcelsForItems(productMap, parsed.data.items);
     const dispatchInfo = dispatchAdviceNow();
 
