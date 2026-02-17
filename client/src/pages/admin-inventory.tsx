@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ScanLine, PackagePlus } from "lucide-react";
+import { ScanLine, PackagePlus, X } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -36,23 +36,8 @@ export default function AdminInventory() {
   const [transactions, setTransactions] = React.useState<InventoryTx[]>([]);
   const [scanning, setScanning] = React.useState(false);
   const [scanSource, setScanSource] = React.useState<"native" | "zxing" | "">("");
-
-  const createHiddenScannerVideo = () => {
-    const video = document.createElement("video");
-    video.setAttribute("playsinline", "true");
-    video.setAttribute("webkit-playsinline", "true");
-    video.setAttribute("autoplay", "true");
-    video.muted = true;
-    video.playsInline = true;
-    video.autoplay = true;
-    video.style.position = "fixed";
-    video.style.left = "-9999px";
-    video.style.width = "1px";
-    video.style.height = "1px";
-    video.style.opacity = "0";
-    document.body.appendChild(video);
-    return video;
-  };
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const stopScanRef = React.useRef<(() => void) | null>(null);
 
   const requestRearCameraStream = async () => {
     const attempts: MediaStreamConstraints[] = [
@@ -177,6 +162,18 @@ export default function AdminInventory() {
     }
   };
 
+  const stopScanning = React.useCallback(() => {
+    stopScanRef.current?.();
+    stopScanRef.current = null;
+    const video = videoRef.current;
+    if (video?.srcObject) {
+      (video.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
+    }
+    setScanning(false);
+    setScanSource("");
+  }, []);
+
   const startCameraScan = async () => {
     if (!window.isSecureContext) {
       toast.error("Camera scanning requires HTTPS (or localhost). Open the site over a secure connection.");
@@ -187,32 +184,30 @@ export default function AdminInventory() {
       return;
     }
 
+    const video = videoRef.current;
+    if (!video) return;
+
     const Detector = (window as any).BarcodeDetector;
 
-    let stream: MediaStream | null = null;
-    let video: HTMLVideoElement | null = null;
     try {
+      const stream = await requestRearCameraStream();
+      video.srcObject = stream;
+      await video.play();
+
       if (Detector) {
         const supported = await Detector.getSupportedFormats?.();
         const detector = new Detector({ formats: supported || ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"] });
-        stream = await requestRearCameraStream();
         setScanSource("native");
         setScanning(true);
 
-        video = createHiddenScannerVideo();
-        video.srcObject = stream;
-        await video.play();
-
         let active = true;
+        stopScanRef.current = () => { active = false; };
         const startedAt = Date.now();
+
         const tryScan = async () => {
           if (!active) return;
-          if (Date.now() - startedAt > 20000) {
-            active = false;
-            stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
-            video?.remove();
-            setScanning(false);
-            setScanSource("");
+          if (Date.now() - startedAt > 30000) {
+            stopScanning();
             toast.error("No barcode detected. Try better lighting or manual barcode entry.");
             return;
           }
@@ -223,12 +218,8 @@ export default function AdminInventory() {
             if (raw) {
               setScanValue(raw);
               setScanFormat(String((c as any).format || "unknown"));
+              stopScanning();
               await resolveBarcode(raw);
-              stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
-              active = false;
-              video?.remove();
-              setScanning(false);
-              setScanSource("");
               return;
             }
           }
@@ -241,8 +232,6 @@ export default function AdminInventory() {
 
       // Safari and other browsers fallback.
       const reader = new BrowserMultiFormatReader();
-      video = createHiddenScannerVideo();
-
       setScanSource("zxing");
       setScanning(true);
       let done = false;
@@ -256,31 +245,27 @@ export default function AdminInventory() {
           if (!raw) return;
           done = true;
           callbackControls.stop();
-
           setScanValue(raw);
           setScanFormat("unknown");
+          stopScanning();
           await resolveBarcode(raw);
-          setScanning(false);
-          setScanSource("");
-          video?.remove();
         }
       );
 
+      stopScanRef.current = () => {
+        if (!done) {
+          done = true;
+          controls.stop();
+        }
+      };
+
       window.setTimeout(() => {
         if (done) return;
-        done = true;
-        controls.stop();
-        stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
-        setScanning(false);
-        setScanSource("");
-        video?.remove();
+        stopScanning();
         toast.error("No barcode detected. Try better lighting or manual barcode entry.");
-      }, 20000);
+      }, 30000);
     } catch (err) {
-      stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
-      video?.remove();
-      setScanning(false);
-      setScanSource("");
+      stopScanning();
       const message = err instanceof Error ? err.message : "Camera scan failed";
       if (message.toLowerCase().includes("denied") || message.toLowerCase().includes("notallowed")) {
         toast.error("Camera permission denied. Allow camera access for this site and try again.");
@@ -324,6 +309,36 @@ export default function AdminInventory() {
             <Button className="h-11" onClick={() => resolveBarcode()} disabled={loading}>
               Find Product
             </Button>
+          </div>
+
+          {/* Camera preview */}
+          <div className={`relative overflow-hidden rounded-lg bg-black ${scanning ? "block" : "hidden"}`}>
+            <video
+              ref={videoRef}
+              playsInline
+              autoPlay
+              muted
+              className="w-full aspect-[4/3] object-cover"
+            />
+            {/* Viewfinder overlay */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute inset-0 border-[3px] border-white/20 rounded-lg" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-1/3 border-2 border-white/60 rounded-md" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[0.5px] w-3/4 h-[1px] bg-red-500/70" />
+            </div>
+            {/* Cancel button */}
+            <Button
+              variant="secondary"
+              size="sm"
+              className="absolute top-3 right-3 h-9 gap-1.5 bg-black/60 hover:bg-black/80 text-white border-0"
+              onClick={stopScanning}
+            >
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
+            <div className="absolute bottom-3 left-0 right-0 text-center text-sm text-white/80">
+              Point at a barcode
+            </div>
           </div>
 
           {resolved && (
