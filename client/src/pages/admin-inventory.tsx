@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { BrowserMultiFormatReader } from "@zxing/browser";
+import DecodeHintType from "@zxing/library/esm/core/DecodeHintType";
 
 type Resolved = {
   barcode: { code: string; format?: string };
@@ -46,7 +47,8 @@ export default function AdminInventory() {
           facingMode: { ideal: "environment" },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
-        },
+          focusMode: { ideal: "continuous" },
+        } as MediaTrackConstraints,
       },
       {
         video: {
@@ -194,9 +196,22 @@ export default function AdminInventory() {
       video.srcObject = stream;
       await video.play();
 
+      // Try to enable continuous autofocus on the video track
+      try {
+        const track = stream.getVideoTracks()[0];
+        const caps = track.getCapabilities?.() as any;
+        if (caps?.focusMode?.includes?.("continuous")) {
+          await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] });
+        }
+      } catch { /* ignore – not all browsers support this */ }
+
       if (Detector) {
         const supported = await Detector.getSupportedFormats?.();
-        const detector = new Detector({ formats: supported || ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"] });
+        const allFormats = supported || [
+          "ean_13", "ean_8", "code_128", "code_39", "code_93",
+          "upc_a", "upc_e", "itf", "codabar", "data_matrix", "qr_code",
+        ];
+        const detector = new Detector({ formats: allFormats });
         setScanSource("native");
         setScanning(true);
 
@@ -206,38 +221,52 @@ export default function AdminInventory() {
 
         const tryScan = async () => {
           if (!active) return;
-          if (Date.now() - startedAt > 30000) {
+          if (Date.now() - startedAt > 60000) {
             stopScanning();
             toast.error("No barcode detected. Try better lighting or manual barcode entry.");
             return;
           }
-          const codes = await detector.detect(video);
-          if (codes.length > 0) {
-            const c = codes[0];
-            const raw = c.rawValue || "";
-            if (raw) {
-              setScanValue(raw);
-              setScanFormat(String((c as any).format || "unknown"));
-              stopScanning();
-              await resolveBarcode(raw);
-              return;
+          try {
+            const codes = await detector.detect(video);
+            if (codes.length > 0) {
+              const c = codes[0];
+              const raw = c.rawValue || "";
+              if (raw) {
+                setScanValue(raw);
+                setScanFormat(String((c as any).format || "unknown"));
+                stopScanning();
+                await resolveBarcode(raw);
+                return;
+              }
             }
-          }
-          requestAnimationFrame(tryScan);
+          } catch { /* detection can throw on some frames, just retry */ }
+          // Scan every ~100ms for faster pickup
+          setTimeout(() => requestAnimationFrame(tryScan), 100);
         };
 
         requestAnimationFrame(tryScan);
         return;
       }
 
-      // Safari and other browsers fallback.
-      const reader = new BrowserMultiFormatReader();
+      // Safari and other browsers fallback — use TRY_HARDER + fast scan interval
+      const hints = new Map();
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      const reader = new BrowserMultiFormatReader(hints, {
+        delayBetweenScanAttempts: 100,
+        delayBetweenScanSuccess: 300,
+      });
       setScanSource("zxing");
       setScanning(true);
       let done = false;
 
       const controls = await reader.decodeFromConstraints(
-        { video: { facingMode: { ideal: "environment" } } },
+        {
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        },
         video,
         async (result, _error, callbackControls) => {
           if (!result) return;
@@ -263,7 +292,7 @@ export default function AdminInventory() {
         if (done) return;
         stopScanning();
         toast.error("No barcode detected. Try better lighting or manual barcode entry.");
-      }, 30000);
+      }, 60000);
     } catch (err) {
       stopScanning();
       const message = err instanceof Error ? err.message : "Camera scan failed";
