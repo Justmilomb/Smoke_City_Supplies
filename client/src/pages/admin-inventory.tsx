@@ -51,24 +51,85 @@ export default function AdminInventory() {
   const [scanning, setScanning] = React.useState(false);
   const [scanSource, setScanSource] = React.useState<"native" | "zxing" | "">("");
 
+  const createHiddenScannerVideo = () => {
+    const video = document.createElement("video");
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("webkit-playsinline", "true");
+    video.setAttribute("autoplay", "true");
+    video.muted = true;
+    video.playsInline = true;
+    video.autoplay = true;
+    video.style.position = "fixed";
+    video.style.left = "-9999px";
+    video.style.width = "1px";
+    video.style.height = "1px";
+    video.style.opacity = "0";
+    document.body.appendChild(video);
+    return video;
+  };
+
+  const requestRearCameraStream = async () => {
+    const attempts: MediaStreamConstraints[] = [
+      {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      },
+      {
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
+      { video: true },
+    ];
+
+    let lastErr: unknown = null;
+    for (const constraints of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error("Unable to access camera");
+  };
+
   const loadZxingBrowser = async (): Promise<ZXingBrowserGlobal> => {
     const existing = (window as any).ZXingBrowser;
     if (existing?.BrowserMultiFormatReader) return existing as ZXingBrowserGlobal;
 
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js";
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load scanner fallback library"));
-      document.head.appendChild(script);
-    });
+    const scriptSources = [
+      "https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js",
+      "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js",
+    ];
 
-    const loaded = (window as any).ZXingBrowser;
-    if (!loaded?.BrowserMultiFormatReader) {
+    let loaded = false;
+    for (const src of scriptSources) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = src;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Failed to load scanner fallback library"));
+          document.head.appendChild(script);
+        });
+        loaded = true;
+        break;
+      } catch {
+        // Try the next CDN source.
+      }
+    }
+
+    const loadedLib = (window as any).ZXingBrowser;
+    if (!loaded || !loadedLib?.BrowserMultiFormatReader) {
       throw new Error("Scanner fallback is unavailable");
     }
-    return loaded as ZXingBrowserGlobal;
+    return loadedLib as ZXingBrowserGlobal;
   };
 
   const loadTransactions = React.useCallback(async () => {
@@ -176,15 +237,16 @@ export default function AdminInventory() {
     const Detector = (window as any).BarcodeDetector;
 
     let stream: MediaStream | null = null;
+    let video: HTMLVideoElement | null = null;
     try {
       if (Detector) {
         const supported = await Detector.getSupportedFormats?.();
         const detector = new Detector({ formats: supported || ["ean_13", "ean_8", "code_128", "upc_a", "upc_e"] });
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
+        stream = await requestRearCameraStream();
         setScanSource("native");
         setScanning(true);
 
-        const video = document.createElement("video");
+        video = createHiddenScannerVideo();
         video.srcObject = stream;
         await video.play();
 
@@ -195,6 +257,7 @@ export default function AdminInventory() {
           if (Date.now() - startedAt > 20000) {
             active = false;
             stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+            video?.remove();
             setScanning(false);
             setScanSource("");
             toast.error("No barcode detected. Try better lighting or manual barcode entry.");
@@ -210,6 +273,7 @@ export default function AdminInventory() {
               await resolveBarcode(raw);
               stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
               active = false;
+              video?.remove();
               setScanning(false);
               setScanSource("");
               return;
@@ -225,14 +289,7 @@ export default function AdminInventory() {
       // Safari and other browsers fallback.
       const ZXingBrowser = await loadZxingBrowser();
       const reader = new ZXingBrowser.BrowserMultiFormatReader();
-      const video = document.createElement("video");
-      video.setAttribute("playsinline", "true");
-      video.muted = true;
-      video.style.position = "fixed";
-      video.style.left = "-9999px";
-      video.style.width = "1px";
-      video.style.height = "1px";
-      document.body.appendChild(video);
+      video = createHiddenScannerVideo();
 
       setScanSource("zxing");
       setScanning(true);
@@ -253,7 +310,7 @@ export default function AdminInventory() {
           await resolveBarcode(raw);
           setScanning(false);
           setScanSource("");
-          video.remove();
+          video?.remove();
         }
       );
 
@@ -262,13 +319,15 @@ export default function AdminInventory() {
         done = true;
         controls.stop();
         reader.reset();
+        stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
         setScanning(false);
         setScanSource("");
-        video.remove();
+        video?.remove();
         toast.error("No barcode detected. Try better lighting or manual barcode entry.");
       }, 20000);
     } catch (err) {
       stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+      video?.remove();
       setScanning(false);
       setScanSource("");
       const message = err instanceof Error ? err.message : "Camera scan failed";
