@@ -10,7 +10,8 @@ import BackButton from "@/components/site/BackButton";
 import AdminImageUpload from "@/components/admin/AdminImageUpload";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { useCategories } from "@/lib/store";
-import { useProduct, useUpdateProduct } from "@/lib/products";
+import { useProduct, useProducts, useUpdateProduct } from "@/lib/products";
+import { useCreateCategory } from "@/lib/categories";
 import type { PartCategory, VehicleType } from "@/lib/mockData";
 import { toast } from "sonner";
 
@@ -25,6 +26,8 @@ const schema = z.object({
   name: z.string().min(3, "Name is too short"),
   vehicle: z.enum(["motorcycle", "bike", "scooter"]),
   category: z.string().min(1, "Pick a category"),
+  subcategory: z.string().min(1, "Add a subcategory"),
+  brand: z.string().min(1, "Pick or add a company"),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
   deliveryEta: z.string().min(2, "Add a delivery time"),
   stock: z.enum(["in-stock", "low", "out"]),
@@ -44,15 +47,38 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export default function AdminEditPart() {
   const params = useParams();
   const id = params?.id;
   const [, setLoc] = useLocation();
   const { data: product, isLoading } = useProduct(id);
+  const { data: products = [] } = useProducts();
   const updateProduct = useUpdateProduct();
+  const createCategory = useCreateCategory();
   const cats = useCategories();
   usePageMeta({ title: product ? `Edit ${product.name}` : "Edit Product", description: "Edit part details and image.", noindex: true });
   const [preview, setPreview] = React.useState<string>("");
+  const [addingCategory, setAddingCategory] = React.useState(false);
+  const [newCategoryName, setNewCategoryName] = React.useState("");
+
+  const brandOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          products
+            .map((p) => (p.brand || "").trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [products]
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -60,6 +86,8 @@ export default function AdminEditPart() {
       name: "",
       vehicle: "motorcycle",
       category: cats[0] ?? "Brakes",
+      subcategory: "",
+      brand: "",
       price: 0,
       deliveryEta: "Next-day delivery",
       stock: "in-stock",
@@ -77,6 +105,11 @@ export default function AdminEditPart() {
       barcodeFormat: "",
     },
   });
+  const selectedCategory = form.watch("category");
+  const categoryOptions = React.useMemo(
+    () => Array.from(new Set([...(cats ?? []), selectedCategory].filter(Boolean))),
+    [cats, selectedCategory]
+  );
 
   const [seoPrompt, setSeoPrompt] = React.useState("");
   const [seoLoading, setSeoLoading] = React.useState(false);
@@ -117,6 +150,8 @@ export default function AdminEditPart() {
         name: product.name,
         vehicle: product.vehicle as "motorcycle" | "bike" | "scooter",
         category: product.category,
+        subcategory: product.subcategory ?? "",
+        brand: product.brand ?? "",
         price: product.price,
         deliveryEta: product.deliveryEta,
         stock: product.stock as "in-stock" | "low" | "out",
@@ -137,6 +172,29 @@ export default function AdminEditPart() {
     }
   }, [product, form]);
 
+  const addCategoryInline = async () => {
+    const name = newCategoryName.trim();
+    if (!name) {
+      toast.error("Enter a category name");
+      return;
+    }
+    const vehicle = form.getValues("vehicle");
+    const vehicleType = vehicle === "scooter" ? "scooter" : vehicle === "bike" ? "bike" : "all";
+    try {
+      const created = await createCategory.mutateAsync({
+        name,
+        slug: slugify(name),
+        vehicleType,
+      });
+      form.setValue("category", created.name, { shouldValidate: true });
+      setNewCategoryName("");
+      setAddingCategory(false);
+      toast.success("Category added");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add category");
+    }
+  };
+
   const onSubmit = (v: FormValues) => {
     if (!id) return;
     const vehicle = v.vehicle as VehicleType;
@@ -148,6 +206,8 @@ export default function AdminEditPart() {
           name: v.name,
           vehicle,
           category,
+          subcategory: v.subcategory,
+          brand: v.brand,
           price: v.price,
           deliveryEta: v.deliveryEta,
           stock: v.stock,
@@ -284,7 +344,17 @@ export default function AdminEditPart() {
                     name="category"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Category</FormLabel>
+                        <div className="flex items-center justify-between gap-2">
+                          <FormLabel>Category</FormLabel>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => setAddingCategory((v) => !v)}
+                          >
+                            {addingCategory ? "Close" : "Add category"}
+                          </Button>
+                        </div>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger className="h-11 rounded-lg">
@@ -292,13 +362,73 @@ export default function AdminEditPart() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {cats.map((c) => (
+                            {categoryOptions.map((c) => (
                               <SelectItem key={c} value={c}>
                                 {c}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {addingCategory && (
+                  <div className="rounded-lg border border-border/60 p-3">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <Input
+                        placeholder="New category name"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        className="h-10 rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        className="h-10 rounded-lg"
+                        disabled={createCategory.isPending}
+                        onClick={addCategoryInline}
+                      >
+                        {createCategory.isPending ? "Adding…" : "Save category"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="subcategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subcategory</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Brake Pads" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="brand"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company / Brand</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            list="brand-options-edit"
+                            placeholder="Choose or type a company"
+                            className="h-11 rounded-lg"
+                          />
+                        </FormControl>
+                        <datalist id="brand-options-edit">
+                          {brandOptions.map((brand) => (
+                            <option key={brand} value={brand} />
+                          ))}
+                        </datalist>
                         <FormMessage />
                       </FormItem>
                     )}

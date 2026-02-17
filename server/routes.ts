@@ -402,6 +402,9 @@ ${urls
       ...parsed.data,
       ...sanitized,
       vehicle: (sanitized.vehicle ?? parsed.data.vehicle) as string,
+      category: (sanitized.category || parsed.data.category) as string,
+      subcategory: (sanitized.subcategory || parsed.data.subcategory) as string,
+      brand: (sanitized.brand || parsed.data.brand) as string,
     };
 
     const product = await storage.createProduct(data);
