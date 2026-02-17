@@ -20,12 +20,13 @@ import {
   createOrderSchema,
   inventoryTransactions,
   orderItems,
+  orderFulfillmentScans,
   orders,
   products,
   storedFiles,
   users,
 } from "@shared/schema";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { seedProducts } from "./seed";
@@ -63,6 +64,15 @@ export interface IStorage {
   updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined>;
   markOrderPaidByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined>;
   markOrderPaymentFailedByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined>;
+  recordOrderFulfillmentScan(input: {
+    orderId: string;
+    productId: string;
+    barcodeId?: string;
+    quantity: number;
+    actor: string;
+  }): Promise<{ packed: boolean; progress: Array<{ productId: string; required: number; scanned: number }> }>;
+  getOrderFulfillmentProgress(orderId: string): Promise<Array<{ productId: string; required: number; scanned: number }>>;
+  restockOverdueUnpackedOrders(days: number): Promise<{ ordersRestocked: number; itemsRestocked: number }>;
   recordOrderInvoice(
     orderId: string,
     data: { invoiceNumber: string; invoiceUrl?: string; invoiceFileId?: string; invoiceSentAt?: string }
@@ -144,6 +154,10 @@ function orderToApi(
     trackingNumber: row.trackingNumber ?? undefined,
     labelCreatedAt: row.labelCreatedAt ?? undefined,
     stockDeductedAt: row.stockDeductedAt ?? undefined,
+    packedAt: row.packedAt ?? undefined,
+    packingCompletedBy: row.packingCompletedBy ?? undefined,
+    stockRevertedAt: row.stockRevertedAt ?? undefined,
+    stockRevertReason: row.stockRevertReason ?? undefined,
     subtotalPence: row.subtotalPence ?? undefined,
     shippingAmountPence: row.shippingAmountPence ?? undefined,
     shippingRateId: row.shippingRateId ?? undefined,
@@ -709,6 +723,120 @@ export class DbStorage implements IStorage {
     return this.getOrder(orderRow.id);
   }
 
+  async recordOrderFulfillmentScan(input: {
+    orderId: string;
+    productId: string;
+    barcodeId?: string;
+    quantity: number;
+    actor: string;
+  }): Promise<{ packed: boolean; progress: Array<{ productId: string; required: number; scanned: number }> }> {
+    await this.getDb().insert(orderFulfillmentScans).values({
+      id: randomUUID(),
+      orderId: input.orderId,
+      productId: input.productId,
+      barcodeId: input.barcodeId ?? null,
+      quantity: input.quantity,
+      actor: input.actor,
+    });
+
+    const items = await this.listOrderItems(input.orderId);
+    const scans = await this.getDb()
+      .select()
+      .from(orderFulfillmentScans)
+      .where(eq(orderFulfillmentScans.orderId, input.orderId));
+
+    const scannedByProduct = new Map<string, number>();
+    for (const scan of scans) {
+      scannedByProduct.set(scan.productId, (scannedByProduct.get(scan.productId) || 0) + scan.quantity);
+    }
+
+    const progress = items.map((item) => ({
+      productId: item.productId,
+      required: item.quantity,
+      scanned: scannedByProduct.get(item.productId) || 0,
+    }));
+    const packed = progress.every((p) => p.scanned >= p.required);
+
+    if (packed) {
+      await this.getDb()
+        .update(orders)
+        .set({
+          packedAt: new Date().toISOString(),
+          packingCompletedBy: input.actor,
+        })
+        .where(eq(orders.id, input.orderId));
+    }
+
+    return { packed, progress };
+  }
+
+  async getOrderFulfillmentProgress(orderId: string): Promise<Array<{ productId: string; required: number; scanned: number }>> {
+    const items = await this.listOrderItems(orderId);
+    const scans = await this.getDb()
+      .select()
+      .from(orderFulfillmentScans)
+      .where(eq(orderFulfillmentScans.orderId, orderId));
+    const scannedByProduct = new Map<string, number>();
+    for (const scan of scans) {
+      scannedByProduct.set(scan.productId, (scannedByProduct.get(scan.productId) || 0) + scan.quantity);
+    }
+    return items.map((item) => ({
+      productId: item.productId,
+      required: item.quantity,
+      scanned: scannedByProduct.get(item.productId) || 0,
+    }));
+  }
+
+  async restockOverdueUnpackedOrders(days: number): Promise<{ ordersRestocked: number; itemsRestocked: number }> {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - Math.max(1, days) * 24 * 60 * 60 * 1000);
+    const candidates = await this.getDb()
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.paymentStatus, "paid"),
+          isNotNull(orders.stockDeductedAt),
+          isNull(orders.packedAt),
+          isNull(orders.stockRevertedAt)
+        )
+      );
+
+    let ordersRestocked = 0;
+    let itemsRestocked = 0;
+    for (const orderRow of candidates) {
+      const deductedAt = orderRow.stockDeductedAt ? new Date(orderRow.stockDeductedAt) : undefined;
+      if (!deductedAt || Number.isNaN(deductedAt.getTime()) || deductedAt > cutoff) continue;
+
+      const items = await this.listOrderItems(orderRow.id);
+      for (const item of items) {
+        const product = await this.getProduct(item.productId);
+        if (!product) continue;
+        await this.updateProductQuantity(item.productId, product.quantity + item.quantity);
+        await this.recordInventoryTransaction({
+          productId: item.productId,
+          type: "order_restock_timeout",
+          quantityDelta: item.quantity,
+          actor: "system",
+          orderId: orderRow.id,
+          reason: `Auto restock after ${days} days without packing`,
+        });
+        itemsRestocked += item.quantity;
+      }
+
+      await this.getDb()
+        .update(orders)
+        .set({
+          stockRevertedAt: now.toISOString(),
+          stockRevertReason: `Auto restock after ${days} days without packing`,
+        })
+        .where(eq(orders.id, orderRow.id));
+      ordersRestocked += 1;
+    }
+
+    return { ordersRestocked, itemsRestocked };
+  }
+
   async recordOrderInvoice(
     orderId: string,
     data: { invoiceNumber: string; invoiceUrl?: string; invoiceFileId?: string; invoiceSentAt?: string }
@@ -841,6 +969,7 @@ export class MemStorage implements IStorage {
   private files = new Map<string, ApiStoredFile>();
   private barcodeMap = new Map<string, ApiBarcode>(); // code -> barcode
   private inventoryTx = new Map<string, ApiInventoryTransaction>();
+  private fulfillmentScans = new Map<string, Array<{ productId: string; quantity: number; barcodeId?: string; actor: string; createdAt: string }>>();
 
   constructor() {
     seedProducts.forEach((p) => this.products.set(p.id, { ...p }));
@@ -1199,6 +1328,97 @@ export class MemStorage implements IStorage {
     const updated = { ...order, paymentStatus: "failed" };
     this.orders.set(order.id, updated);
     return updated;
+  }
+
+  async recordOrderFulfillmentScan(input: {
+    orderId: string;
+    productId: string;
+    barcodeId?: string;
+    quantity: number;
+    actor: string;
+  }): Promise<{ packed: boolean; progress: Array<{ productId: string; required: number; scanned: number }> }> {
+    const order = this.orders.get(input.orderId);
+    if (!order) return { packed: false, progress: [] };
+    const list = this.fulfillmentScans.get(input.orderId) || [];
+    list.push({
+      productId: input.productId,
+      quantity: input.quantity,
+      barcodeId: input.barcodeId,
+      actor: input.actor,
+      createdAt: new Date().toISOString(),
+    });
+    this.fulfillmentScans.set(input.orderId, list);
+
+    const scannedByProduct = new Map<string, number>();
+    for (const scan of list) {
+      scannedByProduct.set(scan.productId, (scannedByProduct.get(scan.productId) || 0) + scan.quantity);
+    }
+    const progress = order.items.map((item) => ({
+      productId: item.productId,
+      required: item.quantity,
+      scanned: scannedByProduct.get(item.productId) || 0,
+    }));
+    const packed = progress.every((p) => p.scanned >= p.required);
+    if (packed) {
+      this.orders.set(input.orderId, {
+        ...order,
+        packedAt: new Date().toISOString(),
+        packingCompletedBy: input.actor,
+      });
+    }
+    return { packed, progress };
+  }
+
+  async getOrderFulfillmentProgress(orderId: string): Promise<Array<{ productId: string; required: number; scanned: number }>> {
+    const order = this.orders.get(orderId);
+    if (!order) return [];
+    const list = this.fulfillmentScans.get(orderId) || [];
+    const scannedByProduct = new Map<string, number>();
+    for (const scan of list) {
+      scannedByProduct.set(scan.productId, (scannedByProduct.get(scan.productId) || 0) + scan.quantity);
+    }
+    return order.items.map((item) => ({
+      productId: item.productId,
+      required: item.quantity,
+      scanned: scannedByProduct.get(item.productId) || 0,
+    }));
+  }
+
+  async restockOverdueUnpackedOrders(days: number): Promise<{ ordersRestocked: number; itemsRestocked: number }> {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - Math.max(1, days) * 24 * 60 * 60 * 1000);
+    let ordersRestocked = 0;
+    let itemsRestocked = 0;
+
+    for (const order of this.orders.values()) {
+      if (order.paymentStatus !== "paid" || !order.stockDeductedAt || order.packedAt || order.stockRevertedAt) continue;
+      const deductedAt = new Date(order.stockDeductedAt);
+      if (Number.isNaN(deductedAt.getTime()) || deductedAt > cutoff) continue;
+
+      for (const item of order.items) {
+        const product = this.products.get(item.productId);
+        if (!product) continue;
+        await this.updateProductQuantity(item.productId, product.quantity + item.quantity);
+        this.recordInventoryTransaction({
+          productId: item.productId,
+          type: "order_restock_timeout",
+          quantityDelta: item.quantity,
+          actor: "system",
+          orderId: order.id,
+          reason: `Auto restock after ${days} days without packing`,
+        });
+        itemsRestocked += item.quantity;
+      }
+
+      this.orders.set(order.id, {
+        ...order,
+        stockRevertedAt: now.toISOString(),
+        stockRevertReason: `Auto restock after ${days} days without packing`,
+      });
+      ordersRestocked += 1;
+    }
+
+    return { ordersRestocked, itemsRestocked };
   }
 
   async recordOrderInvoice(

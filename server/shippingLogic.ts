@@ -1,5 +1,5 @@
 import type { ApiOrder, ApiProduct, ShippingRatesQuoteInput } from "@shared/schema";
-import type { ShippingParcel } from "./shipping/sendcloud";
+import type { ShippingParcel } from "./shipping/royalMailManual";
 
 const LONDON_TIMEZONE = "Europe/London";
 const CUTOFF_HOUR_24 = 18;

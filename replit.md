@@ -46,9 +46,10 @@ A full-stack e-commerce application for motorcycle and scooter parts and accesso
 - `INVOICE_FROM_EMAIL` - Invoice sender email
 - `INVOICE_REPLY_TO` - Invoice reply-to email
 - `ADMIN_ORDER_ALERT_EMAIL` - Admin alert recipient for new paid orders
-- `SENDCLOUD_API_BASE_URL` - Sendcloud API base URL
-- `SENDCLOUD_PUBLIC_KEY` - Sendcloud public key
-- `SENDCLOUD_SECRET_KEY` - Sendcloud secret key
+- `ROYAL_MAIL_LABEL_URL` - Royal Mail label portal URL
+- `ROYAL_MAIL_NEXT_DAY_GUARANTEED_PENCE` - Next Day Guaranteed price in pence (default 1000)
+- `ROYAL_MAIL_NEXT_DAY_AIM_PENCE` - Next Day Aim price in pence (default 500)
+- `ROYAL_MAIL_TRACKED_48_PENCE` - Tracked 48 (Two Day Delivery Aim) price in pence (default 400)
 - `SHIP_FROM_NAME` - Sender name for labels
 - `SHIP_FROM_ADDRESS_LINE1` - Sender address line 1
 - `SHIP_FROM_ADDRESS_LINE2` - Sender address line 2

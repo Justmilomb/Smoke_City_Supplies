@@ -10,7 +10,7 @@ E-commerce site for motorcycle and scooter parts, run by Karl. Bringing back old
 - **Admin Panel** - Full CRUD for products, orders, categories
 - **Barcode Inventory Tools** - Admin can link/scan barcodes for stock-in workflows (mobile-first)
 - **Invoice + Shipping Ops** - Automatic invoice email pipeline and manual shipping label generation
-- **Live UK Shipping Rates** - Checkout quotes live Sendcloud rates and includes shipping in Stripe total
+- **Live UK Shipping Rates** - Checkout uses fixed Royal Mail rates and includes shipping in Stripe total
 - **Security** - Rate limiting, input sanitization, CSRF protection
 - **Brand Story** - Personal touch throughout the customer journey
 
@@ -74,9 +74,9 @@ npm run start
 - `INVOICE_FROM_EMAIL` - Sender address for invoices (e.g. billing@yourdomain.com)
 - `INVOICE_REPLY_TO` - Reply address customers use when replying to invoice emails (defaults to `smokecitycycles@gmail.com`)
 - `ADMIN_ORDER_ALERT_EMAIL` - Admin alert recipient for new paid orders (default `support@smokecitysupplies.com`)
-- `SENDCLOUD_API_BASE_URL` - Sendcloud API base URL (default `https://panel.sendcloud.sc/api/v2`)
-- `SENDCLOUD_PUBLIC_KEY` - Sendcloud public key
-- `SENDCLOUD_SECRET_KEY` - Sendcloud secret key
+- `ROYAL_MAIL_LABEL_URL` - Royal Mail business portal URL for manual label purchase/printing
+- `ROYAL_MAIL_NEXT_DAY_GUARANTEED_PENCE` - Flat shipping price for Next Day Guaranteed (default `1000`)
+- `ROYAL_MAIL_NEXT_DAY_AIM_PENCE` - Flat shipping price for Next Day Aim (default `500`)
 - `SHIP_FROM_NAME` - Sender name for shipping labels
 - `SHIP_FROM_ADDRESS_LINE1` - Sender street for shipping labels
 - `SHIP_FROM_ADDRESS_LINE2` - Sender address line 2
@@ -116,10 +116,15 @@ npm run start
   - generate shipping label (`/api/admin/orders/:id/shipping-label`)
   - print packing slip (`/api/admin/orders/:id/packing-slip`)
 
-## Sendcloud Mode
+## Royal Mail Manual Mode
 
-- Shipping is Sendcloud-only in production and checkout is strict (no shipping fallback rates).
-- Admin can run `POST /api/admin/test/shipping` (or click **Test Shipping**) to verify Sendcloud quote + label creation.
+- Shipping is Royal Mail manual mode with two fixed checkout services:
+  - Tracked 48 (Two Day Delivery Aim) (`£4`)
+  - Next Day Guaranteed (`£10`)
+  - Next Day Aim (`£5`)
+- Admin can run `POST /api/admin/test/shipping` (or click **Test Shipping**) to verify the manual Royal Mail payload flow.
+- Admin uses the Royal Mail website to buy/print labels from the order details.
+- Delivery commitments are subject to Royal Mail terms and conditions.
 
 ## Google Merchant File Feed (Automatic Updates)
 

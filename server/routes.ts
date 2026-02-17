@@ -44,7 +44,7 @@ import {
 } from "./googleMerchantFeed";
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
 import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderConfirmationEmail, sendOrderShippedEmail } from "./email";
-import { createSendcloudLabel, getSendcloudStatus, quoteSendcloudRates } from "./shipping/sendcloud";
+import { createRoyalMailManualLabel, getRoyalMailManualStatus, quoteRoyalMailFlatRates } from "./shipping/royalMailManual";
 import { buildPackingSlipHtml, buildParcelsForItems, dispatchAdviceNow } from "./shippingLogic";
 import { z } from "zod";
 
@@ -305,13 +305,13 @@ ${urls
     };
 
     const parcels = [{ lengthCm: 20, widthCm: 15, heightCm: 10, weightGrams: 1000 }];
-    const status = getSendcloudStatus();
+    const status = getRoyalMailManualStatus();
     if (!status.configured) {
-      return res.status(400).json({ message: "Sendcloud is not configured", status });
+      return res.status(400).json({ message: "Royal Mail manual shipping is not configured", status });
     }
     let rates;
     try {
-      rates = await quoteSendcloudRates({
+      rates = quoteRoyalMailFlatRates({
         ...testInput,
         parcels,
       });
@@ -320,14 +320,15 @@ ${urls
       return res.status(400).json({ message, status });
     }
     if (!rates.length) {
-      return res.status(400).json({ message: "No Sendcloud rates available for test payload", status });
+      return res.status(400).json({ message: "No Royal Mail rates available for test payload", status });
     }
     const chosen = rates[0];
-    const label = await createSendcloudLabel({
+    const label = createRoyalMailManualLabel({
       ...testInput,
       parcels,
       selectedRateId: chosen.rateId,
       selectedServiceCode: chosen.serviceCode,
+      selectedServiceName: chosen.serviceName,
     });
     return res.json({ ok: true, status, rates, chosenRate: chosen, label });
   });
@@ -512,23 +513,62 @@ ${urls
       return res.status(400).json({ message: "Order is not paid yet" });
     }
 
-    const resolved = await storage.resolveBarcode(parsed.data.code.trim());
-    if (!resolved.product) {
-      return res.status(404).json({ message: "Barcode not linked to a product" });
+    let selectedProductId = parsed.data.productId;
+    let selectedBarcodeId: string | undefined;
+    let selectedProductName = "";
+
+    if (parsed.data.code) {
+      const resolved = await storage.resolveBarcode(parsed.data.code.trim());
+      if (!resolved.product) {
+        return res.status(404).json({ message: "Barcode not linked to a product" });
+      }
+      selectedProductId = resolved.product.id;
+      selectedProductName = resolved.product.name;
+      selectedBarcodeId = resolved.barcode?.id;
     }
 
-    const matchingItem = order.items.find((item) => item.productId === resolved.product!.id);
+    if (!selectedProductId) {
+      return res.status(400).json({ message: "Scan a barcode or select a product" });
+    }
+
+    const matchingItem = order.items.find((item) => item.productId === selectedProductId);
     if (!matchingItem) {
-      return res.status(400).json({ message: "Scanned barcode does not belong to this order" });
+      return res.status(400).json({ message: "Selected product does not belong to this order" });
     }
 
-    // This endpoint is verification-only for paid online orders (no second stock deduction).
+    const progressBefore = await storage.getOrderFulfillmentProgress(orderId);
+    const existing = progressBefore.find((p) => p.productId === selectedProductId);
+    const scannedAlready = existing?.scanned || 0;
+    if (scannedAlready + parsed.data.quantity > matchingItem.quantity) {
+      return res.status(400).json({
+        message: "Packed quantity exceeds ordered quantity",
+        productId: selectedProductId,
+        ordered: matchingItem.quantity,
+        alreadyPacked: scannedAlready,
+      });
+    }
+
+    const packedResult = await storage.recordOrderFulfillmentScan({
+      orderId,
+      productId: selectedProductId,
+      barcodeId: selectedBarcodeId,
+      quantity: parsed.data.quantity,
+      actor: req.user?.username || "admin",
+    });
+
     return res.json({
       ok: true,
       orderId,
-      scannedProduct: resolved.product,
+      scannedProduct: {
+        id: selectedProductId,
+        name: selectedProductName || matchingItem.productName,
+      },
       scannedQty: parsed.data.quantity,
-      note: "Fulfillment scan recorded. Stock was already deducted at payment confirmation.",
+      packed: packedResult.packed,
+      progress: packedResult.progress,
+      note: packedResult.packed
+        ? "Order fully packed. Stock was already deducted at payment confirmation."
+        : "Fulfillment scan recorded. Continue scanning remaining items.",
     });
   });
 
@@ -608,7 +648,7 @@ Rules:
 
     let rates;
     try {
-      rates = await quoteSendcloudRates({
+      rates = quoteRoyalMailFlatRates({
         name: parsed.data.customerName,
         email: parsed.data.customerEmail,
         addressLine1: parsed.data.addressLine1,
@@ -660,7 +700,7 @@ Rules:
 
     let liveRates;
     try {
-      liveRates = await quoteSendcloudRates({
+      liveRates = quoteRoyalMailFlatRates({
         name: parsed.data.customerName,
         email: parsed.data.customerEmail,
         addressLine1: parsed.data.addressLine1,
@@ -946,8 +986,53 @@ Rules:
       return res.status(400).json({ message: "Order status must be processing before creating a label" });
     }
 
-    if (!order.customerName || !order.addressLine1 || !order.city || !order.postcode) {
-      return res.status(400).json({ message: "Missing shipping address fields on order" });
+    const labelPayloadSchema = z.object({
+      name: z.string().min(1).optional(),
+      email: z.string().email().optional(),
+      addressLine1: z.string().min(1).optional(),
+      addressLine2: z.string().optional(),
+      city: z.string().min(1).optional(),
+      county: z.string().optional(),
+      postcode: z.string().min(1).optional(),
+      country: z.string().min(2).max(2).optional(),
+      selectedRateId: z.string().min(1).optional(),
+      selectedServiceCode: z.string().min(1).optional(),
+    });
+    const parsedPayload = labelPayloadSchema.safeParse(req.body ?? {});
+    if (!parsedPayload.success) {
+      return res.status(400).json({
+        message: "Invalid shipping label details",
+        errors: parsedPayload.error.flatten().fieldErrors,
+      });
+    }
+
+    const shippingInput = {
+      name: parsedPayload.data.name || order.customerName || "",
+      email: parsedPayload.data.email || order.customerEmail,
+      addressLine1: parsedPayload.data.addressLine1 || order.addressLine1 || "",
+      addressLine2: parsedPayload.data.addressLine2 || order.addressLine2,
+      city: parsedPayload.data.city || order.city || "",
+      county: parsedPayload.data.county || order.county,
+      postcode: parsedPayload.data.postcode || order.postcode || "",
+      country: (parsedPayload.data.country || order.country || "GB").toUpperCase(),
+      selectedRateId: parsedPayload.data.selectedRateId || order.shippingRateId || "",
+      selectedServiceCode:
+        parsedPayload.data.selectedServiceCode || order.shippingRateId || order.shippingServiceLevel || "",
+    };
+
+    const missingFields = [
+      !shippingInput.name ? "name" : "",
+      !shippingInput.addressLine1 ? "addressLine1" : "",
+      !shippingInput.city ? "city" : "",
+      !shippingInput.postcode ? "postcode" : "",
+      !shippingInput.country ? "country" : "",
+      !shippingInput.selectedRateId ? "selectedRateId" : "",
+    ].filter(Boolean);
+    if (missingFields.length) {
+      return res.status(400).json({
+        message: "Missing required shipping details before preparing Royal Mail label",
+        missingFields,
+      });
     }
 
     const productMap = await getProductMap();
@@ -960,54 +1045,27 @@ Rules:
 
     let label;
     try {
-      label = await createSendcloudLabel({
-        name: order.customerName,
-        email: order.customerEmail,
-        addressLine1: order.addressLine1,
-        addressLine2: order.addressLine2,
-        city: order.city,
-        county: order.county,
-        postcode: order.postcode,
-        country: order.country || "GB",
+      label = createRoyalMailManualLabel({
+        name: shippingInput.name,
+        email: shippingInput.email,
+        addressLine1: shippingInput.addressLine1,
+        addressLine2: shippingInput.addressLine2,
+        city: shippingInput.city,
+        county: shippingInput.county,
+        postcode: shippingInput.postcode,
+        country: shippingInput.country,
         parcels,
-        selectedRateId: order.shippingRateId,
-        selectedServiceCode: order.shippingRateId || order.shippingServiceLevel,
+        selectedRateId: shippingInput.selectedRateId,
+        selectedServiceCode: shippingInput.selectedServiceCode,
+        selectedServiceName: order.shippingServiceLevel || undefined,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Shipping label generation failed";
       return res.status(400).json({ message });
     }
 
-    let shippingLabelUrl = label.labelUrl || "";
-    let shippingLabelFileId: string | undefined;
-    if (label.labelContentBase64) {
-      const stored = await storage.createStoredFile({
-        kind: "shipping_label_pdf",
-        filename: label.labelFilename || `${label.labelId}.html`,
-        mimeType: label.labelMimeType || "text/html; charset=utf-8",
-        content: Buffer.from(label.labelContentBase64, "base64"),
-      });
-      shippingLabelFileId = stored.id;
-      shippingLabelUrl = `/api/files/${stored.id}`;
-    } else if (label.labelUrl) {
-      try {
-        const fetched = await fetch(label.labelUrl);
-        if (fetched.ok) {
-          const mimeType = fetched.headers.get("content-type") || "application/pdf";
-          const buffer = Buffer.from(await fetched.arrayBuffer());
-          const stored = await storage.createStoredFile({
-            kind: "shipping_label_pdf",
-            filename: `${label.labelId}.pdf`,
-            mimeType,
-            content: buffer,
-          });
-          shippingLabelFileId = stored.id;
-          shippingLabelUrl = `/api/files/${stored.id}`;
-        }
-      } catch (err) {
-        console.warn("[shipping] could not mirror label file to database:", err);
-      }
-    }
+    const shippingLabelUrl = label.labelUrl || "";
+    const shippingLabelFileId: string | undefined = undefined;
 
     if (!shippingLabelUrl) {
       return res.status(500).json({ message: "Shipping provider did not return a usable label" });
@@ -1027,6 +1085,8 @@ Rules:
       order: updated,
       shippingLabelUrl,
       trackingNumber: label.trackingNumber,
+      manualRoyalMailUrl: label.labelUrl,
+      selectedService: label.serviceName,
       shippingAddress: orderToAddressText(order),
     });
   });

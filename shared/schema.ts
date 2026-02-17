@@ -145,6 +145,16 @@ export const orderItems = pgTable("order_items", {
   priceEach: integer("price_each").notNull(),
 });
 
+export const orderFulfillmentScans = pgTable("order_fulfillment_scans", {
+  id: varchar("id").primaryKey(),
+  orderId: varchar("order_id").notNull(),
+  productId: varchar("product_id").notNull(),
+  barcodeId: varchar("barcode_id"),
+  quantity: integer("quantity").notNull(),
+  actor: text("actor").notNull().default("admin"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(),
   createdAt: text("created_at").notNull(),
@@ -172,6 +182,10 @@ export const orders = pgTable("orders", {
   trackingNumber: text("tracking_number"),
   labelCreatedAt: text("label_created_at"),
   stockDeductedAt: text("stock_deducted_at"),
+  packedAt: text("packed_at"),
+  packingCompletedBy: text("packing_completed_by"),
+  stockRevertedAt: text("stock_reverted_at"),
+  stockRevertReason: text("stock_revert_reason"),
   subtotalPence: integer("subtotal_pence"),
   shippingAmountPence: integer("shipping_amount_pence"),
   shippingRateId: text("shipping_rate_id"),
@@ -271,8 +285,12 @@ export const stockInSchema = z.object({
 });
 
 export const fulfillmentScanSchema = z.object({
-  code: z.string().min(3),
+  code: z.string().min(3).optional(),
+  productId: z.string().min(1).optional(),
   quantity: z.number().int().min(1).default(1),
+}).refine((v) => Boolean(v.code || v.productId), {
+  message: "Either barcode code or productId is required",
+  path: ["code"],
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
@@ -379,6 +397,10 @@ export type ApiOrder = {
   trackingNumber?: string;
   labelCreatedAt?: string;
   stockDeductedAt?: string;
+  packedAt?: string;
+  packingCompletedBy?: string;
+  stockRevertedAt?: string;
+  stockRevertReason?: string;
   subtotalPence?: number;
   shippingAmountPence?: number;
   shippingRateId?: string;

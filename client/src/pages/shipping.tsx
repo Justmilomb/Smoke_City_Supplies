@@ -47,7 +47,13 @@ export default function ShippingPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Shipping Costs</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Live UK shipping rates are calculated at checkout based on parcel weight, dimensions, and destination postcode.
+              Royal Mail services at checkout:
+              <br />
+              Tracked 48 (Two Day Delivery Aim): £4.00
+              <br />
+              Next Day Aim: £5.00
+              <br />
+              Next Day Guaranteed: £10.00
             </p>
           </Card>
 
@@ -79,6 +85,9 @@ export default function ShippingPage() {
               <h3 className="font-semibold mb-1">Need Help?</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Have questions about shipping for your order? We're here to help.
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Delivery commitments and exclusions are subject to Royal Mail service terms and conditions.
               </p>
               <Link href="/contact">
                 <Button variant="outline" size="sm" asChild>

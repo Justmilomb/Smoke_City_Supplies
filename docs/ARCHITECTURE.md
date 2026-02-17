@@ -12,7 +12,7 @@
 - `server/routes.ts`: API route registration (main router/controller surface).
 - `server/invoice.ts`: invoice number generation + HTML/PDF rendering helpers.
 - `server/email.ts`: transactional email dispatch (invoice, order confirmation, shipped, admin alert) via Resend.
-- `server/shipping/sendcloud.ts`: Sendcloud quote + label integration and startup config validation.
+- `server/shipping/royalMailManual.ts`: fixed Royal Mail shipping rates + manual label draft flow.
 - `server/shippingLogic.ts`: parcel building, dispatch cutoff advice, and packing slip HTML generation.
 - `server/googleMerchantFeed.ts`: Google Merchant XML feed builder + feed-file writer scheduler.
 - `server/auth.ts`: Passport strategies and auth wiring.

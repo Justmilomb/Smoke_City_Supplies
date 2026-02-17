@@ -443,7 +443,7 @@ export default function CartPage() {
                     </Button>
                   </div>
                   {shippingRates.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">Enter address details and fetch live Sendcloud shipping rates.</div>
+                    <div className="text-sm text-muted-foreground">Enter address details and fetch Royal Mail delivery options.</div>
                   ) : (
                     <div className="space-y-2">
                       {shippingRates.map((rate) => (

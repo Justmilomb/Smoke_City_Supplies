@@ -6,6 +6,16 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -38,7 +48,11 @@ type Order = {
   invoiceSentAt?: string;
   shippingLabelUrl?: string;
   trackingNumber?: string;
+  packedAt?: string;
+  stockRevertedAt?: string;
+  stockRevertReason?: string;
   shippingServiceLevel?: string;
+  shippingRateId?: string;
   shippingAmountPence?: number;
   dispatchAdvice?: string;
   expectedShipDate?: string;
@@ -77,24 +91,38 @@ async function resendInvoice(orderId: string) {
   return res.json();
 }
 
-async function generateLabel(orderId: string) {
+async function generateLabel(orderId: string, payload: {
+  name: string;
+  email?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  county?: string;
+  postcode: string;
+  country: string;
+  selectedRateId?: string;
+  selectedServiceCode?: string;
+}) {
   const res = await fetch(`${API}/admin/orders/${orderId}/shipping-label`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     credentials: "include",
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.message ?? "Failed to generate shipping label");
+    const missing = Array.isArray(data?.missingFields) && data.missingFields.length ? ` (${data.missingFields.join(", ")})` : "";
+    throw new Error((data.message ?? "Failed to generate shipping label") + missing);
   }
   return res.json();
 }
 
-async function submitFulfillmentScan(orderId: string, code: string, quantity = 1) {
+async function submitFulfillmentScan(orderId: string, payload: { code?: string; productId?: string; quantity?: number }) {
   const res = await fetch(`${API}/admin/orders/${orderId}/fulfillment/scan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ code, quantity }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -148,6 +176,32 @@ function OrderStatusSelect({
 function ActionButtons({ order }: { order: Order }) {
   const queryClient = useQueryClient();
   const [working, setWorking] = React.useState(false);
+  const [labelOpen, setLabelOpen] = React.useState(false);
+  const [labelForm, setLabelForm] = React.useState({
+    name: order.customerName || "",
+    email: order.customerEmail || "",
+    addressLine1: order.addressLine1 || "",
+    addressLine2: order.addressLine2 || "",
+    city: order.city || "",
+    county: order.county || "",
+    postcode: order.postcode || "",
+    country: (order.country || "GB").toUpperCase(),
+    selectedRateId: order.shippingRateId || "",
+  });
+
+  React.useEffect(() => {
+    setLabelForm({
+      name: order.customerName || "",
+      email: order.customerEmail || "",
+      addressLine1: order.addressLine1 || "",
+      addressLine2: order.addressLine2 || "",
+      city: order.city || "",
+      county: order.county || "",
+      postcode: order.postcode || "",
+      country: (order.country || "GB").toUpperCase(),
+      selectedRateId: order.shippingRateId || "",
+    });
+  }, [order.id, order.customerName, order.customerEmail, order.addressLine1, order.addressLine2, order.city, order.county, order.postcode, order.country, order.shippingRateId]);
 
   const onResendInvoice = async () => {
     setWorking(true);
@@ -165,8 +219,22 @@ function ActionButtons({ order }: { order: Order }) {
   const onGenerateLabel = async () => {
     setWorking(true);
     try {
-      const data = await generateLabel(order.id);
+      const data = await generateLabel(order.id, {
+        name: labelForm.name.trim(),
+        email: labelForm.email.trim() || undefined,
+        addressLine1: labelForm.addressLine1.trim(),
+        addressLine2: labelForm.addressLine2.trim() || undefined,
+        city: labelForm.city.trim(),
+        county: labelForm.county.trim() || undefined,
+        postcode: labelForm.postcode.trim().toUpperCase(),
+        country: (labelForm.country.trim() || "GB").toUpperCase(),
+        selectedRateId: labelForm.selectedRateId.trim() || undefined,
+      });
       toast.success(data.trackingNumber ? `Label generated (${data.trackingNumber})` : "Label generated");
+      if (data.manualRoyalMailUrl) {
+        window.open(data.manualRoyalMailUrl, "_blank", "noopener,noreferrer");
+      }
+      setLabelOpen(false);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Label generation failed");
@@ -181,12 +249,25 @@ function ActionButtons({ order }: { order: Order }) {
 
   const onFulfillmentScan = async () => {
     const code = window.prompt("Scan or enter barcode for this order:");
-    if (!code?.trim()) return;
+    let payload: { code?: string; productId?: string; quantity?: number };
+    if (code?.trim()) {
+      payload = { code: code.trim(), quantity: 1 };
+    } else {
+      const choices = order.items.map((item, idx) => `${idx + 1}. ${item.productName} (x${item.quantity})`).join("\n");
+      const picked = window.prompt(`No barcode entered. Select packed product number:\n${choices}`);
+      if (!picked?.trim()) return;
+      const index = Number(picked.trim()) - 1;
+      if (!Number.isInteger(index) || index < 0 || index >= order.items.length) {
+        toast.error("Invalid product selection");
+        return;
+      }
+      payload = { productId: order.items[index].productId, quantity: 1 };
+    }
 
     setWorking(true);
     try {
-      await submitFulfillmentScan(order.id, code.trim(), 1);
-      toast.success("Fulfillment scan recorded");
+      const data = await submitFulfillmentScan(order.id, payload);
+      toast.success(data?.packed ? "Order fully packed" : "Packing progress recorded");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Fulfillment scan failed");
     } finally {
@@ -203,7 +284,7 @@ function ActionButtons({ order }: { order: Order }) {
         variant="outline"
         size="sm"
         className="h-8"
-        onClick={onGenerateLabel}
+        onClick={() => setLabelOpen(true)}
         disabled={working || order.paymentStatus !== "paid" || order.status !== "processing"}
       >
         Generate Label
@@ -225,6 +306,75 @@ function ActionButtons({ order }: { order: Order }) {
           Label PDF
         </a>
       )}
+      <Dialog open={labelOpen} onOpenChange={setLabelOpen}>
+        <DialogContent className="sm:max-w-[620px]">
+          <DialogHeader>
+            <DialogTitle>Prepare Royal Mail Label</DialogTitle>
+            <DialogDescription>
+              Confirm shipping details, then open Royal Mail to buy and print the label.
+            </DialogDescription>
+            <p className="text-xs text-muted-foreground">
+              Shipping is fulfilled via Royal Mail. Confirm service terms in Royal Mail T&amp;Cs before purchasing labels.
+            </p>
+          </DialogHeader>
+          <div className="grid gap-3 py-1">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Name *</Label>
+                <Input value={labelForm.name} onChange={(e) => setLabelForm((s) => ({ ...s, name: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Email</Label>
+                <Input value={labelForm.email} onChange={(e) => setLabelForm((s) => ({ ...s, email: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Address Line 1 *</Label>
+              <Input value={labelForm.addressLine1} onChange={(e) => setLabelForm((s) => ({ ...s, addressLine1: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Address Line 2</Label>
+              <Input value={labelForm.addressLine2} onChange={(e) => setLabelForm((s) => ({ ...s, addressLine2: e.target.value }))} />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>City *</Label>
+                <Input value={labelForm.city} onChange={(e) => setLabelForm((s) => ({ ...s, city: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>County</Label>
+                <Input value={labelForm.county} onChange={(e) => setLabelForm((s) => ({ ...s, county: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Postcode *</Label>
+                <Input value={labelForm.postcode} onChange={(e) => setLabelForm((s) => ({ ...s, postcode: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Country *</Label>
+                <Input value={labelForm.country} onChange={(e) => setLabelForm((s) => ({ ...s, country: e.target.value.toUpperCase() }))} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Royal Mail Service *</Label>
+              <Input
+                placeholder="royal_mail_tracked_48_two_day_aim, royal_mail_next_day_aim, or royal_mail_next_day_guaranteed"
+                value={labelForm.selectedRateId}
+                onChange={(e) => setLabelForm((s) => ({ ...s, selectedRateId: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setLabelOpen(false)} disabled={working}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={onGenerateLabel} disabled={working}>
+              {working ? "Preparing..." : "Prepare Label"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -297,6 +447,8 @@ export default function AdminOrders() {
                   </div>
                   <div className="text-base font-medium tabular-nums">£{((order.totalPence ?? 0) / 100).toFixed(2)}</div>
                   {order.trackingNumber && <div className="text-xs text-muted-foreground">Tracking: {order.trackingNumber}</div>}
+                  {order.packedAt && <div className="text-xs text-emerald-700">Packed: {new Date(order.packedAt).toLocaleString()}</div>}
+                  {order.stockRevertedAt && <div className="text-xs text-amber-700">Restocked: {new Date(order.stockRevertedAt).toLocaleString()}</div>}
                   <ActionButtons order={order} />
                 </div>
               ))}
@@ -353,6 +505,8 @@ export default function AdminOrders() {
                       {order.invoiceNumber && <div className="text-xs">{order.invoiceNumber}</div>}
                       {order.invoiceSentAt && <div className="text-xs text-muted-foreground">Sent</div>}
                       {order.trackingNumber && <div className="text-xs text-muted-foreground">Tracking: {order.trackingNumber}</div>}
+                      {order.packedAt && <div className="text-xs text-emerald-700">Packed</div>}
+                      {order.stockRevertedAt && <div className="text-xs text-amber-700">Restocked</div>}
                       <div className="mt-2">
                         <ActionButtons order={order} />
                       </div>

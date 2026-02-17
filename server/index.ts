@@ -9,9 +9,10 @@ import { UPLOADS_DIR } from "./upload";
 import { pool } from "./db";
 import "./auth"; // Passport strategies
 import { securityHeaders, corsConfig } from "./security";
-import { assertSendcloudConfigurationOrThrow } from "./shipping/sendcloud";
+import { assertRoyalMailManualConfigurationOrThrow } from "./shipping/royalMailManual";
+import { storage } from "./storage";
 
-assertSendcloudConfigurationOrThrow();
+assertRoyalMailManualConfigurationOrThrow();
 
 const PgSession = connectPgSimple(session);
 const MemSessionStore = createMemoryStore(session);
@@ -116,6 +117,22 @@ app.use((req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
+
+  const runRestockReconciliation = async () => {
+    try {
+      const result = await storage.restockOverdueUnpackedOrders(30);
+      if (result.ordersRestocked > 0) {
+        log(`auto-restocked ${result.itemsRestocked} units across ${result.ordersRestocked} overdue unpacked orders`, "stock-reconcile");
+      }
+    } catch (err) {
+      console.error("[stock-reconcile] failed:", err);
+    }
+  };
+  // Run once at boot and daily after that.
+  void runRestockReconciliation();
+  setInterval(() => {
+    void runRestockReconciliation();
+  }, 24 * 60 * 60 * 1000);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
