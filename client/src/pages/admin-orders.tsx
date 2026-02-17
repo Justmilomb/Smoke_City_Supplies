@@ -131,6 +131,18 @@ async function submitFulfillmentScan(orderId: string, payload: { code?: string; 
   return res.json();
 }
 
+async function refundOrder(orderId: string) {
+  const res = await fetch(`${API}/admin/orders/${orderId}/refund`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message ?? "Failed to process refund");
+  }
+  return res.json();
+}
+
 function OrderStatusSelect({
   orderId,
   currentStatus,
@@ -182,6 +194,7 @@ function ActionButtons({ order }: { order: Order }) {
   const queryClient = useQueryClient();
   const [working, setWorking] = React.useState(false);
   const [labelOpen, setLabelOpen] = React.useState(false);
+  const [refundConfirmOpen, setRefundConfirmOpen] = React.useState(false);
   const [labelForm, setLabelForm] = React.useState({
     name: order.customerName || "",
     email: order.customerEmail || "",
@@ -280,6 +293,22 @@ function ActionButtons({ order }: { order: Order }) {
     }
   };
 
+  const onRefund = async () => {
+    setRefundConfirmOpen(false);
+    setWorking(true);
+    try {
+      const data = await refundOrder(order.id);
+      toast.success(`Refund processed (${data.refundId})`);
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Refund failed");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const canRefund = order.status === "cancelled" && order.paymentStatus === "paid" && !!order.stripePaymentIntentId;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" className="h-8" onClick={onResendInvoice} disabled={working || order.paymentStatus !== "paid"}>
@@ -306,11 +335,43 @@ function ActionButtons({ order }: { order: Order }) {
       <Button variant="outline" size="sm" className="h-8" onClick={onPrintPackingSlip}>
         Packing Slip
       </Button>
+      {canRefund && (
+        <Button
+          variant="destructive"
+          size="sm"
+          className="h-8"
+          onClick={() => setRefundConfirmOpen(true)}
+          disabled={working}
+        >
+          Refund Money
+        </Button>
+      )}
+      {order.paymentStatus === "refunded" && (
+        <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Refunded</span>
+      )}
       {order.shippingLabelUrl && (
         <a href={order.shippingLabelUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
           Label PDF
         </a>
       )}
+      <Dialog open={refundConfirmOpen} onOpenChange={setRefundConfirmOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Confirm Refund</DialogTitle>
+            <DialogDescription>
+              This will issue a full refund of <strong>£{(order.totalPence / 100).toFixed(2)}</strong> to the customer's original payment method via Stripe. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRefundConfirmOpen(false)} disabled={working}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={onRefund} disabled={working}>
+              {working ? "Processing..." : "Confirm Refund"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={labelOpen} onOpenChange={setLabelOpen}>
         <DialogContent className="sm:max-w-[620px]">
           <DialogHeader>

@@ -1007,6 +1007,55 @@ Rules:
     return res.json(updated);
   });
 
+  app.post("/api/admin/orders/:id/refund", requireAuth, apiRateLimiter, async (req, res) => {
+    const orderId = paramId(req);
+    const order = await storage.getOrder(orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (order.paymentStatus !== "paid") {
+      return res.status(400).json({ message: `Cannot refund order with payment status "${order.paymentStatus}"` });
+    }
+
+    if (!order.stripePaymentIntentId) {
+      return res.status(400).json({ message: "Order has no Stripe payment intent — cannot process refund" });
+    }
+
+    try {
+      const refund = await stripe.refunds.create({
+        payment_intent: order.stripePaymentIntentId,
+      });
+
+      const updated = await storage.markOrderRefunded(orderId);
+
+      // Send cancellation/refund email if customer has email
+      if (updated?.customerEmail) {
+        try {
+          await sendOrderCancelledEmail({
+            to: updated.customerEmail,
+            orderId: updated.id,
+            customerName: updated.customerName,
+            totalPence: updated.totalPence,
+            items: updated.items,
+          });
+        } catch (emailErr) {
+          console.error("[refund email] failed:", emailErr);
+        }
+      }
+
+      return res.json({
+        ok: true,
+        refundId: refund.id,
+        refundStatus: refund.status,
+        amountRefunded: refund.amount,
+        order: updated,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Refund failed";
+      console.error("[refund] Stripe error:", message);
+      return res.status(500).json({ message: `Refund failed: ${message}` });
+    }
+  });
+
   app.get("/api/admin/orders/:id/invoice.pdf", requireAuth, async (req, res) => {
     const order = await storage.getOrder(paramId(req));
     if (!order) return res.status(404).json({ message: "Order not found" });

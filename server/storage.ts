@@ -64,6 +64,7 @@ export interface IStorage {
   updateOrderStatus(id: string, status: string): Promise<ApiOrder | undefined>;
   markOrderPaidByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined>;
   markOrderPaymentFailedByPaymentIntent(paymentIntentId: string): Promise<ApiOrder | undefined>;
+  markOrderRefunded(id: string): Promise<ApiOrder | undefined>;
   recordOrderFulfillmentScan(input: {
     orderId: string;
     productId: string;
@@ -756,6 +757,22 @@ export class DbStorage implements IStorage {
     return this.getOrder(orderRow.id);
   }
 
+  async markOrderRefunded(id: string): Promise<ApiOrder | undefined> {
+    const [orderRow] = await this.getDb()
+      .select()
+      .from(orders)
+      .where(eq(orders.id, id))
+      .limit(1);
+    if (!orderRow) return undefined;
+
+    await this.getDb()
+      .update(orders)
+      .set({ paymentStatus: "refunded" })
+      .where(eq(orders.id, id));
+
+    return this.getOrder(id);
+  }
+
   async recordOrderFulfillmentScan(input: {
     orderId: string;
     productId: string;
@@ -1360,6 +1377,14 @@ export class MemStorage implements IStorage {
     if (!order) return undefined;
     const updated = { ...order, paymentStatus: "failed" };
     this.orders.set(order.id, updated);
+    return updated;
+  }
+
+  async markOrderRefunded(id: string): Promise<ApiOrder | undefined> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    const updated = { ...order, paymentStatus: "refunded" };
+    this.orders.set(id, updated);
     return updated;
   }
 
