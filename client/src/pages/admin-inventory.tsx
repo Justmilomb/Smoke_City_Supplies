@@ -8,21 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-
-type ZXingBrowserGlobal = {
-  BrowserMultiFormatReader: new () => {
-    decodeFromConstraints: (
-      constraints: MediaStreamConstraints,
-      videoEl: HTMLVideoElement,
-      callback: (
-        result: { getText: () => string } | null,
-        error: unknown,
-        controls: { stop: () => void }
-      ) => void
-    ) => Promise<{ stop: () => void }>;
-    reset: () => void;
-  };
-};
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 type Resolved = {
   barcode: { code: string; format?: string };
@@ -98,39 +84,6 @@ export default function AdminInventory() {
     throw lastErr instanceof Error ? lastErr : new Error("Unable to access camera");
   };
 
-  const loadZxingBrowser = async (): Promise<ZXingBrowserGlobal> => {
-    const existing = (window as any).ZXingBrowser;
-    if (existing?.BrowserMultiFormatReader) return existing as ZXingBrowserGlobal;
-
-    const scriptSources = [
-      "https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js",
-      "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js",
-    ];
-
-    let loaded = false;
-    for (const src of scriptSources) {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = src;
-          script.async = true;
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Failed to load scanner fallback library"));
-          document.head.appendChild(script);
-        });
-        loaded = true;
-        break;
-      } catch {
-        // Try next source.
-      }
-    }
-
-    const loadedLib = (window as any).ZXingBrowser;
-    if (!loaded || !loadedLib?.BrowserMultiFormatReader) {
-      throw new Error("Scanner fallback is unavailable");
-    }
-    return loadedLib as ZXingBrowserGlobal;
-  };
 
   const loadTransactions = React.useCallback(async () => {
     const res = await fetch("/api/admin/inventory/transactions?limit=12", { credentials: "include" });
@@ -287,8 +240,7 @@ export default function AdminInventory() {
       }
 
       // Safari and other browsers fallback.
-      const ZXingBrowser = await loadZxingBrowser();
-      const reader = new ZXingBrowser.BrowserMultiFormatReader();
+      const reader = new BrowserMultiFormatReader();
       video = createHiddenScannerVideo();
 
       setScanSource("zxing");
@@ -304,7 +256,7 @@ export default function AdminInventory() {
           if (!raw) return;
           done = true;
           callbackControls.stop();
-          reader.reset();
+
           setScanValue(raw);
           setScanFormat("unknown");
           await resolveBarcode(raw);
@@ -318,7 +270,6 @@ export default function AdminInventory() {
         if (done) return;
         done = true;
         controls.stop();
-        reader.reset();
         stream?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
         setScanning(false);
         setScanSource("");
