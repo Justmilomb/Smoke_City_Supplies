@@ -64,12 +64,12 @@ function postcodeLooksUk(postcode: string): boolean {
   return /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/.test(normalized);
 }
 
-function assertUkDestination(input: { country?: string; postcode?: string }) {
+function assertUkDestination(input: { country?: string; postcode?: string }, requirePostcode = true) {
   const country = (input.country || "GB").toUpperCase();
   if (country !== "GB" && country !== "UK") {
     throw new Error("Only UK domestic shipping is supported right now.");
   }
-  if (!input.postcode || !postcodeLooksUk(input.postcode)) {
+  if (requirePostcode && (!input.postcode || !postcodeLooksUk(input.postcode))) {
     throw new Error("Please enter a valid UK postcode.");
   }
 }
@@ -82,8 +82,9 @@ export function getRoyalMailManualStatus() {
   return { mode: "manual" as const, configured: true, provider: "royal_mail_manual" as const };
 }
 
-export function quoteRoyalMailFlatRates(input: ShippingQuoteInput): ShippingQuote[] {
-  assertUkDestination(input);
+export function quoteRoyalMailFlatRates(input: Partial<ShippingQuoteInput> & { parcels?: ShippingParcel[] }): ShippingQuote[] {
+  const hasPostcode = Boolean(input.postcode?.trim());
+  assertUkDestination(input, hasPostcode);
   return [
     {
       rateId: "royal_mail_tracked_48_two_day_aim",

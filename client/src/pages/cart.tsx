@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { Minus, Plus, ShoppingBag, Trash2, CheckCircle2, CreditCard } from "lucide-react";
 import { Elements } from "@stripe/react-stripe-js";
@@ -68,7 +68,7 @@ export default function CartPage() {
       return;
     }
     if (!selectedRate) {
-      toast.error("Please fetch and select a shipping option");
+      toast.error("Please select a delivery option");
       return;
     }
 
@@ -101,22 +101,12 @@ export default function CartPage() {
     }
   };
 
+  const ratesFetchedRef = useRef(false);
+
   const fetchRates = async () => {
-    if (!name || !addressLine1 || !city || !postcode) {
-      toast.error("Add delivery name/address first");
-      return;
-    }
-    setPlacingOrder(true);
     try {
       const data = await quoteShippingRates({
         items: state.items,
-        customerName: name,
-        customerEmail: email || undefined,
-        addressLine1,
-        addressLine2,
-        city,
-        county,
-        postcode,
         country: "GB",
       });
       setShippingRates(data.rates);
@@ -124,11 +114,19 @@ export default function CartPage() {
       setDispatchAdvice(data.dispatchAdvice || "");
       setExpectedShipDate(data.expectedShipDate || "");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to fetch shipping rates");
-    } finally {
-      setPlacingOrder(false);
+      toast.error(err instanceof Error ? err.message : "Failed to fetch delivery options");
     }
   };
+
+  useEffect(() => {
+    if (checkoutOpen && !ratesFetchedRef.current && state.items.length > 0) {
+      ratesFetchedRef.current = true;
+      fetchRates();
+    }
+    if (!checkoutOpen) {
+      ratesFetchedRef.current = false;
+    }
+  }, [checkoutOpen]);
 
   const handlePaymentSuccess = async () => {
     try {
@@ -436,14 +434,9 @@ export default function CartPage() {
                   />
                 </div>
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm text-muted-foreground">Shipping options</div>
-                    <Button type="button" variant="outline" size="sm" onClick={fetchRates} disabled={placingOrder}>
-                      {placingOrder ? "Loading…" : "Get live rates"}
-                    </Button>
-                  </div>
+                  <div className="mb-3 text-sm font-medium">Delivery options</div>
                   {shippingRates.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">Enter address details and fetch Royal Mail delivery options.</div>
+                    <div className="text-sm text-muted-foreground">Loading delivery options...</div>
                   ) : (
                     <div className="space-y-2">
                       {shippingRates.map((rate) => (

@@ -649,13 +649,13 @@ Rules:
     let rates;
     try {
       rates = quoteRoyalMailFlatRates({
-        name: parsed.data.customerName,
+        name: parsed.data.customerName || undefined,
         email: parsed.data.customerEmail,
-        addressLine1: parsed.data.addressLine1,
+        addressLine1: parsed.data.addressLine1 || undefined,
         addressLine2: parsed.data.addressLine2,
-        city: parsed.data.city,
+        city: parsed.data.city || undefined,
         county: parsed.data.county,
-        postcode: parsed.data.postcode,
+        postcode: parsed.data.postcode || undefined,
         country: parsed.data.country || "GB",
         parcels,
       });
@@ -665,7 +665,7 @@ Rules:
     }
 
     if (!rates.length) {
-      return res.status(400).json({ message: "No shipping options available for this address." });
+      return res.status(400).json({ message: "No shipping options available." });
     }
 
     return res.json({

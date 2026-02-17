@@ -6,7 +6,7 @@ import { UPLOADS_DIR } from "./upload";
 
 const FEED_FILENAME = "google-merchant.xml";
 const FEED_PATH = path.join(UPLOADS_DIR, FEED_FILENAME);
-const DAY_MS = 24 * 60 * 60 * 1000;
+const REFRESH_MS = 15 * 60 * 1000;
 
 let feedScheduler: NodeJS.Timeout | null = null;
 let writeInProgress = false;
@@ -117,8 +117,8 @@ export function startGoogleMerchantFeedScheduler(): void {
   if (feedScheduler) return;
 
   feedScheduler = setInterval(() => {
-    writeGoogleMerchantFeedFile("daily-schedule").catch(() => {});
-  }, DAY_MS);
+    writeGoogleMerchantFeedFile("scheduled-refresh").catch(() => {});
+  }, REFRESH_MS);
 
   writeGoogleMerchantFeedFile("startup").catch(() => {});
 }

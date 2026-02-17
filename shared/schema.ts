@@ -265,13 +265,13 @@ export const shippingRatesQuoteSchema = z.object({
     quantity: z.number().int().min(1),
     priceEach: z.number().positive(),
   })).min(1),
-  customerName: z.string().min(1),
+  customerName: z.string().optional().default(""),
   customerEmail: z.string().email().optional(),
-  addressLine1: z.string().min(1),
+  addressLine1: z.string().optional().default(""),
   addressLine2: z.string().optional(),
-  city: z.string().min(1),
+  city: z.string().optional().default(""),
   county: z.string().optional(),
-  postcode: z.string().min(1),
+  postcode: z.string().optional().default(""),
   country: z.string().default("GB"),
 });
 
