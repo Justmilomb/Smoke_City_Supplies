@@ -43,7 +43,7 @@ import {
   writeGoogleMerchantFeedFile,
 } from "./googleMerchantFeed";
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
-import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderConfirmationEmail, sendOrderShippedEmail } from "./email";
+import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderCancelledEmail, sendOrderConfirmationEmail, sendOrderDeliveredEmail, sendOrderShippedEmail } from "./email";
 import { createRoyalMailManualLabel, getRoyalMailManualStatus, quoteRoyalMailFlatRates } from "./shipping/royalMailManual";
 import { buildPackingSlipHtml, buildParcelsForItems, dispatchAdviceNow } from "./shippingLogic";
 import { z } from "zod";
@@ -866,9 +866,13 @@ Rules:
               await sendOrderConfirmationEmail({
                 to: withInvoice.customerEmail,
                 orderId: withInvoice.id,
+                customerName: withInvoice.customerName,
                 totalPence: withInvoice.totalPence,
+                subtotalPence: withInvoice.subtotalPence,
+                shippingAmountPence: withInvoice.shippingAmountPence,
                 shippingServiceLevel: withInvoice.shippingServiceLevel,
                 dispatchAdvice: withInvoice.dispatchAdvice,
+                items: withInvoice.items,
               });
             }
             const adminEmail = process.env.ADMIN_ORDER_ALERT_EMAIL || "support@smokecitysupplies.com";
@@ -879,6 +883,7 @@ Rules:
                 customerName: withInvoice.customerName,
                 customerEmail: withInvoice.customerEmail,
                 totalPence: withInvoice.totalPence,
+                items: withInvoice.items,
               });
             }
             await storage.recordOrderEmailEvents(withInvoice.id, {
@@ -934,21 +939,54 @@ Rules:
         errors: parsed.error.flatten().fieldErrors,
       });
     }
-    const updated = await storage.updateOrderStatus(id, parsed.data.status);
+
+    // Fetch order before updating so we can detect status changes
+    const before = await storage.getOrder(id);
+    if (!before) return res.status(404).json({ message: "Order not found" });
+
+    const newStatus = parsed.data.status;
+    const updated = await storage.updateOrderStatus(id, newStatus);
     if (!updated) return res.status(404).json({ message: "Order not found" });
-    if (parsed.data.status === "shipped" && updated.customerEmail && !updated.customerShippedEmailSentAt) {
+
+    // Only send email if the status actually changed and customer has an email
+    if (before.status !== newStatus && updated.customerEmail) {
       try {
-        await sendOrderShippedEmail({
-          to: updated.customerEmail,
-          orderId: updated.id,
-          trackingNumber: updated.trackingNumber,
-          shippingLabelUrl: updated.shippingLabelUrl,
-        });
-        await storage.recordOrderEmailEvents(updated.id, { customerShippedEmailSentAt: new Date().toISOString() });
+        if (newStatus === "shipped" && !updated.customerShippedEmailSentAt) {
+          await sendOrderShippedEmail({
+            to: updated.customerEmail,
+            orderId: updated.id,
+            customerName: updated.customerName,
+            trackingNumber: updated.trackingNumber,
+            shippingLabelUrl: updated.shippingLabelUrl,
+            shippingServiceLevel: updated.shippingServiceLevel,
+            items: updated.items,
+          });
+          await storage.recordOrderEmailEvents(updated.id, { customerShippedEmailSentAt: new Date().toISOString() });
+        }
+
+        if (newStatus === "delivered") {
+          await sendOrderDeliveredEmail({
+            to: updated.customerEmail,
+            orderId: updated.id,
+            customerName: updated.customerName,
+            items: updated.items,
+          });
+        }
+
+        if (newStatus === "cancelled") {
+          await sendOrderCancelledEmail({
+            to: updated.customerEmail,
+            orderId: updated.id,
+            customerName: updated.customerName,
+            totalPence: updated.totalPence,
+            items: updated.items,
+          });
+        }
       } catch (err) {
-        console.error("[order shipped email] failed:", err);
+        console.error(`[order ${newStatus} email] failed:`, err);
       }
     }
+
     return res.json(updated);
   });
 
