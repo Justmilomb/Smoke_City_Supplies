@@ -50,7 +50,14 @@ app.use(corsConfig);
 // Session (required for Passport) — use PostgreSQL when DATABASE_URL set, else in-memory for local dev
 const sessionSecret = process.env.SESSION_SECRET || "dev-session-secret-change-in-production";
 const sessionStore = pool
-  ? new PgSession({ pool, tableName: "session", createTableIfMissing: true })
+  ? new PgSession({
+      pool,
+      tableName: "session",
+      // Avoid runtime table creation in bundled production builds.
+      // connect-pg-simple reads its own table.sql file, which is not present in dist bundles.
+      // We manage session table via schema/db:push instead.
+      createTableIfMissing: false,
+    })
   : new MemSessionStore({ checkPeriod: 86400000 });
 
 if (!pool) {
