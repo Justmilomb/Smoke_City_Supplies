@@ -611,7 +611,7 @@ export default function AdminEditPart() {
                     <span className="text-sm font-semibold">SEO for Search Engines</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Describe the product below and click "Generate SEO" to auto-create meta tags for search engines. This data is not shown on the product page.
+                    Describe the product below and click "Generate SEO" to auto-create meta tags for search engines. This appears in page metadata (title/description) and structured data, not as visible body text.
                   </p>
                   <div className="flex gap-2">
                     <Input

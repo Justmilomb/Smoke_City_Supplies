@@ -3,4 +3,6 @@ Allow: /
 Disallow: /admin
 Disallow: /admin/*
 Disallow: /cart
-Disallow: /api/*
+Allow: /api/files/
+Disallow: /api/
+Sitemap: https://smokecitysupplies.com/sitemap.xml

@@ -146,9 +146,30 @@ Allow: /
 Disallow: /admin
 Disallow: /admin/*
 Disallow: /cart
-Disallow: /api/*
+Allow: /api/files/
+Disallow: /api/
 
 Sitemap: ${base}/sitemap.xml
+`;
+    res.type("text/plain").send(txt);
+  });
+
+  app.get("/llms.txt", (req, res) => {
+    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const txt = `# Smoke City Supplies
+
+Official website for motorcycle, bike, and scooter parts in the UK.
+
+Key URLs:
+- ${base}/
+- ${base}/store
+- ${base}/catalog
+- ${base}/sitemap.xml
+- ${base}/feeds/google-merchant.xml
+- ${base}/shipping
+- ${base}/returns
+- ${base}/privacy
+- ${base}/terms
 `;
     res.type("text/plain").send(txt);
   });
@@ -421,7 +442,7 @@ ${urls
     const sanitized = sanitizeProductInput(patch);
     const updated = await storage.updateProduct(id, { ...patch, ...sanitized });
     writeGoogleMerchantFeedFile("update-product").catch(() => {});
-    pingIndexNow(req, [`/product/${id}`]);
+    pingIndexNow(req, [`/product/${id}`, "/store", "/sitemap.xml"]);
     return res.json(updated);
   });
 
@@ -434,13 +455,16 @@ ${urls
     const updated = await storage.updateProductQuantity(id, quantity);
     if (!updated) return res.status(404).json({ message: "Product not found" });
     writeGoogleMerchantFeedFile("update-quantity").catch(() => {});
+    pingIndexNow(req, [`/product/${id}`, "/store", "/sitemap.xml"]);
     return res.json(updated);
   });
 
   app.delete("/api/products/:id", requireAuth, apiRateLimiter, async (req, res) => {
-    const deleted = await storage.deleteProduct(paramId(req));
+    const id = paramId(req);
+    const deleted = await storage.deleteProduct(id);
     if (!deleted) return res.status(404).json({ message: "Product not found" });
     writeGoogleMerchantFeedFile("delete-product").catch(() => {});
+    pingIndexNow(req, [`/product/${id}`, "/store", "/sitemap.xml"]);
     return res.status(204).send();
   });
 

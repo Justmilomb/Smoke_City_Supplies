@@ -146,3 +146,30 @@ How updates work:
 - Fallback live endpoint is available at `https://<your-domain>/feeds/google-merchant.xml`.
 
 If your live feed has only a few products, your production database currently has only those products. Seeded demo products in this repo are not automatically enabled in production unless `SEED_PARTS_ON_STARTUP=true`.
+
+## Search Indexing + SEO (Google, Bing, AI Crawlers)
+
+The app exposes SEO crawl files and endpoints:
+
+- `GET /sitemap.xml` - includes all public pages plus every product page from the database
+- `GET /robots.txt` - allows crawling, blocks admin/cart/internal API, allows product images at `/api/files/`
+- `GET /llms.txt` - high-level map for AI crawlers and tools
+
+Automatic refresh behavior:
+
+- Product create/update/delete triggers:
+  - Google Merchant feed rewrite
+  - IndexNow ping (Bing and supporting engines)
+- Search engines still recrawl on their own schedules.
+
+Recommended manual submission (best results):
+
+1. Google Search Console
+2. Bing Webmaster Tools
+3. Submit `https://<your-domain>/sitemap.xml`
+4. Re-submit sitemap after large catalog imports/migrations
+
+Note on AI-generated product SEO:
+
+- Admin "Generate SEO" writes `metaTitle`, `metaDescription`, `metaKeywords` to each product.
+- Product pages use these values in page `<title>`, meta tags, OpenGraph/Twitter tags, and Product JSON-LD.
