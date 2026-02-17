@@ -136,11 +136,10 @@ async function sendEmail(input: {
   const fromEmail = process.env.INVOICE_FROM_EMAIL || process.env.SMTP_FROM || "no-reply@smokecitysupplies.com";
   const replyTo = process.env.INVOICE_REPLY_TO || "smokecitycycles@gmail.com";
 
+  console.log("[email] attempting to send:", { to: input.to, subject: input.subject, from: fromEmail, hasResendKey: !!resendKey });
+
   if (!resendKey) {
-    console.warn("[email] RESEND_API_KEY missing; logging email instead of sending", {
-      to: input.to,
-      subject: input.subject,
-    });
+    console.warn("[email] RESEND_API_KEY missing; skipping send");
     return;
   }
 
@@ -269,6 +268,58 @@ export async function sendOrderConfirmationEmail(input: {
   return sendEmail({
     to: input.to,
     subject: `Order confirmed #${input.orderId} - Smoke City Supplies`,
+    html,
+  });
+}
+
+// ─── Order Processing ──────────────────────────────────────────────────────────
+
+export async function sendOrderProcessingEmail(input: {
+  to: string;
+  orderId: string;
+  customerName?: string;
+  items?: Array<{ productName: string; quantity: number; priceEach: number }>;
+}): Promise<void> {
+  let body = `
+    <p style="font-size:16px;color:#374151;">
+      Hi${input.customerName ? ` <strong>${escapeHtml(input.customerName)}</strong>` : ""},
+    </p>
+    <p style="font-size:15px;color:#374151;">
+      Your order is now being processed! We're picking and packing your items ready for dispatch.
+    </p>
+
+    <div style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin:20px 0;">
+      <p style="margin:0;font-size:14px;color:#1e40af;font-weight:600;">Order in progress</p>
+      <p style="margin:4px 0 0;font-size:13px;color:#1d4ed8;">We'll send you another email with tracking details once your order has shipped.</p>
+    </div>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;">
+      ${infoRow("Order ID", input.orderId)}
+    </table>`;
+
+  if (input.items && input.items.length > 0) {
+    body += `<p style="font-size:14px;font-weight:600;color:#374151;margin:24px 0 8px;">Items being prepared:</p>`;
+    body += itemsTable(input.items);
+  }
+
+  body += `
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px;color:#6b7280;margin:0;">
+        If you have any questions about your order, please reply to this email.
+      </p>
+    </div>`;
+
+  const html = emailLayout({
+    preheader: `Your order ${input.orderId} is being prepared for dispatch.`,
+    heading: "Order Processing",
+    heroColor: "#2563eb",
+    heroIcon: "&#128230;",
+    body,
+  });
+
+  return sendEmail({
+    to: input.to,
+    subject: `Order processing #${input.orderId} - Smoke City Supplies`,
     html,
   });
 }

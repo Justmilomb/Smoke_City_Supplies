@@ -43,7 +43,7 @@ import {
   writeGoogleMerchantFeedFile,
 } from "./googleMerchantFeed";
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
-import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderCancelledEmail, sendOrderConfirmationEmail, sendOrderDeliveredEmail, sendOrderShippedEmail } from "./email";
+import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderCancelledEmail, sendOrderConfirmationEmail, sendOrderDeliveredEmail, sendOrderProcessingEmail, sendOrderShippedEmail } from "./email";
 import { createRoyalMailManualLabel, getRoyalMailManualStatus, quoteRoyalMailFlatRates } from "./shipping/royalMailManual";
 import { buildPackingSlipHtml, buildParcelsForItems, dispatchAdviceNow } from "./shippingLogic";
 import { z } from "zod";
@@ -948,43 +948,60 @@ Rules:
     const updated = await storage.updateOrderStatus(id, newStatus);
     if (!updated) return res.status(404).json({ message: "Order not found" });
 
-    // Only send email if the status actually changed and customer has an email
+    // Send status email for every status transition
+    console.log("[order status] change:", { orderId: id, from: before.status, to: newStatus, customerEmail: updated.customerEmail ?? "(none)" });
     if (before.status !== newStatus && updated.customerEmail) {
+      console.log("[order status] sending email for:", newStatus, "to:", updated.customerEmail);
       try {
-        if (newStatus === "shipped" && !updated.customerShippedEmailSentAt) {
-          await sendOrderShippedEmail({
-            to: updated.customerEmail,
-            orderId: updated.id,
-            customerName: updated.customerName,
-            trackingNumber: updated.trackingNumber,
-            shippingLabelUrl: updated.shippingLabelUrl,
-            shippingServiceLevel: updated.shippingServiceLevel,
-            items: updated.items,
-          });
-          await storage.recordOrderEmailEvents(updated.id, { customerShippedEmailSentAt: new Date().toISOString() });
-        }
-
-        if (newStatus === "delivered") {
-          await sendOrderDeliveredEmail({
-            to: updated.customerEmail,
-            orderId: updated.id,
-            customerName: updated.customerName,
-            items: updated.items,
-          });
-        }
-
-        if (newStatus === "cancelled") {
-          await sendOrderCancelledEmail({
-            to: updated.customerEmail,
-            orderId: updated.id,
-            customerName: updated.customerName,
-            totalPence: updated.totalPence,
-            items: updated.items,
-          });
+        switch (newStatus) {
+          case "processing":
+            await sendOrderProcessingEmail({
+              to: updated.customerEmail,
+              orderId: updated.id,
+              customerName: updated.customerName,
+              items: updated.items,
+            });
+            break;
+          case "shipped":
+            await sendOrderShippedEmail({
+              to: updated.customerEmail,
+              orderId: updated.id,
+              customerName: updated.customerName,
+              trackingNumber: updated.trackingNumber,
+              shippingLabelUrl: updated.shippingLabelUrl,
+              shippingServiceLevel: updated.shippingServiceLevel,
+              items: updated.items,
+            });
+            await storage.recordOrderEmailEvents(updated.id, { customerShippedEmailSentAt: new Date().toISOString() });
+            break;
+          case "delivered":
+            await sendOrderDeliveredEmail({
+              to: updated.customerEmail,
+              orderId: updated.id,
+              customerName: updated.customerName,
+              items: updated.items,
+            });
+            break;
+          case "cancelled":
+            await sendOrderCancelledEmail({
+              to: updated.customerEmail,
+              orderId: updated.id,
+              customerName: updated.customerName,
+              totalPence: updated.totalPence,
+              items: updated.items,
+            });
+            break;
+          default:
+            console.log("[order status] no email template for status:", newStatus);
+            break;
         }
       } catch (err) {
-        console.error(`[order ${newStatus} email] failed:`, err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`[order ${newStatus} email] failed:`, errMsg);
+        return res.json({ ...updated, _emailError: errMsg });
       }
+    } else {
+      console.log("[order status] skipping email:", before.status === newStatus ? "status unchanged" : "no customer email");
     }
 
     return res.json(updated);
