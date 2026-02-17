@@ -9,6 +9,14 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
+// Keep connect-pg-simple session table in Drizzle schema so db:push
+// does not attempt to drop it as an unmanaged table.
+export const session = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
