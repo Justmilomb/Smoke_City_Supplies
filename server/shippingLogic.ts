@@ -91,6 +91,7 @@ export function dispatchAdviceNow(date = new Date()): { dispatchAdvice: string; 
 }
 
 export function buildPackingSlipHtml(order: ApiOrder): string {
+  const customerName = `${order.customerFirstName ?? ""} ${order.customerLastName ?? ""}`.trim() || order.customerName || "Customer";
   const address = [order.addressLine1, order.addressLine2, order.city, order.county, order.postcode, order.country]
     .filter(Boolean)
     .join(", ");
@@ -99,7 +100,7 @@ export function buildPackingSlipHtml(order: ApiOrder): string {
     .join("");
   return `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111">
 <h1 style="margin:0 0 8px">Packing Slip</h1>
-<p style="margin:0 0 12px"><strong>Order:</strong> ${order.id}<br/><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString("en-GB")}<br/><strong>Customer:</strong> ${order.customerName || "Customer"}</p>
+<p style="margin:0 0 12px"><strong>Order:</strong> ${order.id}<br/><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString("en-GB")}<br/><strong>Customer:</strong> ${customerName}</p>
 <p style="margin:0 0 12px"><strong>Ship To:</strong> ${address || "-"}</p>
 <table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid #aaa">Item</th><th style="text-align:right;padding:8px;border-bottom:2px solid #aaa">Qty</th></tr></thead><tbody>${itemRows}</tbody></table>
 </body></html>`;

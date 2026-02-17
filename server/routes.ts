@@ -68,6 +68,11 @@ function orderToAddressText(order: ApiOrder): string {
     .join(", ");
 }
 
+function fullCustomerName(input: { customerFirstName?: string; customerLastName?: string; customerName?: string }): string {
+  const fullName = `${input.customerFirstName ?? ""} ${input.customerLastName ?? ""}`.trim();
+  return fullName || input.customerName || "";
+}
+
 async function getProductMap(): Promise<Map<string, ApiProduct>> {
   const products = await storage.listProducts();
   return new Map(products.map((p) => [p.id, p]));
@@ -649,7 +654,7 @@ Rules:
     let rates;
     try {
       rates = quoteRoyalMailFlatRates({
-        name: parsed.data.customerName || undefined,
+        name: fullCustomerName(parsed.data) || undefined,
         email: parsed.data.customerEmail,
         addressLine1: parsed.data.addressLine1 || undefined,
         addressLine2: parsed.data.addressLine2,
@@ -730,7 +735,7 @@ Rules:
     let liveRates;
     try {
       liveRates = quoteRoyalMailFlatRates({
-        name: parsed.data.customerName,
+        name: fullCustomerName(parsed.data),
         email: parsed.data.customerEmail,
         addressLine1: parsed.data.addressLine1,
         addressLine2: parsed.data.addressLine2,
@@ -775,12 +780,13 @@ Rules:
       automatic_payment_methods: { enabled: true },
       metadata: {
         customerEmail: parsed.data.customerEmail,
-        customerName: parsed.data.customerName,
+        customerName: fullCustomerName(parsed.data),
       },
     });
 
     const order = await storage.createOrder({
       ...parsed.data,
+      customerName: fullCustomerName(parsed.data),
       stripePaymentIntentId: paymentIntent.id,
       paymentStatus: "awaiting_payment",
       subtotalPence,
@@ -1140,7 +1146,7 @@ Rules:
     }
 
     const shippingInput = {
-      name: parsedPayload.data.name || order.customerName || "",
+      name: parsedPayload.data.name || fullCustomerName(order) || "",
       email: parsedPayload.data.email || order.customerEmail,
       addressLine1: parsedPayload.data.addressLine1 || order.addressLine1 || "",
       addressLine2: parsedPayload.data.addressLine2 || order.addressLine2,

@@ -41,7 +41,8 @@ export default function CartPage() {
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [city, setCity] = useState("");
@@ -74,7 +75,7 @@ export default function CartPage() {
       toast.error("Your cart is empty");
       return;
     }
-    if (!email || !name || !addressLine1 || !city || !postcode) {
+    if (!email || !firstName || !lastName || !addressLine1 || !city || !postcode) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -88,7 +89,8 @@ export default function CartPage() {
       const payload = await prepareCheckout({
         items: state.items,
         customerEmail: email,
-        customerName: name,
+        customerFirstName: firstName,
+        customerLastName: lastName,
         addressLine1,
         addressLine2,
         city,
@@ -201,7 +203,7 @@ export default function CartPage() {
             </p>
           )}
           <p className="text-muted-foreground mb-2">
-            Thank you for your order, {name}!
+            Thank you for your order, {`${firstName} ${lastName}`.trim()}!
           </p>
           <p className="text-sm text-muted-foreground mb-8">
             We will email your invoice and payment confirmation to {email}. Your items will be dispatched shortly to {city}, {postcode}.
@@ -381,12 +383,23 @@ export default function CartPage() {
               <>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="checkout-name">Full name *</Label>
+                    <Label htmlFor="checkout-first-name">First name *</Label>
                     <Input
-                      id="checkout-name"
-                      placeholder="Your name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      id="checkout-first-name"
+                      placeholder="First name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="rounded-lg"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="checkout-last-name">Last name *</Label>
+                    <Input
+                      id="checkout-last-name"
+                      placeholder="Last name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
                       className="rounded-lg"
                       required
                     />

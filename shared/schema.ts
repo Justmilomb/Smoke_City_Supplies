@@ -170,6 +170,8 @@ export const orders = pgTable("orders", {
   totalPence: integer("total_pence").notNull(),
   customerEmail: text("customer_email"),
   customerName: text("customer_name"),
+  customerFirstName: text("customer_first_name"),
+  customerLastName: text("customer_last_name"),
   addressLine1: text("address_line1"),
   addressLine2: text("address_line2"),
   city: text("city"),
@@ -217,6 +219,8 @@ export const createOrderSchema = z.object({
   })),
   customerEmail: z.string().email().optional(),
   customerName: z.string().optional(),
+  customerFirstName: z.string().optional(),
+  customerLastName: z.string().optional(),
   addressLine1: z.string().optional(),
   addressLine2: z.string().optional(),
   city: z.string().optional(),
@@ -244,7 +248,9 @@ export const checkoutPrepareSchema = z.object({
     priceEach: z.number().positive(),
   })).min(1),
   customerEmail: z.string().email(),
-  customerName: z.string().min(1),
+  customerName: z.string().optional(),
+  customerFirstName: z.string().min(1),
+  customerLastName: z.string().min(1),
   addressLine1: z.string().min(1),
   addressLine2: z.string().optional(),
   city: z.string().min(1),
@@ -266,6 +272,8 @@ export const shippingRatesQuoteSchema = z.object({
     priceEach: z.number().positive(),
   })).min(1),
   customerName: z.string().optional().default(""),
+  customerFirstName: z.string().optional(),
+  customerLastName: z.string().optional(),
   customerEmail: z.string().email().optional(),
   addressLine1: z.string().optional().default(""),
   addressLine2: z.string().optional(),
@@ -385,6 +393,8 @@ export type ApiOrder = {
   items: ApiOrderItem[];
   customerEmail?: string;
   customerName?: string;
+  customerFirstName?: string;
+  customerLastName?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;

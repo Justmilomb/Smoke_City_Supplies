@@ -37,6 +37,8 @@ type Order = {
   paymentStatus: string;
   customerEmail?: string;
   customerName?: string;
+  customerFirstName?: string;
+  customerLastName?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;
@@ -58,6 +60,11 @@ type Order = {
   expectedShipDate?: string;
   items: { productId: string; productName: string; quantity: number }[];
 };
+
+function getCustomerDisplayName(order: Pick<Order, "customerFirstName" | "customerLastName" | "customerName">): string {
+  const fullName = `${order.customerFirstName || ""} ${order.customerLastName || ""}`.trim();
+  return fullName || order.customerName || "";
+}
 
 async function fetchOrders() {
   const res = await fetch(`${API}/orders`, { credentials: "include" });
@@ -195,8 +202,9 @@ function ActionButtons({ order }: { order: Order }) {
   const [working, setWorking] = React.useState(false);
   const [labelOpen, setLabelOpen] = React.useState(false);
   const [refundConfirmOpen, setRefundConfirmOpen] = React.useState(false);
+  const customerDisplayName = getCustomerDisplayName(order);
   const [labelForm, setLabelForm] = React.useState({
-    name: order.customerName || "",
+    name: customerDisplayName,
     email: order.customerEmail || "",
     addressLine1: order.addressLine1 || "",
     addressLine2: order.addressLine2 || "",
@@ -209,7 +217,7 @@ function ActionButtons({ order }: { order: Order }) {
 
   React.useEffect(() => {
     setLabelForm({
-      name: order.customerName || "",
+      name: getCustomerDisplayName(order),
       email: order.customerEmail || "",
       addressLine1: order.addressLine1 || "",
       addressLine2: order.addressLine2 || "",
@@ -219,7 +227,7 @@ function ActionButtons({ order }: { order: Order }) {
       country: (order.country || "GB").toUpperCase(),
       selectedRateId: order.shippingRateId || "",
     });
-  }, [order.id, order.customerName, order.customerEmail, order.addressLine1, order.addressLine2, order.city, order.county, order.postcode, order.country, order.shippingRateId]);
+  }, [order.id, order.customerName, order.customerFirstName, order.customerLastName, order.customerEmail, order.addressLine1, order.addressLine2, order.city, order.county, order.postcode, order.country, order.shippingRateId]);
 
   const onResendInvoice = async () => {
     setWorking(true);
@@ -489,10 +497,10 @@ export default function AdminOrders() {
                   <div className="text-xs text-muted-foreground">
                     Payment: <span className="font-medium">{order.paymentStatus || "awaiting_payment"}</span>
                   </div>
-                  {(order.customerName || order.customerEmail) && (
+                  {(getCustomerDisplayName(order) || order.customerEmail) && (
                     <div className="text-sm text-muted-foreground">
-                      {order.customerName && <span>{order.customerName}</span>}
-                      {order.customerName && order.customerEmail && " · "}
+                      {getCustomerDisplayName(order) && <span>{getCustomerDisplayName(order)}</span>}
+                      {getCustomerDisplayName(order) && order.customerEmail && " · "}
                       {order.customerEmail && <span>{order.customerEmail}</span>}
                     </div>
                   )}
@@ -539,7 +547,7 @@ export default function AdminOrders() {
                     <TableCell className="font-mono text-xs">{order.id.slice(0, 8)}…</TableCell>
                     <TableCell className="text-sm">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-sm max-w-[280px]">
-                      {order.customerName && <div>{order.customerName}</div>}
+                      {getCustomerDisplayName(order) && <div>{getCustomerDisplayName(order)}</div>}
                       {order.customerEmail && <div className="text-muted-foreground">{order.customerEmail}</div>}
                       {(order.addressLine1 || order.city || order.postcode) && (
                         <div className="text-xs text-muted-foreground mt-1">

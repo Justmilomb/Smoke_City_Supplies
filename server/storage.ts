@@ -113,6 +113,11 @@ function stockFromQuantity(quantity: number): "in-stock" | "low" | "out" {
   return "in-stock";
 }
 
+function composeCustomerName(firstName?: string, lastName?: string, fallbackName?: string): string | undefined {
+  const fullName = `${firstName ?? ""} ${lastName ?? ""}`.trim();
+  return fullName || fallbackName;
+}
+
 function parseImageFileId(image: string | undefined): string | undefined {
   if (!image) return undefined;
   const match = image.match(/^\/api\/files\/([^/?#]+)/);
@@ -135,6 +140,8 @@ function orderToApi(
     items,
     customerEmail: row.customerEmail ?? undefined,
     customerName: row.customerName ?? undefined,
+    customerFirstName: row.customerFirstName ?? undefined,
+    customerLastName: row.customerLastName ?? undefined,
     addressLine1: row.addressLine1 ?? undefined,
     addressLine2: row.addressLine2 ?? undefined,
     city: row.city ?? undefined,
@@ -550,7 +557,8 @@ export class DbStorage implements IStorage {
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid order");
-    const { items, customerEmail, customerName } = parsed.data;
+    const { items, customerEmail, customerName, customerFirstName, customerLastName } = parsed.data;
+    const normalizedCustomerName = composeCustomerName(customerFirstName, customerLastName, customerName);
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
@@ -567,7 +575,9 @@ export class DbStorage implements IStorage {
       status: "pending",
       totalPence,
       customerEmail: customerEmail ?? null,
-      customerName: customerName ?? null,
+      customerName: normalizedCustomerName ?? null,
+      customerFirstName: customerFirstName ?? null,
+      customerLastName: customerLastName ?? null,
       addressLine1: parsed.data.addressLine1 ?? null,
       addressLine2: parsed.data.addressLine2 ?? null,
       city: parsed.data.city ?? null,
@@ -1245,7 +1255,8 @@ export class MemStorage implements IStorage {
   async createOrder(input: CreateOrderInput): Promise<ApiOrder> {
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid order");
-    const { items, customerEmail, customerName } = parsed.data;
+    const { items, customerEmail, customerName, customerFirstName, customerLastName } = parsed.data;
+    const normalizedCustomerName = composeCustomerName(customerFirstName, customerLastName, customerName);
 
     const orderId = randomUUID();
     const now = new Date().toISOString();
@@ -1269,7 +1280,9 @@ export class MemStorage implements IStorage {
       totalPence,
       items: apiItems,
       customerEmail,
-      customerName,
+      customerName: normalizedCustomerName,
+      customerFirstName,
+      customerLastName,
       addressLine1: parsed.data.addressLine1,
       addressLine2: parsed.data.addressLine2,
       city: parsed.data.city,

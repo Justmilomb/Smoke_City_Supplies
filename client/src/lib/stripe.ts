@@ -39,7 +39,8 @@ export async function createPaymentIntent(amount: number, customerEmail?: string
 export async function prepareCheckout(input: {
   items: CartItem[];
   customerEmail: string;
-  customerName: string;
+  customerFirstName: string;
+  customerLastName: string;
   addressLine1: string;
   addressLine2?: string;
   city: string;
@@ -63,7 +64,9 @@ export async function prepareCheckout(input: {
         priceEach: i.priceEach,
       })),
       customerEmail: input.customerEmail,
-      customerName: input.customerName,
+      customerName: `${input.customerFirstName} ${input.customerLastName}`.trim(),
+      customerFirstName: input.customerFirstName,
+      customerLastName: input.customerLastName,
       addressLine1: input.addressLine1,
       addressLine2: input.addressLine2 || undefined,
       city: input.city,
