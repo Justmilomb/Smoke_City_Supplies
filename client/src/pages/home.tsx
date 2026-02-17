@@ -31,16 +31,21 @@ export default function Home() {
               <br />
               Service <span className="text-primary">Done</span> Right
             </h1>
-            <div className="space-y-4 text-muted-foreground md:text-lg max-w-lg mb-8">
-              <p>
-                We started <span className="font-semibold text-foreground">Smoke City Supplies</span> because we were tired of seeing the motorcycle parts industry lose its soul.
+            <div className="max-w-lg mb-8 text-muted-foreground md:text-lg">
+              <p className="md:hidden">
+                Real motorcycle parts support from real people. Fast answers, right-fit parts, and UK-wide delivery.
               </p>
-              <p>
-                Every day, it's the same story: automated systems, indifferent corporations, and customers treated like order numbers. That's not service—that's just processing.
-              </p>
-              <p className="text-foreground font-medium">
-                We're bringing back <span className="underline decoration-primary decoration-2 underline-offset-4">old-fashioned service</span>—the kind where you talk to a real person who actually cares about your bike, your ride, and getting you the right part the first time.
-              </p>
+              <div className="hidden space-y-4 md:block">
+                <p>
+                  We started <span className="font-semibold text-foreground">Smoke City Supplies</span> because we were tired of seeing the motorcycle parts industry lose its soul.
+                </p>
+                <p>
+                  Every day, it's the same story: automated systems, indifferent corporations, and customers treated like order numbers. That's not service—that's just processing.
+                </p>
+                <p className="text-foreground font-medium">
+                  We're bringing back <span className="underline decoration-primary decoration-2 underline-offset-4">old-fashioned service</span>—the kind where you talk to a real person who actually cares about your bike, your ride, and getting you the right part the first time.
+                </p>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <Button size="lg" className="gap-2 font-semibold shadow-lg shadow-primary/20" asChild>
@@ -220,8 +225,11 @@ export default function Home() {
             <h2 className="text-2xl md:text-3xl font-bold mb-4">
               Why Smoke City is Different
             </h2>
-            <p className="text-muted-foreground mb-6 md:text-lg">
+            <p className="mb-6 text-muted-foreground md:text-lg">
+              <span className="md:hidden">Real people, real advice, right parts.</span>
+              <span className="hidden md:inline">
               In a world of faceless corporations and automated responses, we're doing things the old way—with actual human care and expertise. When you order from Smoke City, you're not a ticket number in a queue. You're a fellow rider who deserves respect, honest advice, and parts that work.
+              </span>
             </p>
             <p className="text-foreground font-medium md:text-lg">
               That's not just our promise—that's how we run every single day.

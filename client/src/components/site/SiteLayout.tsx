@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { Search, ShoppingCart, Menu, Phone, ArrowUp } from "lucide-react";
+import { Search, ShoppingCart, Menu, Phone, Mail, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth";
 import { Logo } from "./Logo";
 
 const HEADER_PHONE = "07950 827584";
+const HEADER_EMAIL = "support@smokecitysupplies.com";
 
 function NavLink({
   href,
@@ -131,6 +132,24 @@ export default function SiteLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
       />
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="border-b bg-muted/40 md:hidden">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-2">
+            <a
+              href={`tel:${HEADER_PHONE.replace(/\s/g, "")}`}
+              className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-foreground"
+            >
+              <Phone className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{HEADER_PHONE}</span>
+            </a>
+            <a
+              href={`mailto:${HEADER_EMAIL}`}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              <span>Email</span>
+            </a>
+          </div>
+        </div>
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 md:px-6 lg:px-8 md:flex-row md:items-center md:justify-between md:gap-6 md:py-4">
           <div className="flex items-center justify-between gap-4 md:justify-start">
             <Link href="/" data-testid="link-home" className="group shrink-0 transition-opacity hover:opacity-80">
@@ -167,6 +186,22 @@ export default function SiteLayout({
                     </Link>
                   ))}
                 </nav>
+                <div className="mt-6 space-y-2 border-t pt-4">
+                  <a
+                    href={`tel:${HEADER_PHONE.replace(/\s/g, "")}`}
+                    className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    <Phone className="h-5 w-5" />
+                    <span>{HEADER_PHONE}</span>
+                  </a>
+                  <a
+                    href={`mailto:${HEADER_EMAIL}`}
+                    className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    <Mail className="h-5 w-5" />
+                    <span>{HEADER_EMAIL}</span>
+                  </a>
+                </div>
               </SheetContent>
             </Sheet>
 
@@ -204,6 +239,13 @@ export default function SiteLayout({
             >
               <Phone className="h-4 w-4" />
               <span>{HEADER_PHONE}</span>
+            </a>
+            <a
+              href={`mailto:${HEADER_EMAIL}`}
+              className="hidden md:flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+            >
+              <Mail className="h-4 w-4" />
+              <span>Email</span>
             </a>
             {right}
             <Link href="/cart">
@@ -280,6 +322,16 @@ export default function SiteLayout({
           <div>
             <div className="font-semibold text-sm mb-4">Customer Service</div>
             <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <a href={`tel:${HEADER_PHONE.replace(/\s/g, "")}`} className="hover:text-foreground transition-colors">
+                  Call {HEADER_PHONE}
+                </a>
+              </li>
+              <li>
+                <a href={`mailto:${HEADER_EMAIL}`} className="hover:text-foreground transition-colors">
+                  {HEADER_EMAIL}
+                </a>
+              </li>
               <li>
                 <Link href="/shipping" className="hover:text-foreground transition-colors">
                   Shipping & Delivery

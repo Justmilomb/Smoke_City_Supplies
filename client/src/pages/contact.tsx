@@ -1,5 +1,5 @@
 import React from "react";
-import { Mail, Send, MessageSquare } from "lucide-react";
+import { Mail, Phone, Send, MessageSquare } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,9 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import { toast } from "sonner";
 
 export default function ContactPage() {
+  const supportPhone = "07950 827584";
+  const supportEmail = "support@smokecitysupplies.com";
+
   usePageMeta({
     title: "Contact Us",
     description: "Contact Smoke City Supplies for motorcycle parts enquiries, support and orders. UK-based online store. Email and phone support.",
@@ -61,9 +64,9 @@ export default function ContactPage() {
               Contact Us
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Have a question? We're here to help. Send us a message and we'll respond as soon as possible.
+              Need help with a part or order? Call, email, or send us a message.
             </p>
-            <p className="mt-3 text-sm text-muted-foreground max-w-2xl">
+            <p className="mt-3 hidden max-w-2xl text-sm text-muted-foreground md:block">
               Contact Smoke City Supplies for motorcycle parts enquiries, compatibility questions, and order support. We're a UK-based online store — no physical location — and deliver across the UK. Use the form below or call us.
             </p>
           </div>
@@ -149,11 +152,21 @@ export default function ContactPage() {
                 <Mail className="h-6 w-6" />
               </div>
               <h3 className="mb-2 font-semibold">Email Us</h3>
-              <p className="text-sm text-muted-foreground">
-                support@smokecitysupplies.com
-              </p>
+              <a href={`mailto:${supportEmail}`} className="text-sm text-primary hover:underline">
+                {supportEmail}
+              </a>
+            </Card>
+
+            <Card className="border-border/50 p-6">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Phone className="h-6 w-6" />
+              </div>
+              <h3 className="mb-2 font-semibold">Call Us</h3>
+              <a href={`tel:${supportPhone.replace(/\s/g, "")}`} className="text-sm text-primary hover:underline">
+                {supportPhone}
+              </a>
               <p className="mt-2 text-xs text-muted-foreground">
-                We typically respond within 1–2 business days.
+                Mon-Sat, 9am-6pm
               </p>
             </Card>
 
@@ -163,7 +176,7 @@ export default function ContactPage() {
               </div>
               <h3 className="mb-2 font-semibold">Response Time</h3>
               <p className="text-sm text-muted-foreground">
-                Most inquiries are answered within 24 hours during business days.
+                Most messages are answered within 24 hours.
               </p>
             </Card>
           </div>
