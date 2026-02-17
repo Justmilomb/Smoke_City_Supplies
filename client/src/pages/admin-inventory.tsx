@@ -121,7 +121,7 @@ export default function AdminInventory() {
         loaded = true;
         break;
       } catch {
-        // Try the next CDN source.
+        // Try next source.
       }
     }
 
