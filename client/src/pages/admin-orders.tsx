@@ -146,10 +146,15 @@ function OrderStatusSelect({
   const handleChange = (newStatus: string) => {
     setValue(newStatus);
     updateOrderStatus(orderId, newStatus)
-      .then(() => {
+      .then((data) => {
         queryClient.invalidateQueries({ queryKey: ["orders"] });
         onUpdated?.();
-        toast.success("Order status updated");
+        if (data?._emailError) {
+          toast.success("Status updated");
+          toast.error(`Email failed: ${data._emailError}`);
+        } else {
+          toast.success("Order status updated & email sent");
+        }
       })
       .catch((err) => {
         setValue(currentStatus);
