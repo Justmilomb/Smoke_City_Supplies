@@ -763,6 +763,12 @@ Rules:
     return res.json({ publishableKey: STRIPE_PUBLISHABLE_KEY });
   });
 
+  app.get("/api/shipping/rates", (_req, res) => {
+    return res.status(405).json({
+      message: "Use POST /api/shipping/rates with cart items and delivery details to fetch live shipping options.",
+    });
+  });
+
   app.post("/api/shipping/rates", orderRateLimiter, async (req, res) => {
     const parsed = shippingRatesQuoteSchema.safeParse(req.body);
     if (!parsed.success) {

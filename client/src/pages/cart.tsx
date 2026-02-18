@@ -105,6 +105,8 @@ export default function CartPage() {
   const [selectedRateId, setSelectedRateId] = useState("");
   const [dispatchAdvice, setDispatchAdvice] = useState("");
   const [expectedShipDate, setExpectedShipDate] = useState("");
+  const [deliveryDetailsConfirmed, setDeliveryDetailsConfirmed] = useState(false);
+  const [shippingRatesLoading, setShippingRatesLoading] = useState(false);
   const [stripePromise] = useState(() => getStripe());
 
   const total = state.items.reduce(
@@ -163,32 +165,44 @@ export default function CartPage() {
     }
   };
 
-  const ratesFetchedRef = useRef(false);
+  const clearDeliveryQuote = useCallback(() => {
+    setDeliveryDetailsConfirmed(false);
+    setShippingRates([]);
+    setSelectedRateId("");
+    setDispatchAdvice("");
+    setExpectedShipDate("");
+  }, []);
 
   const fetchRates = async () => {
+    if (!email || !firstName || !lastName || !addressLine1 || !city || !postcode) {
+      toast.error("Please fill in all required delivery fields before confirming");
+      return;
+    }
+
+    setShippingRatesLoading(true);
     try {
       const data = await quoteShippingRates({
         items: state.items,
+        customerName: `${firstName} ${lastName}`.trim(),
+        customerEmail: email,
+        addressLine1,
+        addressLine2,
+        city,
+        county,
+        postcode,
         country: "GB",
       });
       setShippingRates(data.rates);
       setSelectedRateId(data.rates[0]?.rateId || "");
       setDispatchAdvice(data.dispatchAdvice || "");
       setExpectedShipDate(data.expectedShipDate || "");
+      setDeliveryDetailsConfirmed(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to fetch delivery options");
+    } finally {
+      setShippingRatesLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (checkoutOpen && !ratesFetchedRef.current && state.items.length > 0) {
-      ratesFetchedRef.current = true;
-      fetchRates();
-    }
-    if (!checkoutOpen) {
-      ratesFetchedRef.current = false;
-    }
-  }, [checkoutOpen]);
 
   const handlePaymentSuccess = async () => {
     try {
@@ -446,7 +460,15 @@ export default function CartPage() {
         </div>
       </div>
 
-      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
+      <Dialog
+        open={checkoutOpen}
+        onOpenChange={(open) => {
+          setCheckoutOpen(open);
+          if (!open) {
+            setShippingRatesLoading(false);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Secure Checkout</DialogTitle>
@@ -464,7 +486,10 @@ export default function CartPage() {
                       id="checkout-first-name"
                       placeholder="First name"
                       value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      onChange={(e) => {
+                        setFirstName(e.target.value);
+                        clearDeliveryQuote();
+                      }}
                       className="rounded-lg"
                       required
                     />
@@ -475,7 +500,10 @@ export default function CartPage() {
                       id="checkout-last-name"
                       placeholder="Last name"
                       value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
+                      onChange={(e) => {
+                        setLastName(e.target.value);
+                        clearDeliveryQuote();
+                      }}
                       className="rounded-lg"
                       required
                     />
@@ -487,7 +515,10 @@ export default function CartPage() {
                       type="email"
                       placeholder="you@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        clearDeliveryQuote();
+                      }}
                       className="rounded-lg"
                       required
                     />
@@ -499,7 +530,10 @@ export default function CartPage() {
                     id="checkout-address1"
                     placeholder="House number and street"
                     value={addressLine1}
-                    onChange={(e) => setAddressLine1(e.target.value)}
+                    onChange={(e) => {
+                      setAddressLine1(e.target.value);
+                      clearDeliveryQuote();
+                    }}
                     className="rounded-lg"
                     required
                   />
@@ -510,7 +544,10 @@ export default function CartPage() {
                     id="checkout-address2"
                     placeholder="Flat, building, etc."
                     value={addressLine2}
-                    onChange={(e) => setAddressLine2(e.target.value)}
+                    onChange={(e) => {
+                      setAddressLine2(e.target.value);
+                      clearDeliveryQuote();
+                    }}
                     className="rounded-lg"
                   />
                 </div>
@@ -521,7 +558,10 @@ export default function CartPage() {
                       id="checkout-city"
                       placeholder="City"
                       value={city}
-                      onChange={(e) => setCity(e.target.value)}
+                      onChange={(e) => {
+                        setCity(e.target.value);
+                        clearDeliveryQuote();
+                      }}
                       className="rounded-lg"
                       required
                     />
@@ -532,7 +572,10 @@ export default function CartPage() {
                       id="checkout-county"
                       placeholder="County"
                       value={county}
-                      onChange={(e) => setCounty(e.target.value)}
+                      onChange={(e) => {
+                        setCounty(e.target.value);
+                        clearDeliveryQuote();
+                      }}
                       className="rounded-lg"
                     />
                   </div>
@@ -543,15 +586,37 @@ export default function CartPage() {
                     id="checkout-postcode"
                     placeholder="e.g. M1 1AA"
                     value={postcode}
-                    onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+                    onChange={(e) => {
+                      setPostcode(e.target.value.toUpperCase());
+                      clearDeliveryQuote();
+                    }}
                     className="rounded-lg max-w-[140px]"
                     required
                   />
                 </div>
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">
+                      Confirm delivery details to load live shipping options.
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={fetchRates}
+                      disabled={shippingRatesLoading || state.items.length === 0}
+                    >
+                      {shippingRatesLoading ? "Confirming…" : "Confirm Delivery Details"}
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
                   <div className="mb-3 text-sm font-medium">Delivery options</div>
-                  {shippingRates.length === 0 ? (
+                  {!deliveryDetailsConfirmed ? (
+                    <div className="text-sm text-muted-foreground">Enter your delivery details above, then click "Confirm Delivery Details".</div>
+                  ) : shippingRatesLoading ? (
                     <div className="text-sm text-muted-foreground">Loading delivery options...</div>
+                  ) : shippingRates.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No delivery options available for this address.</div>
                   ) : (
                     <div className="space-y-2">
                       {shippingRates.map((rate) => (

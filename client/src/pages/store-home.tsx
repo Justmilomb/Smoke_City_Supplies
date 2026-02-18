@@ -72,6 +72,18 @@ export default function StoreHome() {
     () => Array.from(new Set(parts.map((p) => p.brand).filter((b): b is string => !!b))).sort(),
     [parts]
   );
+  const compatibilityOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          parts
+            .flatMap((p) => p.compatibility ?? [])
+            .map((model) => model.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [parts]
+  );
 
   const visible = React.useMemo(() => filterParts(parts, filters), [parts, filters]);
   const totalPages = Math.ceil(visible.length / PARTS_PER_PAGE);
@@ -119,7 +131,13 @@ export default function StoreHome() {
           </div>
         </div>
 
-        <FiltersBar categories={categoriesList} brands={derivedBrands} value={filters} onChange={setFilters} />
+        <FiltersBar
+          categories={categoriesList}
+          brands={derivedBrands}
+          compatibilityOptions={compatibilityOptions}
+          value={filters}
+          onChange={setFilters}
+        />
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">

@@ -50,6 +50,18 @@ export default function CatalogPage() {
     () => Array.from(new Set(parts.map((p) => p.brand).filter((b): b is string => !!b))).sort(),
     [parts]
   );
+  const compatibilityOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          parts
+            .flatMap((p) => p.compatibility ?? [])
+            .map((model) => model.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [parts]
+  );
 
   const visible = React.useMemo(() => {
     const q = filters.q.trim().toLowerCase();
@@ -95,7 +107,13 @@ export default function CatalogPage() {
           <BackButton fallback="/" />
         </div>
 
-        <FiltersBar categories={cats} brands={derivedBrands} value={filters} onChange={setFilters} />
+        <FiltersBar
+          categories={cats}
+          brands={derivedBrands}
+          compatibilityOptions={compatibilityOptions}
+          value={filters}
+          onChange={setFilters}
+        />
 
         <Card className="border-border/50 p-6">
           <div className="mb-4 flex items-start justify-between">

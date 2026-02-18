@@ -16,7 +16,6 @@ import {
 import { Card } from "@/components/ui/card";
 import {
   MOTORCYCLE_MANUFACTURERS,
-  MOTORCYCLE_MODELS,
   type PartCategory,
   type VehicleType,
 } from "@/lib/mockData";
@@ -96,11 +95,13 @@ function toQuery(next: CatalogFilters) {
 export default function FiltersBar({
   categories,
   brands: brandOptions,
+  compatibilityOptions,
   value,
   onChange,
 }: {
   categories: PartCategory[];
   brands: string[];
+  compatibilityOptions: string[];
   value: CatalogFilters;
   onChange: (next: CatalogFilters) => void;
 }) {
@@ -149,6 +150,33 @@ export default function FiltersBar({
     (value.priceMin !== "" || value.priceMax !== "" ? 1 : 0) +
     (value.inStockOnly ? 1 : 0);
 
+  const groupedModels = React.useMemo(() => {
+    const buckets = new Map<string, string[]>();
+    const knownManufacturers = [...MOTORCYCLE_MANUFACTURERS];
+
+    for (const raw of compatibilityOptions) {
+      const model = raw.trim();
+      if (!model) continue;
+
+      const matchedManufacturer =
+        knownManufacturers.find((mfr) => model.startsWith(`${mfr} `)) ??
+        knownManufacturers.find((mfr) => model.startsWith(mfr)) ??
+        model.split(/\s+/)[0];
+
+      if (!matchedManufacturer) continue;
+      const list = buckets.get(matchedManufacturer) ?? [];
+      list.push(model);
+      buckets.set(matchedManufacturer, list);
+    }
+
+    return Array.from(buckets.entries())
+      .map(([manufacturer, models]) => ({
+        manufacturer,
+        models: Array.from(new Set(models)).sort((a, b) => a.localeCompare(b)),
+      }))
+      .sort((a, b) => a.manufacturer.localeCompare(b.manufacturer));
+  }, [compatibilityOptions]);
+
   const filterContent = (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -191,12 +219,12 @@ export default function FiltersBar({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All models</SelectItem>
-                {MOTORCYCLE_MANUFACTURERS.map((mfr) => (
-                  <SelectGroup key={mfr}>
-                    <SelectLabel>{mfr}</SelectLabel>
-                    {MOTORCYCLE_MODELS.filter((m) => m.startsWith(mfr)).map((model) => (
+                {groupedModels.map(({ manufacturer, models }) => (
+                  <SelectGroup key={manufacturer}>
+                    <SelectLabel>{manufacturer}</SelectLabel>
+                    {models.map((model) => (
                       <SelectItem key={model} value={model} data-testid={`option-model-${model}`}>
-                        {model.replace(mfr + " ", "")}
+                        {model.replace(`${manufacturer} `, "")}
                       </SelectItem>
                     ))}
                   </SelectGroup>
