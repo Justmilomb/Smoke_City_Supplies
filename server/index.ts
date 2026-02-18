@@ -23,6 +23,32 @@ const app = express();
 // Trust the first proxy hop so secure session cookies work in production.
 app.set("trust proxy", 1);
 
+// Enforce a single canonical domain/protocol in production for SEO consistency.
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV !== "production") return next();
+
+  const raw = process.env.PUBLIC_BASE_URL?.trim() || "https://smokecitysupplies.com";
+  let canonicalUrl: URL;
+  try {
+    canonicalUrl = new URL(raw);
+  } catch {
+    canonicalUrl = new URL("https://smokecitysupplies.com");
+  }
+
+  const hostHeader = (req.get("host") || "").toLowerCase();
+  const requestHost = hostHeader.split(":")[0];
+  const canonicalHost = canonicalUrl.hostname.toLowerCase();
+  const wwwHost = `www.${canonicalHost}`;
+  const shouldNormalizeHost = requestHost === canonicalHost || requestHost === wwwHost;
+  const isHttps = req.protocol === "https";
+
+  if (shouldNormalizeHost && (!isHttps || requestHost === wwwHost)) {
+    return res.redirect(301, `${canonicalUrl.origin}${req.originalUrl || "/"}`);
+  }
+
+  return next();
+});
+
 // Serve uploaded images
 app.use("/uploads", express.static(UPLOADS_DIR));
 const httpServer = createServer(app);

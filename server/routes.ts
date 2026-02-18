@@ -75,6 +75,18 @@ function fullCustomerName(input: { customerFirstName?: string; customerLastName?
   return fullName || input.customerName || "";
 }
 
+function resolvePublicBaseUrl(req: { protocol: string; get(name: string): string | undefined }): string {
+  const fromEnv = process.env.PUBLIC_BASE_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+
+  if (process.env.NODE_ENV === "production") {
+    return "https://smokecitysupplies.com";
+  }
+
+  const host = req.get("host") ?? "localhost:3000";
+  return `${req.protocol}://${host}`;
+}
+
 async function getProductMap(): Promise<Map<string, ApiProduct>> {
   const products = await storage.listProducts();
   return new Map(products.map((p) => [p.id, p]));
@@ -142,7 +154,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/robots.txt", (req, res) => {
-    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const base = resolvePublicBaseUrl(req);
     const txt = `User-agent: *
 Allow: /
 Disallow: /admin
@@ -157,7 +169,7 @@ Sitemap: ${base}/sitemap.xml
   });
 
   app.get("/llms.txt", (req, res) => {
-    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const base = resolvePublicBaseUrl(req);
     const txt = `# Smoke City Supplies
 
 Official website for motorcycle and scooter parts in the UK.
@@ -177,7 +189,7 @@ Key URLs:
   });
 
   app.get("/sitemap.xml", async (req, res) => {
-    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const base = resolvePublicBaseUrl(req);
     const now = new Date().toISOString().split("T")[0];
     const products = await storage.listProducts();
 
@@ -220,7 +232,7 @@ ${urls
   });
 
   async function sendGoogleMerchantFeed(req: Request, res: Response) {
-    const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const base = resolvePublicBaseUrl(req);
     const products = await storage.listProducts();
     const xml = buildGoogleMerchantFeedXml(products, base);
     res.set("Cache-Control", "no-store");
@@ -334,8 +346,8 @@ ${urls
   // IndexNow helper
   const INDEXNOW_KEY = "b805a9eb7ee2426e9fcf9040df864717";
   function pingIndexNow(req: { protocol: string; get(name: string): string | undefined }, urls: string[]) {
-    const host = req.get("host") ?? "localhost";
-    const base = `${req.protocol}://${host}`;
+    const base = resolvePublicBaseUrl(req);
+    const host = new URL(base).host;
     const body = {
       host,
       key: INDEXNOW_KEY,
