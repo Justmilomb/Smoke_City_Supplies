@@ -69,6 +69,7 @@ export default function AdminEditPart() {
   const [newCategoryName, setNewCategoryName] = React.useState("");
   const [addingBrand, setAddingBrand] = React.useState(false);
   const [newBrandName, setNewBrandName] = React.useState("");
+  const [seoGenerating, setSeoGenerating] = React.useState(false);
 
   const brandOptions = React.useMemo(
     () =>
@@ -147,6 +148,43 @@ export default function AdminEditPart() {
       setPreview(product.images ?? (product.image ? [product.image] : []));
     }
   }, [product]);
+
+  const handleGenerateSeo = async () => {
+    const v = form.getValues();
+    const parts = [
+      v.name && `Product: ${v.name}`,
+      v.brand && `Brand: ${v.brand}`,
+      v.category && `Category: ${v.category}`,
+      v.subcategory && `Subcategory: ${v.subcategory}`,
+      v.description && `Description: ${v.description}`,
+      v.compatibility && `Compatibility: ${v.compatibility}`,
+      v.tags && `Tags: ${v.tags}`,
+    ].filter(Boolean);
+    const productInfo = parts.join(". ");
+    if (!productInfo || productInfo.length < 10) {
+      toast.error("Fill in at least a product name and description first");
+      return;
+    }
+    setSeoGenerating(true);
+    try {
+      const res = await fetch("/api/generate-seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productInfo }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "SEO generation failed");
+      if (data.metaTitle) form.setValue("metaTitle", data.metaTitle);
+      if (data.metaDescription) form.setValue("metaDescription", data.metaDescription);
+      if (data.metaKeywords) form.setValue("metaKeywords", data.metaKeywords);
+      toast.success("SEO fields generated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "SEO generation failed");
+    } finally {
+      setSeoGenerating(false);
+    }
+  };
 
   const addCategoryInline = async () => {
     const name = newCategoryName.trim();
@@ -621,7 +659,19 @@ export default function AdminEditPart() {
 
                 {/* SEO */}
                 <div className="rounded-lg border border-border/60 p-4 space-y-3">
-                  <span className="text-sm font-semibold">SEO for Search Engines</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">SEO for Search Engines</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateSeo}
+                      disabled={seoGenerating}
+                      className="h-8 text-xs"
+                    >
+                      {seoGenerating ? "Generating…" : "Complete SEO"}
+                    </Button>
+                  </div>
                   <FormField
                     control={form.control}
                     name="metaTitle"
