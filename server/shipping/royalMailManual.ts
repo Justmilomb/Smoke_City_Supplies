@@ -24,8 +24,8 @@ export type ShippingQuoteInput = ShippingAddress & {
 
 export type ShippingQuote = {
   rateId: string;
-  provider: "royal_mail_manual";
-  carrier: "Royal Mail";
+  provider: "royal_mail_manual" | "shippo";
+  carrier: string;
   serviceName: string;
   serviceCode: string;
   serviceToken: string;
@@ -42,7 +42,7 @@ export type ShippingLabelInput = ShippingAddress & {
 };
 
 export type ShippingLabelResult = {
-  provider: "royal_mail_manual";
+  provider: "royal_mail_manual" | "shippo";
   labelId: string;
   labelUrl: string;
   trackingNumber: string;

@@ -45,6 +45,7 @@ import {
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
 import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderCancelledEmail, sendOrderConfirmationEmail, sendOrderDeliveredEmail, sendOrderProcessingEmail, sendOrderShippedEmail } from "./email";
 import { createRoyalMailManualLabel, getRoyalMailManualStatus, quoteRoyalMailFlatRates } from "./shipping/royalMailManual";
+import { isShippoEnabled, quoteShippoRates } from "./shipping/shippo";
 import { buildPackingSlipHtml, buildParcelsForItems, dispatchAdviceNow } from "./shippingLogic";
 import { z } from "zod";
 
@@ -678,22 +679,29 @@ Rules:
     const parcels = buildParcelsForItems(productMap, parsed.data.items);
     const dispatchInfo = dispatchAdviceNow();
 
-    let rates;
-    try {
-      rates = quoteRoyalMailFlatRates({
-        name: fullCustomerName(parsed.data) || undefined,
-        email: parsed.data.customerEmail,
-        addressLine1: parsed.data.addressLine1 || undefined,
-        addressLine2: parsed.data.addressLine2,
-        city: parsed.data.city || undefined,
-        county: parsed.data.county,
-        postcode: parsed.data.postcode || undefined,
-        country: parsed.data.country || "GB",
-        parcels,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to quote shipping";
-      return res.status(400).json({ message });
+    const quoteInput = {
+      name: fullCustomerName(parsed.data) || undefined,
+      email: parsed.data.customerEmail,
+      addressLine1: parsed.data.addressLine1 || undefined,
+      addressLine2: parsed.data.addressLine2,
+      city: parsed.data.city || undefined,
+      county: parsed.data.county,
+      postcode: parsed.data.postcode || undefined,
+      country: parsed.data.country || "GB",
+      parcels,
+    };
+
+    let rates: import("./shipping/royalMailManual").ShippingQuote[] = [];
+    if (isShippoEnabled()) {
+      rates = await quoteShippoRates(quoteInput as import("./shipping/royalMailManual").ShippingQuoteInput);
+    }
+    if (!rates.length) {
+      try {
+        rates = quoteRoyalMailFlatRates(quoteInput);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to quote shipping";
+        return res.status(400).json({ message });
+      }
     }
 
     if (!rates.length) {
@@ -759,22 +767,29 @@ Rules:
     let selectedShippingServiceLevel = parsed.data.shippingServiceLevel;
     let selectedShippingEstimatedDays = parsed.data.shippingEstimatedDays;
 
-    let liveRates;
-    try {
-      liveRates = quoteRoyalMailFlatRates({
-        name: fullCustomerName(parsed.data),
-        email: parsed.data.customerEmail,
-        addressLine1: parsed.data.addressLine1,
-        addressLine2: parsed.data.addressLine2,
-        city: parsed.data.city,
-        county: parsed.data.county,
-        postcode: parsed.data.postcode,
-        country: parsed.data.country || "GB",
-        parcels,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to quote shipping";
-      return res.status(400).json({ message });
+    const checkoutQuoteInput = {
+      name: fullCustomerName(parsed.data),
+      email: parsed.data.customerEmail,
+      addressLine1: parsed.data.addressLine1,
+      addressLine2: parsed.data.addressLine2,
+      city: parsed.data.city,
+      county: parsed.data.county,
+      postcode: parsed.data.postcode,
+      country: parsed.data.country || "GB",
+      parcels,
+    };
+
+    let liveRates: import("./shipping/royalMailManual").ShippingQuote[] = [];
+    if (isShippoEnabled()) {
+      liveRates = await quoteShippoRates(checkoutQuoteInput as import("./shipping/royalMailManual").ShippingQuoteInput);
+    }
+    if (!liveRates.length) {
+      try {
+        liveRates = quoteRoyalMailFlatRates(checkoutQuoteInput);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to quote shipping";
+        return res.status(400).json({ message });
+      }
     }
 
     if (!liveRates.length) {
