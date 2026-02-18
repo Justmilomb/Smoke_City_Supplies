@@ -37,6 +37,7 @@ import {
 } from "./rateLimit";
 import { stripe, STRIPE_PUBLISHABLE_KEY } from "./stripe";
 import { getAIClient } from "./ai";
+import { generateProductSeo } from "./seo";
 import {
   buildGoogleMerchantFeedXml,
   getGoogleMerchantFeedFileUrlPath,
@@ -388,7 +389,8 @@ ${urls
       brand: (sanitized.brand || parsed.data.brand) as string,
     };
 
-    const product = await storage.createProduct(data);
+    const seo = await generateProductSeo(data);
+    const product = await storage.createProduct({ ...data, ...seo });
     writeGoogleMerchantFeedFile("create-product").catch(() => {});
     pingIndexNow(req, [`/product/${product.id}`, "/store", "/sitemap.xml"]);
     return res.status(201).json(product);
@@ -400,7 +402,8 @@ ${urls
     if (!existing) return res.status(404).json({ message: "Product not found" });
     const patch = req.body as Partial<ApiProduct>;
     const sanitized = sanitizeProductInput(patch);
-    const updated = await storage.updateProduct(id, { ...patch, ...sanitized });
+    const seo = await generateProductSeo({ ...existing, ...patch, ...sanitized } as InsertProduct);
+    const updated = await storage.updateProduct(id, { ...patch, ...sanitized, ...seo });
     writeGoogleMerchantFeedFile("update-product").catch(() => {});
     pingIndexNow(req, [`/product/${id}`, "/store", "/sitemap.xml"]);
     return res.json(updated);
