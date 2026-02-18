@@ -36,7 +36,7 @@ import {
   orderRateLimiter,
 } from "./rateLimit";
 import { stripe, STRIPE_PUBLISHABLE_KEY } from "./stripe";
-import OpenAI from "openai";
+import { getAIClient } from "./ai";
 import {
   buildGoogleMerchantFeedXml,
   getGoogleMerchantFeedFileUrlPath,
@@ -589,22 +589,15 @@ ${urls
     });
   });
 
-  // SEO generation via NVIDIA API
+  // SEO generation via AI API
   app.post("/api/generate-seo", requireAuth, apiRateLimiter, async (req, res) => {
     const { productInfo } = req.body as { productInfo?: string };
     if (!productInfo || typeof productInfo !== "string" || productInfo.trim().length < 3) {
       return res.status(400).json({ message: "Please describe the product" });
     }
 
-    const apiKey = process.env.NVIDIA_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ message: "NVIDIA API key not configured" });
-    }
-
-    const model = process.env.NVIDIA_SEO_MODEL || "deepseek-ai/deepseek-v3.1";
-
     try {
-      const client = new OpenAI({ baseURL: "https://integrate.api.nvidia.com/v1", apiKey });
+      const { client, model } = getAIClient();
 
       const completion = await client.chat.completions.create({
         model,
@@ -648,41 +641,38 @@ Rules:
     }
   });
 
-  // Vehicle fitment generation via NVIDIA API
+  // Vehicle fitment generation via AI API
   app.post("/api/generate-fitment", requireAuth, apiRateLimiter, async (req, res) => {
     const { productInfo } = req.body as { productInfo?: string };
     if (!productInfo || typeof productInfo !== "string" || productInfo.trim().length < 3) {
       return res.status(400).json({ message: "Please describe the product" });
     }
 
-    const apiKey = process.env.NVIDIA_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ message: "NVIDIA API key not configured" });
-    }
-
-    const model = process.env.NVIDIA_SEO_MODEL || "deepseek-ai/deepseek-v3.1";
-
     try {
-      const client = new OpenAI({ baseURL: "https://integrate.api.nvidia.com/v1", apiKey });
+      const { client, model } = getAIClient();
 
       const completion = await client.chat.completions.create({
         model,
         messages: [
           {
             role: "system",
-            content: `You are a motorcycle and vehicle parts compatibility expert. Given a product description, return a comma-separated list of specific vehicle models and year ranges that this part is compatible with. Focus on motorcycle and scooter models. Be specific with model names and year ranges for maximum SEO value.
+            content: `You are a motorcycle and vehicle parts compatibility expert with web search access.
+Search for actual compatibility information for this specific part.
+ONLY list vehicle models you can verify from real sources (manufacturer specs, parts databases, retailer listings).
+Do NOT guess or fabricate compatibility — if you cannot verify a model, omit it.
 
 Respond ONLY with valid JSON in this exact format, nothing else:
 {"compatibility":"Model1 (2018-2024), Model2 (2020-2025), ..."}
 
 Rules:
+- Search the web for actual compatibility data for this exact part number or product
 - Include specific manufacturer + model + year ranges
-- Focus on popular models that commonly use this type of part
-- If the part is universal/generic, list the most popular compatible models
+- Focus on motorcycle and scooter models
+- Only include models you can verify are compatible from real sources
 - Maximum 15 models
 - Keep each entry concise: "Honda CBR600RR (2007-2024)"`,
           },
-          { role: "user", content: `List compatible vehicle models for this product: ${productInfo.trim().slice(0, 500)}` },
+          { role: "user", content: `Search for and list verified compatible vehicle models for this product: ${productInfo.trim().slice(0, 500)}` },
         ],
         temperature: 0.3,
         top_p: 0.7,
@@ -712,33 +702,28 @@ Rules:
       return res.status(400).json({ message: "Please describe the product" });
     }
 
-    const apiKey = process.env.NVIDIA_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ message: "NVIDIA API key not configured" });
-    }
-
-    const model = process.env.NVIDIA_SEO_MODEL || "deepseek-ai/deepseek-v3.1";
-
     try {
-      const client = new OpenAI({ baseURL: "https://integrate.api.nvidia.com/v1", apiKey });
+      const { client, model } = getAIClient();
 
       const completion = await client.chat.completions.create({
         model,
         messages: [
           {
             role: "system",
-            content: `You are a product content expert for Smoke City Supplies, a UK-based motorcycle and scooter parts shop. Generate comprehensive product content. Respond ONLY with valid JSON in this exact format, nothing else:
+            content: `You are a product content expert for Smoke City Supplies, a UK-based motorcycle and scooter parts shop, with web search access.
+Search for actual product information and compatibility data for this specific part.
+Generate comprehensive product content. Respond ONLY with valid JSON in this exact format, nothing else:
 {"description":"...","features":["...","..."],"compatibility":"Model1 (2018-2024), Model2 (2020-2025)","metaTitle":"...","metaDescription":"...","metaKeywords":"..."}
 
 Rules:
 - description: 2-3 sentences, clear and informative, mention key benefits
 - features: 3-6 bullet points highlighting key product features
-- compatibility: comma-separated list of specific vehicle models with year ranges (max 10)
+- compatibility: comma-separated list of specific vehicle models with year ranges (max 10). ONLY list models you can verify from real sources (manufacturer specs, parts databases, retailer listings). Do NOT guess or fabricate compatibility.
 - metaTitle: max 60 characters, include product name and "Smoke City Supplies"
 - metaDescription: max 160 characters, compelling description with UK delivery mention
 - metaKeywords: comma-separated relevant search terms (8-12 keywords)`,
           },
-          { role: "user", content: `Generate product content for: ${productInfo.trim().slice(0, 500)}` },
+          { role: "user", content: `Search for real product data and generate content for: ${productInfo.trim().slice(0, 500)}` },
         ],
         temperature: 0.3,
         top_p: 0.7,
