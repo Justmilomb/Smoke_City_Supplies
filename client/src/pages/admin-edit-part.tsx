@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { ImagePlus, Sparkles, Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, Sparkles } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -69,6 +69,7 @@ export default function AdminEditPart() {
   const [newCategoryName, setNewCategoryName] = React.useState("");
   const [addingBrand, setAddingBrand] = React.useState(false);
   const [newBrandName, setNewBrandName] = React.useState("");
+  const [fitmentLoading, setFitmentLoading] = React.useState(false);
 
   const brandOptions = React.useMemo(
     () =>
@@ -140,108 +141,6 @@ export default function AdminEditPart() {
     [cats, selectedCategory]
   );
 
-  const [seoPrompt, setSeoPrompt] = React.useState("");
-  const [seoLoading, setSeoLoading] = React.useState(false);
-  const [fitmentLoading, setFitmentLoading] = React.useState(false);
-  const [autoFillLoading, setAutoFillLoading] = React.useState(false);
-
-  const autoFillAll = async () => {
-    const name = form.getValues("name");
-    const brand = form.getValues("brand");
-    const cat = form.getValues("category");
-    const vehicle = form.getValues("vehicle");
-    const productInfo = [name, brand, cat, vehicle].filter(Boolean).join(" - ");
-    if (productInfo.length < 3) {
-      toast.error("Enter a product name first");
-      return;
-    }
-    setAutoFillLoading(true);
-    try {
-      const res = await fetch("/api/generate-product-content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ productInfo }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Failed to generate content");
-      }
-      const result = await res.json();
-      if (!form.getValues("description") && result.description) form.setValue("description", result.description);
-      if (!form.getValues("compatibility") && result.compatibility) form.setValue("compatibility", result.compatibility);
-      if (!form.getValues("metaTitle") && result.metaTitle) form.setValue("metaTitle", result.metaTitle);
-      if (!form.getValues("metaDescription") && result.metaDescription) form.setValue("metaDescription", result.metaDescription);
-      if (!form.getValues("metaKeywords") && result.metaKeywords) form.setValue("metaKeywords", result.metaKeywords);
-      toast.success("AI auto-fill complete");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Auto-fill failed");
-    } finally {
-      setAutoFillLoading(false);
-    }
-  };
-
-  const generateFitment = async () => {
-    const info = form.getValues("name");
-    const brand = form.getValues("brand");
-    const cat = form.getValues("category");
-    const desc = form.getValues("description");
-    const productInfo = [info, brand, cat, desc].filter(Boolean).join(" - ");
-    if (productInfo.length < 3) {
-      toast.error("Enter product details first");
-      return;
-    }
-    setFitmentLoading(true);
-    try {
-      const res = await fetch("/api/generate-fitment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ productInfo }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Failed to generate fitment");
-      }
-      const result = await res.json();
-      form.setValue("compatibility", result.compatibility || "");
-      toast.success("Compatibility auto-filled");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fitment generation failed");
-    } finally {
-      setFitmentLoading(false);
-    }
-  };
-
-  const generateSeo = async () => {
-    const info = seoPrompt.trim() || form.getValues("name");
-    if (!info || info.length < 3) {
-      toast.error("Describe the product or enter a name first");
-      return;
-    }
-    setSeoLoading(true);
-    try {
-      const res = await fetch("/api/generate-seo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ productInfo: info }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Failed to generate SEO");
-      }
-      const seo = await res.json();
-      form.setValue("metaTitle", seo.metaTitle || "");
-      form.setValue("metaDescription", seo.metaDescription || "");
-      form.setValue("metaKeywords", seo.metaKeywords || "");
-      toast.success("SEO generated");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "SEO generation failed");
-    } finally {
-      setSeoLoading(false);
-    }
-  };
 
   React.useEffect(() => {
     if (product) {
@@ -269,6 +168,41 @@ export default function AdminEditPart() {
       toast.success("Category added");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add category");
+    }
+  };
+
+  const generateFitment = async () => {
+    const name = form.getValues("name");
+    const brand = form.getValues("brand");
+    const category = form.getValues("category");
+    const description = form.getValues("description");
+    const productInfo = [brand, name, category, description].filter(Boolean).join(" — ");
+    if (productInfo.trim().length < 3) {
+      toast.error("Fill in the product name first");
+      return;
+    }
+    setFitmentLoading(true);
+    try {
+      const res = await fetch("/api/generate-fitment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productInfo }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Fitment generation failed" }));
+        throw new Error(err.message || "Fitment generation failed");
+      }
+      const data = await res.json();
+      if (data.compatibility) {
+        form.setValue("compatibility", data.compatibility, { shouldValidate: true });
+        toast.success("Compatible models found");
+      } else {
+        toast.error("No compatible models returned");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fitment generation failed");
+    } finally {
+      setFitmentLoading(false);
     }
   };
 
@@ -380,18 +314,6 @@ export default function AdminEditPart() {
           <Card className="border-border/50 rounded-lg p-5 lg:col-span-7">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 gap-1.5 rounded-lg"
-                    disabled={autoFillLoading}
-                    onClick={autoFillAll}
-                  >
-                    {autoFillLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    {autoFillLoading ? "Generating…" : "Auto-fill with AI"}
-                  </Button>
-                </div>
                 <FormField
                   control={form.control}
                   name="name"
@@ -701,12 +623,16 @@ export default function AdminEditPart() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-8 px-2 text-xs gap-1.5"
+                          className="h-8 gap-1.5 px-2 text-xs"
                           disabled={fitmentLoading}
                           onClick={generateFitment}
                         >
-                          {fitmentLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                          {fitmentLoading ? "Generating..." : "Auto-fill"}
+                          {fitmentLoading ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3 w-3" />
+                          )}
+                          {fitmentLoading ? "Searching…" : "Find compatible models"}
                         </Button>
                       </div>
                       <FormControl>
@@ -743,34 +669,9 @@ export default function AdminEditPart() {
                   )}
                 />
 
-                {/* SEO Generation */}
+                {/* SEO */}
                 <div className="rounded-lg border border-border/60 p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-semibold">SEO for Search Engines</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Describe the product below and click "Generate SEO" to auto-create meta tags for search engines. This appears in page metadata (title/description) and structured data, not as visible body text.
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="e.g., 10 inch pneumatic tire for electric scooter"
-                      value={seoPrompt}
-                      onChange={(e) => setSeoPrompt(e.target.value)}
-                      className="h-10 rounded-lg flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="h-10 rounded-lg gap-1.5 shrink-0"
-                      disabled={seoLoading}
-                      onClick={generateSeo}
-                    >
-                      {seoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                      {seoLoading ? "Generating…" : "Generate SEO"}
-                    </Button>
-                  </div>
-
+                  <span className="text-sm font-semibold">SEO for Search Engines</span>
                   <FormField
                     control={form.control}
                     name="metaTitle"

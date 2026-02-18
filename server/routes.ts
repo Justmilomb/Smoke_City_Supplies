@@ -656,24 +656,28 @@ Rules:
           {
             role: "system",
             content: `You are a motorcycle and vehicle parts compatibility expert with web search access.
-Search for actual compatibility information for this specific part.
-ONLY list vehicle models you can verify from real sources (manufacturer specs, parts databases, retailer listings).
-Do NOT guess or fabricate compatibility — if you cannot verify a model, omit it.
+Your job is to find EVERY compatible vehicle model for the given part — be exhaustive.
 
-Respond ONLY with valid JSON in this exact format, nothing else:
-{"compatibility":"Model1 (2018-2024), Model2 (2020-2025), ..."}
+Search these sources for compatibility data:
+- Larsson's motorcycle parts database
+- Wemoto
+- CMSNL parts cross-reference
+- Manufacturer OEM cross-reference / parts fiche
+- Major retailer listings (BikeBandit, Fowlers, etc.)
+
+Respond ONLY with valid JSON: {"compatibility":"Model1 (YYYY-YYYY), Model2 (YYYY-YYYY), ..."}
 
 Rules:
-- Search the web for actual compatibility data for this exact part number or product
-- Include specific manufacturer + model + year ranges
-- Focus on motorcycle and scooter models
-- Only include models you can verify are compatible from real sources
-- Maximum 15 models
-- Keep each entry concise: "Honda CBR600RR (2007-2024)"`,
+- List EVERY verified compatible motorcycle/scooter model with year ranges
+- If the same model name appears with minor variants (different BHP, sub-cc differences), list it ONCE with the widest year range
+- If a model has genuinely different generations with separate year ranges, list each generation separately
+- Format: "Manufacturer Model (StartYear-EndYear)"
+- Do NOT guess or fabricate — only include models you can verify from real sources
+- Do NOT limit the number of results — list all verified models`,
           },
           { role: "user", content: `Search for and list verified compatible vehicle models for this product: ${productInfo.trim().slice(0, 500)}` },
         ],
-        max_tokens: 1024,
+        max_tokens: 4096,
         ...(provider === "nvidia"
           ? { temperature: 0.3, top_p: 0.7 }
           : { web_search_options: { search_context_size: "high" } }),
@@ -686,7 +690,7 @@ Rules:
       const result = JSON.parse(jsonMatch ? jsonMatch[0] : content) as { compatibility?: string };
 
       return res.json({
-        compatibility: (result.compatibility ?? "").slice(0, 1000),
+        compatibility: (result.compatibility ?? "").slice(0, 5000),
       });
     } catch (err) {
       console.error("[generate-fitment] error:", err);
@@ -718,14 +722,14 @@ Generate comprehensive product content. Respond ONLY with valid JSON in this exa
 Rules:
 - description: 2-3 sentences, clear and informative, mention key benefits
 - features: 3-6 bullet points highlighting key product features
-- compatibility: comma-separated list of specific vehicle models with year ranges (max 10). ONLY list models you can verify from real sources (manufacturer specs, parts databases, retailer listings). Do NOT guess or fabricate compatibility.
+- compatibility: Search Larsson's, Wemoto, CMSNL, manufacturer OEM cross-references, and major retailer listings (BikeBandit, Fowlers, etc.) for compatibility data. List EVERY verified compatible motorcycle/scooter model with year ranges. If the same model appears with minor variants (BHP, sub-cc differences), list it ONCE with the widest year range. Different generations with separate year ranges should stay separate. Format: "Manufacturer Model (StartYear-EndYear)". Do NOT guess or fabricate. Do NOT limit the number of results.
 - metaTitle: max 60 characters, include product name and "Smoke City Supplies"
 - metaDescription: max 160 characters, compelling description with UK delivery mention
 - metaKeywords: comma-separated relevant search terms (8-12 keywords)`,
           },
           { role: "user", content: `Search for real product data and generate content for: ${productInfo.trim().slice(0, 500)}` },
         ],
-        max_tokens: 2048,
+        max_tokens: 4096,
         ...(provider === "nvidia"
           ? { temperature: 0.3, top_p: 0.7 }
           : { web_search_options: { search_context_size: "high" } }),
@@ -747,7 +751,7 @@ Rules:
       return res.json({
         description: (result.description ?? "").slice(0, 2000),
         features: Array.isArray(result.features) ? result.features.slice(0, 10) : [],
-        compatibility: (result.compatibility ?? "").slice(0, 1000),
+        compatibility: (result.compatibility ?? "").slice(0, 5000),
         metaTitle: (result.metaTitle ?? "").slice(0, 120),
         metaDescription: (result.metaDescription ?? "").slice(0, 320),
         metaKeywords: (result.metaKeywords ?? "").slice(0, 500),
