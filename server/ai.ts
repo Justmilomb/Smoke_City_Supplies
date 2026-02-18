@@ -1,10 +1,12 @@
 import OpenAI from "openai";
 
-export function getAIClient(): { client: OpenAI; model: string } {
-  const provider = process.env.AI_PROVIDER?.toLowerCase();
+export type AIProvider = "perplexity" | "nvidia";
+
+export function getAIClient(): { client: OpenAI; model: string; provider: AIProvider } {
+  const configuredProvider = process.env.AI_PROVIDER?.toLowerCase();
   const perplexityKey = process.env.PERPLEXITY_API_KEY;
 
-  if (provider === "perplexity" || (!provider && perplexityKey)) {
+  if (configuredProvider === "perplexity" || (!configuredProvider && perplexityKey)) {
     if (!perplexityKey) {
       throw new Error("PERPLEXITY_API_KEY not configured");
     }
@@ -14,6 +16,7 @@ export function getAIClient(): { client: OpenAI; model: string } {
         apiKey: perplexityKey,
       }),
       model: "sonar",
+      provider: "perplexity",
     };
   }
 
@@ -28,5 +31,6 @@ export function getAIClient(): { client: OpenAI; model: string } {
       apiKey: nvidiaKey,
     }),
     model: process.env.NVIDIA_SEO_MODEL || "deepseek-ai/deepseek-v3.1",
+    provider: "nvidia",
   };
 }

@@ -597,7 +597,7 @@ ${urls
     }
 
     try {
-      const { client, model } = getAIClient();
+      const { client, model, provider } = getAIClient();
 
       const completion = await client.chat.completions.create({
         model,
@@ -614,10 +614,9 @@ Rules:
           },
           { role: "user", content: `Generate SEO metadata for this product: ${productInfo.trim().slice(0, 500)}` },
         ],
-        temperature: 0.2,
-        top_p: 0.7,
         max_tokens: 1024,
-      });
+        ...(provider === "nvidia" ? { temperature: 0.2, top_p: 0.7 } : {}),
+      } as any);
 
       const content = completion.choices?.[0]?.message?.content?.trim();
       if (!content) return res.status(500).json({ message: "No response from AI model" });
@@ -649,7 +648,7 @@ Rules:
     }
 
     try {
-      const { client, model } = getAIClient();
+      const { client, model, provider } = getAIClient();
 
       const completion = await client.chat.completions.create({
         model,
@@ -674,10 +673,11 @@ Rules:
           },
           { role: "user", content: `Search for and list verified compatible vehicle models for this product: ${productInfo.trim().slice(0, 500)}` },
         ],
-        temperature: 0.3,
-        top_p: 0.7,
         max_tokens: 1024,
-      });
+        ...(provider === "nvidia"
+          ? { temperature: 0.3, top_p: 0.7 }
+          : { web_search_options: { search_context_size: "high" } }),
+      } as any);
 
       const content = completion.choices?.[0]?.message?.content?.trim();
       if (!content) return res.status(500).json({ message: "No response from AI model" });
@@ -703,7 +703,7 @@ Rules:
     }
 
     try {
-      const { client, model } = getAIClient();
+      const { client, model, provider } = getAIClient();
 
       const completion = await client.chat.completions.create({
         model,
@@ -725,10 +725,11 @@ Rules:
           },
           { role: "user", content: `Search for real product data and generate content for: ${productInfo.trim().slice(0, 500)}` },
         ],
-        temperature: 0.3,
-        top_p: 0.7,
         max_tokens: 2048,
-      });
+        ...(provider === "nvidia"
+          ? { temperature: 0.3, top_p: 0.7 }
+          : { web_search_options: { search_context_size: "high" } }),
+      } as any);
 
       const content = completion.choices?.[0]?.message?.content?.trim();
       if (!content) return res.status(500).json({ message: "No response from AI model" });
