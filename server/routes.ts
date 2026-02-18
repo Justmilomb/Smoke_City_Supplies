@@ -165,6 +165,7 @@ Disallow: /api/
 
 Sitemap: ${base}/sitemap.xml
 `;
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.type("text/plain").send(txt);
   });
 
@@ -185,6 +186,7 @@ Key URLs:
 - ${base}/privacy
 - ${base}/terms
 `;
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.type("text/plain").send(txt);
   });
 
@@ -228,6 +230,7 @@ ${urls
   .join("\n")}
 </urlset>`;
 
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.type("application/xml").send(xml);
   });
 
