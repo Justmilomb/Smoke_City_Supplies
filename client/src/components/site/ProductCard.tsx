@@ -68,7 +68,7 @@ export default function ProductCard({ part }: { part: Part }) {
                 {part.name}
               </div>
               <div className="text-xs font-medium text-muted-foreground">
-                {part.vehicle === "motorcycle" ? "Motorcycle" : part.vehicle === "bike" ? "Bike" : "Scooter"} · {part.category}
+                {part.vehicle === "motorcycle" ? "Motorcycle" : "Scooter"} · {part.category}
                 {part.partNumber && (
                   <span className="ml-1 font-mono">· {part.partNumber}</span>
                 )}

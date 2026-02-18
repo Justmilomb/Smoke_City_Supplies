@@ -31,7 +31,7 @@ export const categories = pgTable("categories", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   icon: text("icon"),
-  vehicleType: varchar("vehicle_type", { length: 20 }).notNull(), // "bike" | "scooter" | "all"
+  vehicleType: varchar("vehicle_type", { length: 20 }).notNull(), // "motorcycle" | "scooter" | "all"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -39,7 +39,7 @@ export const insertCategorySchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1),
   icon: z.string().optional(),
-  vehicleType: z.enum(["bike", "scooter", "all"]),
+  vehicleType: z.enum(["motorcycle", "scooter", "all"]),
 });
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;

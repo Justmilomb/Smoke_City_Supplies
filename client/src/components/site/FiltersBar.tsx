@@ -50,7 +50,7 @@ function parseQuery(search: string): Partial<CatalogFilters> {
   const q = p.get("q") ?? "";
   const vehicleRaw = p.get("vehicle");
   const vehicle: CatalogFilters["vehicle"] =
-    vehicleRaw === "bike" || vehicleRaw === "scooter" || vehicleRaw === "motorcycle"
+    vehicleRaw === "scooter" || vehicleRaw === "motorcycle"
       ? vehicleRaw
       : "all";
   const categoryRaw = p.get("category");
@@ -173,14 +173,11 @@ export default function FiltersBar({
                 <SelectItem data-testid="option-vehicle-all" value="all">
                   All Vehicles
                 </SelectItem>
-                <SelectItem data-testid="option-vehicle-bike" value="bike">
-                  Bike
+                <SelectItem data-testid="option-vehicle-motorcycle" value="motorcycle">
+                  Motorcycle
                 </SelectItem>
                 <SelectItem data-testid="option-vehicle-scooter" value="scooter">
                   Scooter
-                </SelectItem>
-                <SelectItem data-testid="option-vehicle-motorcycle" value="motorcycle">
-                  Motorcycle
                 </SelectItem>
               </SelectContent>
             </Select>

@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const schema = z.object({
   name: z.string().min(3, "Name is too short"),
-  vehicle: z.enum(["motorcycle", "bike", "scooter"]),
+  vehicle: z.enum(["motorcycle", "scooter"]),
   category: z.string().min(1, "Pick a category"),
   subcategory: z.string().min(1, "Add a subcategory"),
   brand: z.string().min(1, "Pick or add a company"),
@@ -123,6 +123,43 @@ export default function AdminNewPart() {
   const [seoPrompt, setSeoPrompt] = React.useState("");
   const [seoLoading, setSeoLoading] = React.useState(false);
   const [fitmentLoading, setFitmentLoading] = React.useState(false);
+  const [autoFillLoading, setAutoFillLoading] = React.useState(false);
+
+  const autoFillAll = async () => {
+    const name = form.getValues("name");
+    const brand = form.getValues("brand");
+    const cat = form.getValues("category");
+    const vehicle = form.getValues("vehicle");
+    const productInfo = [name, brand, cat, vehicle].filter(Boolean).join(" - ");
+    if (productInfo.length < 3) {
+      toast.error("Enter a product name first");
+      return;
+    }
+    setAutoFillLoading(true);
+    try {
+      const res = await fetch("/api/generate-product-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ productInfo }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to generate content");
+      }
+      const result = await res.json();
+      if (!form.getValues("description") && result.description) form.setValue("description", result.description);
+      if (!form.getValues("compatibility") && result.compatibility) form.setValue("compatibility", result.compatibility);
+      if (!form.getValues("metaTitle") && result.metaTitle) form.setValue("metaTitle", result.metaTitle);
+      if (!form.getValues("metaDescription") && result.metaDescription) form.setValue("metaDescription", result.metaDescription);
+      if (!form.getValues("metaKeywords") && result.metaKeywords) form.setValue("metaKeywords", result.metaKeywords);
+      toast.success("AI auto-fill complete");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Auto-fill failed");
+    } finally {
+      setAutoFillLoading(false);
+    }
+  };
 
   const generateFitment = async () => {
     const info = form.getValues("name");
@@ -163,7 +200,7 @@ export default function AdminNewPart() {
       return;
     }
     const vehicle = form.getValues("vehicle");
-    const vehicleType = vehicle === "scooter" ? "scooter" : vehicle === "bike" ? "bike" : "all";
+    const vehicleType = vehicle === "scooter" ? "scooter" : vehicle === "motorcycle" ? "motorcycle" : "all";
     try {
       const created = await createCategory.mutateAsync({
         name,
@@ -296,6 +333,18 @@ export default function AdminNewPart() {
           <Card className="border-border/50 rounded-lg p-5 lg:col-span-7">
             <Form {...form}>
               <form data-testid="form-admin-new" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 gap-1.5 rounded-lg"
+                    disabled={autoFillLoading}
+                    onClick={autoFillAll}
+                  >
+                    {autoFillLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {autoFillLoading ? "Generating…" : "Auto-fill with AI"}
+                  </Button>
+                </div>
                 <FormField
                   control={form.control}
                   name="name"
@@ -325,7 +374,6 @@ export default function AdminNewPart() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem data-testid="option-part-vehicle-motorcycle" value="motorcycle">Motorcycle</SelectItem>
-                            <SelectItem data-testid="option-part-vehicle-bike" value="bike">Bike</SelectItem>
                             <SelectItem data-testid="option-part-vehicle-scooter" value="scooter">Scooter</SelectItem>
                           </SelectContent>
                         </Select>

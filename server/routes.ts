@@ -160,7 +160,7 @@ Sitemap: ${base}/sitemap.xml
     const base = `${req.protocol}://${req.get("host") ?? "localhost"}`;
     const txt = `# Smoke City Supplies
 
-Official website for motorcycle, bike, and scooter parts in the UK.
+Official website for motorcycle and scooter parts in the UK.
 
 Key URLs:
 - ${base}/
@@ -596,7 +596,7 @@ ${urls
         messages: [
           {
             role: "system",
-            content: `You are an SEO expert for Smoke City Supplies, a UK-based motorcycle, bike, and scooter parts shop. Generate SEO metadata for products. Respond ONLY with valid JSON in this exact format, nothing else:
+            content: `You are an SEO expert for Smoke City Supplies, a UK-based motorcycle and scooter parts shop. Generate SEO metadata for products. Respond ONLY with valid JSON in this exact format, nothing else:
 {"metaTitle":"...","metaDescription":"...","metaKeywords":"..."}
 
 Rules:
@@ -655,7 +655,7 @@ Rules:
         messages: [
           {
             role: "system",
-            content: `You are a motorcycle and vehicle parts compatibility expert. Given a product description, return a comma-separated list of specific vehicle models and year ranges that this part is compatible with. Focus on motorcycle, bike, and scooter models. Be specific with model names and year ranges for maximum SEO value.
+            content: `You are a motorcycle and vehicle parts compatibility expert. Given a product description, return a comma-separated list of specific vehicle models and year ranges that this part is compatible with. Focus on motorcycle and scooter models. Be specific with model names and year ranges for maximum SEO value.
 
 Respond ONLY with valid JSON in this exact format, nothing else:
 {"compatibility":"Model1 (2018-2024), Model2 (2020-2025), ..."}
@@ -686,6 +686,74 @@ Rules:
     } catch (err) {
       console.error("[generate-fitment] error:", err);
       const message = err instanceof Error ? err.message : "Fitment generation failed";
+      return res.status(500).json({ message });
+    }
+  });
+
+  // Combined AI content generation (description, features, compatibility, SEO)
+  app.post("/api/generate-product-content", requireAuth, apiRateLimiter, async (req, res) => {
+    const { productInfo } = req.body as { productInfo?: string };
+    if (!productInfo || typeof productInfo !== "string" || productInfo.trim().length < 3) {
+      return res.status(400).json({ message: "Please describe the product" });
+    }
+
+    const apiKey = process.env.NVIDIA_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: "NVIDIA API key not configured" });
+    }
+
+    const model = process.env.NVIDIA_SEO_MODEL || "deepseek-ai/deepseek-v3.1";
+
+    try {
+      const client = new OpenAI({ baseURL: "https://integrate.api.nvidia.com/v1", apiKey });
+
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: `You are a product content expert for Smoke City Supplies, a UK-based motorcycle and scooter parts shop. Generate comprehensive product content. Respond ONLY with valid JSON in this exact format, nothing else:
+{"description":"...","features":["...","..."],"compatibility":"Model1 (2018-2024), Model2 (2020-2025)","metaTitle":"...","metaDescription":"...","metaKeywords":"..."}
+
+Rules:
+- description: 2-3 sentences, clear and informative, mention key benefits
+- features: 3-6 bullet points highlighting key product features
+- compatibility: comma-separated list of specific vehicle models with year ranges (max 10)
+- metaTitle: max 60 characters, include product name and "Smoke City Supplies"
+- metaDescription: max 160 characters, compelling description with UK delivery mention
+- metaKeywords: comma-separated relevant search terms (8-12 keywords)`,
+          },
+          { role: "user", content: `Generate product content for: ${productInfo.trim().slice(0, 500)}` },
+        ],
+        temperature: 0.3,
+        top_p: 0.7,
+        max_tokens: 2048,
+      });
+
+      const content = completion.choices?.[0]?.message?.content?.trim();
+      if (!content) return res.status(500).json({ message: "No response from AI model" });
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const result = JSON.parse(jsonMatch ? jsonMatch[0] : content) as {
+        description?: string;
+        features?: string[];
+        compatibility?: string;
+        metaTitle?: string;
+        metaDescription?: string;
+        metaKeywords?: string;
+      };
+
+      return res.json({
+        description: (result.description ?? "").slice(0, 2000),
+        features: Array.isArray(result.features) ? result.features.slice(0, 10) : [],
+        compatibility: (result.compatibility ?? "").slice(0, 1000),
+        metaTitle: (result.metaTitle ?? "").slice(0, 120),
+        metaDescription: (result.metaDescription ?? "").slice(0, 320),
+        metaKeywords: (result.metaKeywords ?? "").slice(0, 500),
+      });
+    } catch (err) {
+      console.error("[generate-product-content] error:", err);
+      const message = err instanceof Error ? err.message : "Content generation failed";
       return res.status(500).json({ message });
     }
   });

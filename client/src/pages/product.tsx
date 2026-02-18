@@ -3,8 +3,9 @@ import { CheckCircle2, Headphones, ChevronRight, Shield, Sparkles, Star, Truck }
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useContactModal } from "@/components/site/ContactModal";
-import { useProduct } from "@/lib/products";
+import { useProduct, useProducts } from "@/lib/products";
 import { useCart } from "@/lib/cart";
+import ProductCard from "@/components/site/ProductCard";
 import { getProductImage } from "@/lib/mockData";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { toast } from "sonner";
 export default function ProductPage() {
   const [, params] = useRoute("/product/:id");
   const { data: part, isLoading } = useProduct(params?.id);
+  const { data: allProducts = [] } = useProducts();
   const { state: cartState, actions: cartActions } = useCart();
   const contactModal = useContactModal();
 
@@ -73,6 +75,8 @@ export default function ProductPage() {
     description: part.metaDescription || part.description?.slice(0, 500) || part.name,
     ...(absoluteImage && { image: absoluteImage }),
     ...(part.brand && { brand: { "@type": "Brand", name: part.brand } }),
+    ...(part.partNumber && { sku: part.partNumber }),
+    ...(part.category && { category: part.category }),
     url: productUrl,
     offers: {
       "@type": "Offer",
@@ -90,6 +94,15 @@ export default function ProductPage() {
         name: "Smoke City Supplies",
       },
     },
+    ...(part.reviewCount > 0 && {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: part.rating,
+        reviewCount: part.reviewCount,
+        bestRating: 5,
+        worstRating: 1,
+      },
+    }),
   };
 
   const breadcrumbJsonLd = {
@@ -132,7 +145,7 @@ export default function ProductPage() {
   const currentInCart = cartState.items.find((i) => i.productId === part.id)?.quantity ?? 0;
   const atStockLimit = availableStock > 0 && currentInCart >= availableStock;
 
-  const vehicleLabel = part.vehicle === "motorcycle" ? "Motorcycle" : part.vehicle === "bike" ? "Bike" : "Scooter";
+  const vehicleLabel = part.vehicle === "motorcycle" ? "Motorcycle" : "Scooter";
 
   return (
     <SiteLayout>
@@ -179,7 +192,9 @@ export default function ProductPage() {
               </div>
             )}
             {part.brand && (
-              <div className="text-sm font-medium text-primary">{part.brand}</div>
+              <Link href={`/store?brands=${encodeURIComponent(part.brand)}`}>
+                <span className="text-sm font-medium text-primary hover:underline cursor-pointer">{part.brand}</span>
+              </Link>
             )}
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="rounded-md">
@@ -362,6 +377,29 @@ export default function ProductPage() {
             </Card>
           </div>
         </div>
+
+        {/* Related Products */}
+        {(() => {
+          const related = allProducts
+            .filter((p) => p.id !== part.id)
+            .filter((p) =>
+              p.category === part.category ||
+              p.compatibility?.some((c) => part.compatibility?.includes(c))
+            )
+            .sort((a, b) => b.rating - a.rating)
+            .slice(0, 4);
+          if (related.length === 0) return null;
+          return (
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight mb-4">You May Also Need</h2>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {related.map((p) => (
+                  <ProductCard key={p.id} part={p} />
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </SiteLayout>
   );

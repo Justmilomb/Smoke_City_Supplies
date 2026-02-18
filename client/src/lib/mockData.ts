@@ -6,7 +6,7 @@ import productPlaceholder from "@/assets/images/product-placeholder.svg";
 export type StockStatus = "in-stock" | "low" | "out";
 
 /** Vehicle type for filters (motorcycle-focused shop) */
-export type VehicleType = "motorcycle" | "bike" | "scooter";
+export type VehicleType = "motorcycle" | "scooter";
 
 export type PartCategory =
   | "Brakes"

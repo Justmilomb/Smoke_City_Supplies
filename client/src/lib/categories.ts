@@ -21,7 +21,7 @@ async function createCategory(data: {
   name: string;
   slug: string;
   icon?: string;
-  vehicleType: "bike" | "scooter" | "all";
+  vehicleType: "motorcycle" | "scooter" | "all";
 }): Promise<Category> {
   const res = await fetch(`${API}/categories`, {
     method: "POST",

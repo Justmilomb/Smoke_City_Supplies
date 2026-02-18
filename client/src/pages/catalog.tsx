@@ -15,19 +15,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { bikeTerms, scooterTerms } from "@/lib/dictionary";
 
-function parseVehicle(loc: string): "all" | "bike" | "scooter" {
+function parseVehicle(loc: string): "all" | "motorcycle" | "scooter" {
   const idx = loc.indexOf("?");
   const s = idx >= 0 ? loc.slice(idx) : "";
   const p = new URLSearchParams(s);
-  const vehicle = (p.get("vehicle") ?? "all") as "all" | "bike" | "scooter";
-  return vehicle;
+  const raw = p.get("vehicle") ?? "all";
+  const vehicle = (raw === "motorcycle" || raw === "scooter") ? raw : "all";
+  return vehicle as "all" | "motorcycle" | "scooter";
 }
 
 export default function CatalogPage() {
   usePageMeta({
     title: "Parts Catalog",
-    description: "Full catalog of motorcycle, bike and scooter parts. Filter by category, vehicle type and price. Quality parts with UK delivery from Smoke City Supplies.",
-    keywords: "motorcycle parts catalog, bike parts list, scooter parts, motorcycle spares catalog, UK motorcycle parts, parts by category",
+    description: "Full catalog of motorcycle and scooter parts. Filter by category, vehicle type and price. Quality parts with UK delivery from Smoke City Supplies.",
+    keywords: "motorcycle parts catalog, scooter parts, motorcycle spares catalog, UK motorcycle parts, parts by category",
   });
   const cats = useCategories();
   const { data: parts = [], isLoading } = useProducts();
@@ -112,16 +113,16 @@ export default function CatalogPage() {
             </Badge>
           </div>
 
-          <Tabs defaultValue={intentVehicle === "all" ? "bike" : intentVehicle} className="mt-4">
+          <Tabs defaultValue={intentVehicle === "all" ? "motorcycle" : intentVehicle} className="mt-4">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger data-testid="tab-bike" value="bike">
-                Bike Terms
+              <TabsTrigger data-testid="tab-motorcycle" value="motorcycle">
+                Motorcycle Terms
               </TabsTrigger>
               <TabsTrigger data-testid="tab-scooter" value="scooter">
                 Scooter Terms
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="bike" className="mt-4">
+            <TabsContent value="motorcycle" className="mt-4">
               <Accordion type="single" collapsible className="w-full">
                 {bikeTerms.map((term) => (
                   <AccordionItem key={term.term} value={term.term}>

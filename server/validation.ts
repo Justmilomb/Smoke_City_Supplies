@@ -78,7 +78,7 @@ export function sanitizeCategoryInput(input: any) {
     name: sanitizeString(input.name),
     slug: sanitizeString(input.slug).toLowerCase().replace(/[^a-z0-9-]/g, "-"),
     icon: sanitizeString(input.icon),
-    vehicleType: input.vehicleType === "bike" || input.vehicleType === "scooter" || input.vehicleType === "all"
+    vehicleType: input.vehicleType === "motorcycle" || input.vehicleType === "scooter" || input.vehicleType === "all"
       ? input.vehicleType
       : undefined,
   };

@@ -49,7 +49,7 @@ export default function AdminCategories() {
   const [editing, setEditing] = React.useState<Category | null>(null);
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
-  const [vehicleType, setVehicleType] = React.useState<"bike" | "scooter" | "all">("all");
+  const [vehicleType, setVehicleType] = React.useState<"motorcycle" | "scooter" | "all">("all");
 
   const resetForm = () => {
     setEditing(null);
@@ -106,7 +106,7 @@ export default function AdminCategories() {
     setEditing(c);
     setName(c.name);
     setSlug(c.slug);
-    setVehicleType((c.vehicleType as "bike" | "scooter" | "all") || "all");
+    setVehicleType((c.vehicleType as "motorcycle" | "scooter" | "all") || "all");
     setDialogOpen(true);
   };
 
@@ -235,13 +235,13 @@ export default function AdminCategories() {
               <Label>Vehicle type</Label>
               <Select
                 value={vehicleType}
-                onValueChange={(v) => setVehicleType(v as "bike" | "scooter" | "all")}
+                onValueChange={(v) => setVehicleType(v as "motorcycle" | "scooter" | "all")}
               >
                 <SelectTrigger className="h-11 rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="bike">Bike</SelectItem>
+                  <SelectItem value="motorcycle">Motorcycle</SelectItem>
                   <SelectItem value="scooter">Scooter</SelectItem>
                   <SelectItem value="all">All</SelectItem>
                 </SelectContent>
