@@ -410,8 +410,8 @@ function ActionButtons({ order }: { order: Order }) {
         selectedRateId: labelForm.selectedRateId.trim() || undefined,
       });
       toast.success(data.trackingNumber ? `Label generated (${data.trackingNumber})` : "Label generated");
-      if (data.manualRoyalMailUrl) {
-        window.open(data.manualRoyalMailUrl, "_blank", "noopener,noreferrer");
+      if (data.shippingLabelUrl) {
+        window.open(data.shippingLabelUrl, "_blank", "noopener,noreferrer");
       }
       setLabelOpen(false);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -512,13 +512,10 @@ function ActionButtons({ order }: { order: Order }) {
       <Dialog open={labelOpen} onOpenChange={setLabelOpen}>
         <DialogContent className="sm:max-w-[620px]">
           <DialogHeader>
-            <DialogTitle>Prepare Royal Mail Label</DialogTitle>
+            <DialogTitle>Generate Shipping Label</DialogTitle>
             <DialogDescription>
-              Confirm shipping details, then open Royal Mail to buy and print the label.
+              Confirm shipping details, then generate a label via Shippo.
             </DialogDescription>
-            <p className="text-xs text-muted-foreground">
-              Shipping is fulfilled via Royal Mail. Confirm service terms in Royal Mail T&amp;Cs before purchasing labels.
-            </p>
           </DialogHeader>
           <div className="grid gap-3 py-1">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -560,9 +557,9 @@ function ActionButtons({ order }: { order: Order }) {
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Royal Mail Service *</Label>
+              <Label>Shipping Service (optional)</Label>
               <Input
-                placeholder="royal_mail_tracked_48_two_day_aim, royal_mail_next_day_aim, or royal_mail_next_day_guaranteed"
+                placeholder="Leave blank for best available rate"
                 value={labelForm.selectedRateId}
                 onChange={(e) => setLabelForm((s) => ({ ...s, selectedRateId: e.target.value }))}
               />

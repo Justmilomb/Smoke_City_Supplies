@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Link } from "wouter";
-import { Minus, Plus, ShoppingBag, Trash2, CheckCircle2, CreditCard } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Trash2, CheckCircle2, CreditCard, AlertTriangle } from "lucide-react";
 import { Elements } from "@stripe/react-stripe-js";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
@@ -36,6 +36,49 @@ export default function CartPage() {
     }
     return map;
   }, [allProducts]);
+  // Validate cart against current product data — remove deleted/unavailable items, fix stale prices
+  const [cartWarnings, setCartWarnings] = useState<string[]>([]);
+  const cartValidatedRef = useRef(false);
+
+  const validateCart = useCallback(() => {
+    if (!allProducts || allProducts.length === 0) return;
+    const warnings: string[] = [];
+    const productMap = new Map(allProducts.map((p) => [p.id, p]));
+
+    for (const item of state.items) {
+      const dbProduct = productMap.get(item.productId);
+      if (!dbProduct) {
+        warnings.push(`"${item.productName}" is no longer available and was removed from your cart.`);
+        actions.remove(item.productId);
+        continue;
+      }
+      const availableQty = dbProduct.quantity ?? 0;
+      if (availableQty === 0 || dbProduct.stock === "out") {
+        warnings.push(`"${dbProduct.name}" is out of stock and was removed from your cart.`);
+        actions.remove(item.productId);
+        continue;
+      }
+      if (availableQty < item.quantity) {
+        warnings.push(`Only ${availableQty} of "${dbProduct.name}" available. Quantity adjusted.`);
+        actions.updateQuantity(item.productId, availableQty);
+      }
+      if (Math.round(dbProduct.price * 100) !== Math.round(item.priceEach * 100)) {
+        warnings.push(`Price for "${dbProduct.name}" has changed to £${dbProduct.price.toFixed(2)}.`);
+      }
+    }
+    if (warnings.length > 0) {
+      setCartWarnings(warnings);
+      for (const w of warnings) toast.warning(w);
+    }
+  }, [allProducts, state.items, actions]);
+
+  useEffect(() => {
+    if (allProducts && allProducts.length > 0 && state.items.length > 0 && !cartValidatedRef.current) {
+      cartValidatedRef.current = true;
+      validateCart();
+    }
+  }, [allProducts, state.items.length, validateCart]);
+
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
@@ -240,6 +283,20 @@ export default function CartPage() {
           <BackButton fallback="/store" />
         </div>
 
+        {cartWarnings.length > 0 && (
+          <Card className="border-amber-300 bg-amber-50 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-amber-800">Your cart was updated</div>
+                {cartWarnings.map((w, i) => (
+                  <div key={i} className="text-sm text-amber-700">{w}</div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        )}
+
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-4">
             {state.items.map((item) => (
@@ -356,7 +413,26 @@ export default function CartPage() {
             <Button
               className="w-full h-12 text-base gap-2"
               size="lg"
-              onClick={() => setCheckoutOpen(true)}
+              onClick={() => {
+                // Re-validate cart before opening checkout
+                if (allProducts && allProducts.length > 0) {
+                  const productMap = new Map(allProducts.map((p) => [p.id, p]));
+                  for (const item of state.items) {
+                    const dbProduct = productMap.get(item.productId);
+                    if (!dbProduct || (dbProduct.quantity ?? 0) === 0 || dbProduct.stock === "out") {
+                      toast.error(`"${item.productName}" is no longer available. Please review your cart.`);
+                      validateCart();
+                      return;
+                    }
+                    if ((dbProduct.quantity ?? 0) < item.quantity) {
+                      toast.error(`Only ${dbProduct.quantity ?? 0} of "${dbProduct.name}" available.`);
+                      validateCart();
+                      return;
+                    }
+                  }
+                }
+                setCheckoutOpen(true);
+              }}
             >
               <CreditCard className="h-5 w-5" />
               Secure Checkout

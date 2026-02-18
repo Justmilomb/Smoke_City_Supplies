@@ -1,5 +1,5 @@
 import { Shippo } from "shippo";
-import type { ShippingQuoteInput, ShippingQuote, ShippingParcel } from "./royalMailManual";
+import type { ShippingQuoteInput, ShippingQuote, ShippingParcel, ShippingLabelResult } from "./royalMailManual";
 
 let _client: Shippo | null = null;
 
@@ -14,7 +14,7 @@ export function isShippoEnabled(): boolean {
   return Boolean(process.env.SHIPPO_API_KEY) && process.env.SHIPPO_ENABLED !== "false";
 }
 
-function buildAddressFrom() {
+export function buildAddressFrom() {
   return {
     name: process.env.SHIP_FROM_NAME || "",
     street1: process.env.SHIP_FROM_ADDRESS_LINE1 || "",
@@ -26,7 +26,7 @@ function buildAddressFrom() {
   };
 }
 
-function buildAddressTo(input: ShippingQuoteInput) {
+export function buildAddressTo(input: ShippingQuoteInput) {
   return {
     name: input.name || "",
     street1: input.addressLine1 || "",
@@ -54,15 +54,26 @@ export async function quoteShippoRates(input: ShippingQuoteInput): Promise<Shipp
   try {
     const client = getClient();
 
+    const addressFrom = buildAddressFrom();
+    const addressTo = buildAddressTo(input);
+    console.log("[shippo] Requesting rates:", {
+      from: { city: addressFrom.city, zip: addressFrom.zip, country: addressFrom.country },
+      to: { city: addressTo.city, zip: addressTo.zip, country: addressTo.country },
+      parcels: input.parcels.length,
+    });
+
     const shipment = await client.shipments.create({
-      addressFrom: buildAddressFrom(),
-      addressTo: buildAddressTo(input),
+      addressFrom,
+      addressTo,
       parcels: buildParcels(input.parcels),
       async: false,
     });
 
     if (!shipment.rates?.length) {
       console.warn("[shippo] No rates returned for shipment", shipment.objectId);
+      if ((shipment as any).messages?.length) {
+        console.warn("[shippo] Messages:", JSON.stringify((shipment as any).messages));
+      }
       return [];
     }
 
@@ -95,4 +106,95 @@ export async function quoteShippoRates(input: ShippingQuoteInput): Promise<Shipp
     console.error("[shippo] Failed to fetch rates:", err instanceof Error ? err.message : err);
     return [];
   }
+}
+
+/**
+ * Purchase a label from Shippo using a rate object ID.
+ * The rateId must be from a shipment created within the last 7 days.
+ */
+export async function createShippoLabel(rateId: string, metadata?: string): Promise<ShippingLabelResult> {
+  const client = getClient();
+
+  const transaction = await client.transactions.create({
+    rate: rateId,
+    labelFileType: "PDF_4x6" as any,
+    async: false,
+    metadata: metadata || "",
+  });
+
+  if (transaction.status === "ERROR") {
+    const msgs = transaction.messages?.map((m) => m.text).filter(Boolean).join("; ");
+    throw new Error(`Shippo label creation failed: ${msgs || "Unknown error"}`);
+  }
+
+  return {
+    provider: "shippo",
+    labelId: transaction.objectId || rateId,
+    labelUrl: transaction.labelUrl || "",
+    trackingNumber: transaction.trackingNumber || "",
+    serviceName: metadata || "Shippo",
+  };
+}
+
+/**
+ * Create a shipment and immediately purchase a label in one call.
+ * Used when we don't have an existing rate ID (e.g., for admin-initiated labels).
+ */
+export async function createShippoShipmentAndLabel(input: {
+  addressFrom: ReturnType<typeof buildAddressFrom>;
+  addressTo: ReturnType<typeof buildAddressTo>;
+  parcels: ShippingParcel[];
+  serviceLevelToken?: string;
+  carrierAccount?: string;
+  metadata?: string;
+}): Promise<ShippingLabelResult> {
+  const client = getClient();
+
+  // Create shipment first to get rates
+  const shipment = await client.shipments.create({
+    addressFrom: input.addressFrom,
+    addressTo: input.addressTo,
+    parcels: buildParcels(input.parcels),
+    async: false,
+  });
+
+  if (!shipment.rates?.length) {
+    throw new Error("No shipping rates available for this address");
+  }
+
+  // Find matching rate or pick cheapest GBP rate
+  const gbpRates = shipment.rates.filter(
+    (r) => r.currency?.toUpperCase() === "GBP" || r.currencyLocal?.toUpperCase() === "GBP"
+  );
+  if (!gbpRates.length) {
+    throw new Error("No GBP shipping rates available");
+  }
+
+  let selectedRate = gbpRates[0];
+  if (input.serviceLevelToken) {
+    const match = gbpRates.find(
+      (r) => r.servicelevel?.token === input.serviceLevelToken || r.objectId === input.serviceLevelToken
+    );
+    if (match) selectedRate = match;
+  }
+
+  const transaction = await client.transactions.create({
+    rate: selectedRate.objectId,
+    labelFileType: "PDF_4x6" as any,
+    async: false,
+    metadata: input.metadata || "",
+  });
+
+  if (transaction.status === "ERROR") {
+    const msgs = transaction.messages?.map((m) => m.text).filter(Boolean).join("; ");
+    throw new Error(`Shippo label creation failed: ${msgs || "Unknown error"}`);
+  }
+
+  return {
+    provider: "shippo",
+    labelId: transaction.objectId || selectedRate.objectId,
+    labelUrl: transaction.labelUrl || "",
+    trackingNumber: transaction.trackingNumber || "",
+    serviceName: selectedRate.servicelevel?.name || "Shippo Shipping",
+  };
 }
