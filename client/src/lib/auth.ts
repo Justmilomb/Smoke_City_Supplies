@@ -34,13 +34,15 @@ async function logout(): Promise<void> {
 
 export const authKeys = { me: ["auth", "me"] as const };
 
-export function useAuth() {
+export function useAuth(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: authKeys.me,
     queryFn: fetchMe,
     retry: false,
     staleTime: 5 * 60 * 1000,
+    enabled,
   });
   const user = data?.user ?? null;
 

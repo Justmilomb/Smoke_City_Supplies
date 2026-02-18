@@ -62,8 +62,10 @@ export default function SiteLayout({
   right?: React.ReactNode;
 }) {
   const cartCount = useCartCount();
-  const { user } = useAuth();
   const [loc, setLoc] = useLocation();
+  const path = loc.indexOf("?") >= 0 ? loc.slice(0, loc.indexOf("?")) : loc;
+  const shouldLoadAuth = path.startsWith("/admin");
+  const { user } = useAuth({ enabled: shouldLoadAuth });
   const [searchQuery, setSearchQuery] = React.useState("");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [showBackToTop, setShowBackToTop] = React.useState(false);
