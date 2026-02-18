@@ -45,6 +45,11 @@ export default function CatalogPage() {
     inStockOnly: false,
   });
 
+  const derivedBrands = React.useMemo(
+    () => Array.from(new Set(parts.map((p) => p.brand).filter((b): b is string => !!b))).sort(),
+    [parts]
+  );
+
   const visible = React.useMemo(() => {
     const q = filters.q.trim().toLowerCase();
     let list = [...parts];
@@ -89,7 +94,7 @@ export default function CatalogPage() {
           <BackButton fallback="/" />
         </div>
 
-        <FiltersBar categories={cats} value={filters} onChange={setFilters} />
+        <FiltersBar categories={cats} brands={derivedBrands} value={filters} onChange={setFilters} />
 
         <Card className="border-border/50 p-6">
           <div className="mb-4 flex items-start justify-between">

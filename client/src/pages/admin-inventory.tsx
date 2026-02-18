@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ScanLine, PackagePlus, X } from "lucide-react";
+import { ScanLine, PackagePlus, PackageMinus, Plus, Minus, X } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -31,7 +31,7 @@ export default function AdminInventory() {
   const [, setLoc] = useLocation();
   const [scanValue, setScanValue] = React.useState("");
   const [scanFormat, setScanFormat] = React.useState("unknown");
-  const [qty, setQty] = React.useState(1);
+  const [qty, setQty] = React.useState("1");
   const [resolved, setResolved] = React.useState<Resolved | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [transactions, setTransactions] = React.useState<InventoryTx[]>([]);
@@ -119,13 +119,11 @@ export default function AdminInventory() {
     }
   };
 
+  const parsedQty = Math.max(1, Math.floor(Number(qty) || 1));
+
   const stockIn = async () => {
     if (!scanValue.trim()) {
       toast.error("Scan or enter a barcode first");
-      return;
-    }
-    if (qty < 1) {
-      toast.error("Quantity must be at least 1");
       return;
     }
 
@@ -135,7 +133,7 @@ export default function AdminInventory() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ code: scanValue.trim(), quantity: qty, reason: "Admin stock-in" }),
+        body: JSON.stringify({ code: scanValue.trim(), quantity: parsedQty, reason: "Admin stock-in" }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -143,7 +141,7 @@ export default function AdminInventory() {
       }
 
       const updated = await res.json();
-      toast.success(`Stock updated for ${updated.name}`);
+      toast.success(`+${parsedQty} stock for ${updated.name}`);
       setResolved((prev) =>
         prev
           ? {
@@ -159,6 +157,47 @@ export default function AdminInventory() {
       loadTransactions();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Stock update failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const stockOut = async () => {
+    if (!scanValue.trim()) {
+      toast.error("Scan or enter a barcode first");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/inventory/stock-out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code: scanValue.trim(), quantity: parsedQty, reason: "Admin stock-out" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to stock out");
+      }
+
+      const updated = await res.json();
+      toast.success(`-${parsedQty} stock for ${updated.name}`);
+      setResolved((prev) =>
+        prev
+          ? {
+              ...prev,
+              product: {
+                ...prev.product,
+                quantity: updated.quantity,
+                stock: updated.stock,
+              },
+            }
+          : prev
+      );
+      loadTransactions();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Stock out failed");
     } finally {
       setLoading(false);
     }
@@ -379,20 +418,45 @@ export default function AdminInventory() {
               </div>
               <div className="text-sm">Current quantity: <span className="font-semibold">{resolved.product.quantity}</span></div>
 
-              <div className="grid gap-3 sm:grid-cols-[160px_auto] items-end">
+              <div className="grid gap-3 sm:grid-cols-[200px_auto_auto] items-end">
                 <div>
-                  <label className="mb-1 block text-sm text-muted-foreground">Quantity to add</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={qty}
-                    onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
-                    className="h-11 rounded-lg"
-                  />
+                  <label className="mb-1 block text-sm text-muted-foreground">Quantity</label>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 shrink-0"
+                      onClick={() => setQty(String(Math.max(1, parsedQty - 1)))}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={qty}
+                      onChange={(e) => setQty(e.target.value)}
+                      onBlur={() => { if (!qty.trim() || Number(qty) < 1) setQty("1"); }}
+                      className="h-11 rounded-lg text-center"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 shrink-0"
+                      onClick={() => setQty(String(parsedQty + 1))}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <Button className="h-11 gap-2" onClick={stockIn} disabled={loading}>
+                <Button className="h-11 gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={stockIn} disabled={loading}>
                   <PackagePlus className="h-4 w-4" />
-                  Confirm Stock In
+                  Stock In
+                </Button>
+                <Button className="h-11 gap-2" variant="destructive" onClick={stockOut} disabled={loading}>
+                  <PackageMinus className="h-4 w-4" />
+                  Stock Out
                 </Button>
               </div>
 

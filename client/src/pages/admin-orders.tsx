@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Check, Package } from "lucide-react";
 
 const API = "/api";
 const ORDER_STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"] as const;
@@ -197,11 +198,163 @@ function OrderStatusSelect({
   );
 }
 
+function PackOrderDialog({
+  order,
+  open,
+  onOpenChange,
+}: {
+  order: Order;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const barcodeRef = React.useRef<HTMLInputElement>(null);
+  const [barcodeInput, setBarcodeInput] = React.useState("");
+  const [manualProductId, setManualProductId] = React.useState("");
+  const [working, setWorking] = React.useState(false);
+  const [packed, setPacked] = React.useState<Record<string, number>>({});
+
+  React.useEffect(() => {
+    if (open) {
+      setPacked({});
+      setBarcodeInput("");
+      setTimeout(() => barcodeRef.current?.focus(), 100);
+    }
+  }, [open]);
+
+  const handleScan = async (payload: { code?: string; productId?: string; quantity?: number }) => {
+    setWorking(true);
+    try {
+      const data = await submitFulfillmentScan(order.id, payload);
+      const matchedId = payload.productId || data?.productId || "";
+      if (matchedId) {
+        setPacked((prev) => ({ ...prev, [matchedId]: (prev[matchedId] || 0) + (payload.quantity || 1) }));
+      }
+      if (data?.packed) {
+        toast.success("Order fully packed");
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+      } else {
+        toast.success("Item scanned");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Scan failed");
+    } finally {
+      setWorking(false);
+      setBarcodeInput("");
+      setTimeout(() => barcodeRef.current?.focus(), 50);
+    }
+  };
+
+  const onBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = barcodeInput.trim();
+    if (!code) return;
+    handleScan({ code, quantity: 1 });
+  };
+
+  const onManualPick = () => {
+    if (!manualProductId) return;
+    handleScan({ productId: manualProductId, quantity: 1 });
+    setManualProductId("");
+  };
+
+  const allPacked = order.items.every((item) => (packed[item.productId] || 0) >= item.quantity);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) queryClient.invalidateQueries({ queryKey: ["orders"] }); onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-[540px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Pack Order {order.id.slice(0, 8)}...
+          </DialogTitle>
+          <DialogDescription>Scan barcodes or manually select items to pack this order.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <form onSubmit={onBarcodeSubmit} className="flex gap-2">
+            <Input
+              ref={barcodeRef}
+              placeholder="Scan or type barcode..."
+              value={barcodeInput}
+              onChange={(e) => setBarcodeInput(e.target.value)}
+              className="h-11 flex-1"
+              disabled={working}
+              autoFocus
+            />
+            <Button type="submit" className="h-11" disabled={working || !barcodeInput.trim()}>
+              Scan
+            </Button>
+          </form>
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Order Items</div>
+            {order.items.map((item) => {
+              const packedQty = packed[item.productId] || 0;
+              const done = packedQty >= item.quantity;
+              return (
+                <div
+                  key={item.productId}
+                  className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${done ? "border-emerald-300 bg-emerald-50" : "border-border/60"}`}
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {done ? (
+                      <Check className="h-5 w-5 text-emerald-600 shrink-0" />
+                    ) : (
+                      <div className="h-5 w-5 rounded border-2 border-muted-foreground/30 shrink-0" />
+                    )}
+                    <span className="text-sm truncate">{item.productName}</span>
+                  </div>
+                  <div className="text-sm font-medium tabular-nums shrink-0">
+                    {packedQty}/{item.quantity}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="border-t pt-3">
+            <div className="text-xs text-muted-foreground mb-2">Manual select (if no barcode)</div>
+            <div className="flex gap-2">
+              <Select value={manualProductId} onValueChange={setManualProductId}>
+                <SelectTrigger className="h-10 flex-1">
+                  <SelectValue placeholder="Pick a product..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {order.items.map((item) => (
+                    <SelectItem key={item.productId} value={item.productId}>
+                      {item.productName} (x{item.quantity})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" className="h-10" onClick={onManualPick} disabled={working || !manualProductId}>
+                Add
+              </Button>
+            </div>
+          </div>
+
+          {allPacked && (
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-center text-sm font-medium text-emerald-700">
+              All items packed
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ActionButtons({ order }: { order: Order }) {
   const queryClient = useQueryClient();
   const [working, setWorking] = React.useState(false);
   const [labelOpen, setLabelOpen] = React.useState(false);
   const [refundConfirmOpen, setRefundConfirmOpen] = React.useState(false);
+  const [packOpen, setPackOpen] = React.useState(false);
   const customerDisplayName = getCustomerDisplayName(order);
   const [labelForm, setLabelForm] = React.useState({
     name: customerDisplayName,
@@ -273,32 +426,8 @@ function ActionButtons({ order }: { order: Order }) {
     window.open(`${API}/admin/orders/${order.id}/packing-slip`, "_blank", "noopener,noreferrer");
   };
 
-  const onFulfillmentScan = async () => {
-    const code = window.prompt("Scan or enter barcode for this order:");
-    let payload: { code?: string; productId?: string; quantity?: number };
-    if (code?.trim()) {
-      payload = { code: code.trim(), quantity: 1 };
-    } else {
-      const choices = order.items.map((item, idx) => `${idx + 1}. ${item.productName} (x${item.quantity})`).join("\n");
-      const picked = window.prompt(`No barcode entered. Select packed product number:\n${choices}`);
-      if (!picked?.trim()) return;
-      const index = Number(picked.trim()) - 1;
-      if (!Number.isInteger(index) || index < 0 || index >= order.items.length) {
-        toast.error("Invalid product selection");
-        return;
-      }
-      payload = { productId: order.items[index].productId, quantity: 1 };
-    }
-
-    setWorking(true);
-    try {
-      const data = await submitFulfillmentScan(order.id, payload);
-      toast.success(data?.packed ? "Order fully packed" : "Packing progress recorded");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fulfillment scan failed");
-    } finally {
-      setWorking(false);
-    }
+  const onFulfillmentScan = () => {
+    setPackOpen(true);
   };
 
   const onRefund = async () => {
@@ -338,7 +467,7 @@ function ActionButtons({ order }: { order: Order }) {
         onClick={onFulfillmentScan}
         disabled={working || order.paymentStatus !== "paid"}
       >
-        Fulfillment Scan
+        Pack Order
       </Button>
       <Button variant="outline" size="sm" className="h-8" onClick={onPrintPackingSlip}>
         Packing Slip
@@ -449,6 +578,7 @@ function ActionButtons({ order }: { order: Order }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PackOrderDialog order={order} open={packOpen} onOpenChange={setPackOpen} />
     </div>
   );
 }

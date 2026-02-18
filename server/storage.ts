@@ -55,6 +55,7 @@ export interface IStorage {
   linkBarcode(code: string, productId: string, format?: string): Promise<ApiBarcode>;
   resolveBarcode(code: string): Promise<{ barcode?: ApiBarcode; product?: ApiProduct }>;
   stockInByBarcode(input: { code: string; quantity: number; reason?: string; actor?: string }): Promise<ApiProduct | undefined>;
+  stockOutByBarcode(input: { code: string; quantity: number; reason?: string; actor?: string }): Promise<ApiProduct | undefined>;
 
   createOrder(input: CreateOrderInput): Promise<ApiOrder>;
   prepareCheckoutOrder(input: CheckoutPrepareInput, stripePaymentIntentId: string): Promise<ApiOrder>;
@@ -547,6 +548,31 @@ export class DbStorage implements IStorage {
       barcodeId: resolved.barcode.id,
       type: "stock_in",
       quantityDelta: input.quantity,
+      reason: input.reason,
+      actor: input.actor ?? "admin",
+    });
+
+    return updated;
+  }
+
+  async stockOutByBarcode(input: {
+    code: string;
+    quantity: number;
+    reason?: string;
+    actor?: string;
+  }): Promise<ApiProduct | undefined> {
+    const resolved = await this.resolveBarcode(input.code);
+    if (!resolved.product || !resolved.barcode) return undefined;
+
+    const nextQty = Math.max(0, resolved.product.quantity - input.quantity);
+    const updated = await this.updateProductQuantity(resolved.product.id, nextQty);
+    if (!updated) return undefined;
+
+    await this.recordInventoryTransaction({
+      productId: updated.id,
+      barcodeId: resolved.barcode.id,
+      type: "stock_out",
+      quantityDelta: -input.quantity,
       reason: input.reason,
       actor: input.actor ?? "admin",
     });
@@ -1245,6 +1271,31 @@ export class MemStorage implements IStorage {
       barcodeId: resolved.barcode.id,
       type: "stock_in",
       quantityDelta: input.quantity,
+      reason: input.reason,
+      actor: input.actor ?? "admin",
+    });
+
+    return updated;
+  }
+
+  async stockOutByBarcode(input: {
+    code: string;
+    quantity: number;
+    reason?: string;
+    actor?: string;
+  }): Promise<ApiProduct | undefined> {
+    const resolved = await this.resolveBarcode(input.code);
+    if (!resolved.product || !resolved.barcode) return undefined;
+
+    const nextQty = Math.max(0, resolved.product.quantity - input.quantity);
+    const updated = await this.updateProductQuantity(resolved.product.id, nextQty);
+    if (!updated) return undefined;
+
+    this.recordInventoryTransaction({
+      productId: updated.id,
+      barcodeId: resolved.barcode.id,
+      type: "stock_out",
+      quantityDelta: -input.quantity,
       reason: input.reason,
       actor: input.actor ?? "admin",
     });

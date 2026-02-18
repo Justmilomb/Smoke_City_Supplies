@@ -102,19 +102,6 @@ export const MOTORCYCLE_MODELS = [
   "Harley-Davidson Sportster",
 ] as const;
 
-/** Brands for parts filter */
-export const PART_BRANDS = [
-  "EBC",
-  "Brembo",
-  "Ohlins",
-  "Akrapovic",
-  "K&N",
-  "Motul",
-  "Michelin",
-  "Pirelli",
-  "Renthal",
-  "R&G",
-] as const;
 
 export const productImageFallbacks: Record<string, string> = {
   p1: productChain,

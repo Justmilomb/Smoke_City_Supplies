@@ -300,6 +300,12 @@ export const stockInSchema = z.object({
   reason: z.string().optional(),
 });
 
+export const stockOutSchema = z.object({
+  code: z.string().min(3),
+  quantity: z.number().int().min(1),
+  reason: z.string().optional(),
+});
+
 export const fulfillmentScanSchema = z.object({
   code: z.string().min(3).optional(),
   productId: z.string().min(1).optional(),

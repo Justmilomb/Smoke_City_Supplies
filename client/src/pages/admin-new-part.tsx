@@ -65,6 +65,8 @@ export default function AdminNewPart() {
   const [preview, setPreview] = React.useState<string>("");
   const [addingCategory, setAddingCategory] = React.useState(false);
   const [newCategoryName, setNewCategoryName] = React.useState("");
+  const [addingBrand, setAddingBrand] = React.useState(false);
+  const [newBrandName, setNewBrandName] = React.useState("");
 
   const brandOptions = React.useMemo(
     () =>
@@ -120,6 +122,39 @@ export default function AdminNewPart() {
 
   const [seoPrompt, setSeoPrompt] = React.useState("");
   const [seoLoading, setSeoLoading] = React.useState(false);
+  const [fitmentLoading, setFitmentLoading] = React.useState(false);
+
+  const generateFitment = async () => {
+    const info = form.getValues("name");
+    const brand = form.getValues("brand");
+    const cat = form.getValues("category");
+    const desc = form.getValues("description");
+    const productInfo = [info, brand, cat, desc].filter(Boolean).join(" - ");
+    if (productInfo.length < 3) {
+      toast.error("Enter product details first");
+      return;
+    }
+    setFitmentLoading(true);
+    try {
+      const res = await fetch("/api/generate-fitment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ productInfo }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to generate fitment");
+      }
+      const result = await res.json();
+      form.setValue("compatibility", result.compatibility || "");
+      toast.success("Compatibility auto-filled");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fitment generation failed");
+    } finally {
+      setFitmentLoading(false);
+    }
+  };
 
   const addCategoryInline = async () => {
     const name = newCategoryName.trim();
@@ -375,25 +410,63 @@ export default function AdminNewPart() {
                     name="brand"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company / Brand</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            list="brand-options-new"
-                            placeholder="Choose or type a company"
-                            className="h-11 rounded-lg"
-                          />
-                        </FormControl>
-                        <datalist id="brand-options-new">
-                          {brandOptions.map((brand) => (
-                            <option key={brand} value={brand} />
-                          ))}
-                        </datalist>
+                        <div className="flex items-center justify-between gap-2">
+                          <FormLabel>Company / Brand</FormLabel>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => setAddingBrand((v) => !v)}
+                          >
+                            {addingBrand ? "Close" : "Add brand"}
+                          </Button>
+                        </div>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="h-11 rounded-lg">
+                              <SelectValue placeholder="Select brand" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {brandOptions.map((brand) => (
+                              <SelectItem key={brand} value={brand}>
+                                {brand}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+
+                {addingBrand && (
+                  <div className="rounded-lg border border-border/60 p-3">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <Input
+                        placeholder="New brand name"
+                        value={newBrandName}
+                        onChange={(e) => setNewBrandName(e.target.value)}
+                        className="h-10 rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        className="h-10 rounded-lg"
+                        onClick={() => {
+                          const name = newBrandName.trim();
+                          if (!name) { toast.error("Enter a brand name"); return; }
+                          form.setValue("brand", name, { shouldValidate: true });
+                          setNewBrandName("");
+                          setAddingBrand(false);
+                          toast.success("Brand set — it will be saved with the product");
+                        }}
+                      >
+                        Save brand
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <FormField
@@ -536,9 +609,21 @@ export default function AdminNewPart() {
                   name="compatibility"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Compatibility (comma separated)</FormLabel>
+                      <div className="flex items-center justify-between gap-2">
+                        <FormLabel>Compatibility (comma separated)</FormLabel>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8 px-2 text-xs gap-1.5"
+                          disabled={fitmentLoading}
+                          onClick={generateFitment}
+                        >
+                          {fitmentLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                          {fitmentLoading ? "Generating..." : "Auto-fill"}
+                        </Button>
+                      </div>
                       <FormControl>
-                        <Input data-testid="input-part-compat" placeholder="e.g., Road, MTB, 10 inch" {...field} className="h-11 rounded-lg" />
+                        <Input data-testid="input-part-compat" placeholder="e.g., Honda CBR600RR (2007-2024), Yamaha R6 (2006-2020)" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

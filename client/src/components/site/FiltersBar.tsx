@@ -17,7 +17,6 @@ import { Card } from "@/components/ui/card";
 import {
   MOTORCYCLE_MANUFACTURERS,
   MOTORCYCLE_MODELS,
-  PART_BRANDS,
   type PartCategory,
   type VehicleType,
 } from "@/lib/mockData";
@@ -96,10 +95,12 @@ function toQuery(next: CatalogFilters) {
 
 export default function FiltersBar({
   categories,
+  brands: brandOptions,
   value,
   onChange,
 }: {
   categories: PartCategory[];
+  brands: string[];
   value: CatalogFilters;
   onChange: (next: CatalogFilters) => void;
 }) {
@@ -311,7 +312,7 @@ export default function FiltersBar({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Brand:</span>
-          {PART_BRANDS.map((brand) => (
+          {brandOptions.map((brand) => (
             <label key={brand} className="flex items-center gap-1.5 cursor-pointer">
               <Checkbox
                 checked={value.brands.includes(brand)}

@@ -65,6 +65,11 @@ export default function StoreHome() {
   ];
   const categoriesList: PartCategory[] = Array.isArray(cats) && cats.length > 0 ? cats : defaultCategories;
 
+  const derivedBrands = React.useMemo(
+    () => Array.from(new Set(parts.map((p) => p.brand).filter((b): b is string => !!b))).sort(),
+    [parts]
+  );
+
   const visible = React.useMemo(() => filterParts(parts, filters), [parts, filters]);
   const totalPages = Math.ceil(visible.length / PARTS_PER_PAGE);
   const displayed = visible.slice(0, page * PARTS_PER_PAGE);
@@ -97,7 +102,7 @@ export default function StoreHome() {
           </div>
         </div>
 
-        <FiltersBar categories={categoriesList} value={filters} onChange={setFilters} />
+        <FiltersBar categories={categoriesList} brands={derivedBrands} value={filters} onChange={setFilters} />
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">

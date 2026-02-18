@@ -10,6 +10,7 @@ import {
   insertProductSchema,
   shippingRatesQuoteSchema,
   stockInSchema,
+  stockOutSchema,
   type ApiOrder,
   type ApiProduct,
   type CreateOrderInput,
@@ -527,6 +528,27 @@ ${urls
     return res.json(updated);
   });
 
+  app.post("/api/admin/inventory/stock-out", requireAuth, apiRateLimiter, async (req, res) => {
+    const parsed = stockOutSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid stock-out payload", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const updated = await storage.stockOutByBarcode({
+      code: parsed.data.code.trim(),
+      quantity: parsed.data.quantity,
+      reason: parsed.data.reason,
+      actor: req.user?.username || "admin",
+    });
+
+    if (!updated) {
+      return res.status(404).json({ message: "Barcode not linked to a product" });
+    }
+
+    writeGoogleMerchantFeedFile("stock-out-by-barcode").catch(() => {});
+    return res.json(updated);
+  });
+
   app.get("/api/admin/inventory/transactions", requireAuth, async (req, res) => {
     const limit = Number(req.query.limit ?? 50);
     const tx = await storage.listInventoryTransactions(Number.isFinite(limit) ? limit : 50);
@@ -660,6 +682,63 @@ Rules:
     } catch (err) {
       console.error("[generate-seo] error:", err);
       const message = err instanceof Error ? err.message : "SEO generation failed";
+      return res.status(500).json({ message });
+    }
+  });
+
+  // Vehicle fitment generation via NVIDIA API
+  app.post("/api/generate-fitment", requireAuth, apiRateLimiter, async (req, res) => {
+    const { productInfo } = req.body as { productInfo?: string };
+    if (!productInfo || typeof productInfo !== "string" || productInfo.trim().length < 3) {
+      return res.status(400).json({ message: "Please describe the product" });
+    }
+
+    const apiKey = process.env.NVIDIA_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: "NVIDIA API key not configured" });
+    }
+
+    const model = process.env.NVIDIA_SEO_MODEL || "deepseek-ai/deepseek-v3.1";
+
+    try {
+      const client = new OpenAI({ baseURL: "https://integrate.api.nvidia.com/v1", apiKey });
+
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: `You are a motorcycle and vehicle parts compatibility expert. Given a product description, return a comma-separated list of specific vehicle models and year ranges that this part is compatible with. Focus on motorcycle, bike, and scooter models. Be specific with model names and year ranges for maximum SEO value.
+
+Respond ONLY with valid JSON in this exact format, nothing else:
+{"compatibility":"Model1 (2018-2024), Model2 (2020-2025), ..."}
+
+Rules:
+- Include specific manufacturer + model + year ranges
+- Focus on popular models that commonly use this type of part
+- If the part is universal/generic, list the most popular compatible models
+- Maximum 15 models
+- Keep each entry concise: "Honda CBR600RR (2007-2024)"`,
+          },
+          { role: "user", content: `List compatible vehicle models for this product: ${productInfo.trim().slice(0, 500)}` },
+        ],
+        temperature: 0.3,
+        top_p: 0.7,
+        max_tokens: 1024,
+      });
+
+      const content = completion.choices?.[0]?.message?.content?.trim();
+      if (!content) return res.status(500).json({ message: "No response from AI model" });
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const result = JSON.parse(jsonMatch ? jsonMatch[0] : content) as { compatibility?: string };
+
+      return res.json({
+        compatibility: (result.compatibility ?? "").slice(0, 1000),
+      });
+    } catch (err) {
+      console.error("[generate-fitment] error:", err);
+      const message = err instanceof Error ? err.message : "Fitment generation failed";
       return res.status(500).json({ message });
     }
   });
