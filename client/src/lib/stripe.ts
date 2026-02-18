@@ -105,13 +105,13 @@ export async function prepareCheckout(input: {
 
 export async function quoteShippingRates(input: {
   items: CartItem[];
-  customerName?: string;
-  customerEmail?: string;
-  addressLine1?: string;
+  customerName: string;
+  customerEmail: string;
+  addressLine1: string;
   addressLine2?: string;
-  city?: string;
+  city: string;
   county?: string;
-  postcode?: string;
+  postcode: string;
   country?: string;
 }) {
   const res = await fetch("/api/shipping/rates", {
@@ -124,13 +124,13 @@ export async function quoteShippingRates(input: {
         quantity: i.quantity,
         priceEach: i.priceEach,
       })),
-      customerName: input.customerName || "",
-      customerEmail: input.customerEmail || undefined,
-      addressLine1: input.addressLine1 || "",
+      customerName: input.customerName,
+      customerEmail: input.customerEmail,
+      addressLine1: input.addressLine1,
       addressLine2: input.addressLine2 || undefined,
-      city: input.city || "",
+      city: input.city,
       county: input.county || undefined,
-      postcode: input.postcode || "",
+      postcode: input.postcode,
       country: input.country || "GB",
     }),
   });

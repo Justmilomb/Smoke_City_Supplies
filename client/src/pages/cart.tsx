@@ -114,13 +114,21 @@ export default function CartPage() {
     0
   );
   const selectedRate = shippingRates.find((r) => r.rateId === selectedRateId);
+  const hasRequiredDeliveryDetails = Boolean(
+    email.trim() &&
+    firstName.trim() &&
+    lastName.trim() &&
+    addressLine1.trim() &&
+    city.trim() &&
+    postcode.trim()
+  );
 
   const handleInitiateCheckout = async () => {
     if (state.items.length === 0) {
       toast.error("Your cart is empty");
       return;
     }
-    if (!email || !firstName || !lastName || !addressLine1 || !city || !postcode) {
+    if (!hasRequiredDeliveryDetails) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -133,14 +141,14 @@ export default function CartPage() {
     try {
       const payload = await prepareCheckout({
         items: state.items,
-        customerEmail: email,
-        customerFirstName: firstName,
-        customerLastName: lastName,
-        addressLine1,
-        addressLine2,
-        city,
-        county,
-        postcode,
+        customerEmail: email.trim(),
+        customerFirstName: firstName.trim(),
+        customerLastName: lastName.trim(),
+        addressLine1: addressLine1.trim(),
+        addressLine2: addressLine2.trim() || undefined,
+        city: city.trim(),
+        county: county.trim() || undefined,
+        postcode: postcode.trim().toUpperCase(),
         country: "GB",
         shippingRateId: selectedRate.rateId,
         shippingAmountPence: selectedRate.amountPence,
@@ -174,22 +182,31 @@ export default function CartPage() {
   }, []);
 
   const fetchRates = async () => {
-    if (!email || !firstName || !lastName || !addressLine1 || !city || !postcode) {
+    if (!hasRequiredDeliveryDetails) {
       toast.error("Please fill in all required delivery fields before confirming");
       return;
     }
+
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const trimmedEmail = email.trim();
+    const trimmedAddress1 = addressLine1.trim();
+    const trimmedAddress2 = addressLine2.trim();
+    const trimmedCity = city.trim();
+    const trimmedCounty = county.trim();
+    const trimmedPostcode = postcode.trim().toUpperCase();
 
     setShippingRatesLoading(true);
     try {
       const data = await quoteShippingRates({
         items: state.items,
-        customerName: `${firstName} ${lastName}`.trim(),
-        customerEmail: email,
-        addressLine1,
-        addressLine2,
-        city,
-        county,
-        postcode,
+        customerName: `${trimmedFirstName} ${trimmedLastName}`.trim(),
+        customerEmail: trimmedEmail,
+        addressLine1: trimmedAddress1,
+        addressLine2: trimmedAddress2 || undefined,
+        city: trimmedCity,
+        county: trimmedCounty || undefined,
+        postcode: trimmedPostcode,
         country: "GB",
       });
       setShippingRates(data.rates);
@@ -603,7 +620,7 @@ export default function CartPage() {
                       type="button"
                       variant="outline"
                       onClick={fetchRates}
-                      disabled={shippingRatesLoading || state.items.length === 0}
+                      disabled={shippingRatesLoading || state.items.length === 0 || !hasRequiredDeliveryDetails}
                     >
                       {shippingRatesLoading ? "Confirming…" : "Confirm Delivery Details"}
                     </Button>
@@ -669,7 +686,7 @@ export default function CartPage() {
               <Button
                 className="rounded-lg gap-2"
                 onClick={handleInitiateCheckout}
-                disabled={state.items.length === 0 || placingOrder}
+                disabled={state.items.length === 0 || placingOrder || !deliveryDetailsConfirmed || !selectedRate}
               >
                 <CreditCard className="h-4 w-4" />
                 {placingOrder ? "Initializing…" : "Continue to Payment"}

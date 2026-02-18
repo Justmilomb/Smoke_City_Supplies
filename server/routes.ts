@@ -774,19 +774,30 @@ Rules:
     if (!parsed.success) {
       return res.status(400).json({ message: "Invalid shipping quote payload", errors: parsed.error.flatten().fieldErrors });
     }
+    const customerName = parsed.data.customerName.trim();
+    const customerEmail = parsed.data.customerEmail.trim();
+    const addressLine1 = parsed.data.addressLine1.trim();
+    const city = parsed.data.city.trim();
+    const postcode = parsed.data.postcode.trim().toUpperCase();
+
+    if (!customerName || !customerEmail || !addressLine1 || !city || !postcode) {
+      return res.status(400).json({
+        message: "Enter delivery name, email, address line 1, city, and postcode before requesting shipping options.",
+      });
+    }
 
     const productMap = await getProductMap();
     const parcels = buildParcelsForItems(productMap, parsed.data.items);
     const dispatchInfo = dispatchAdviceNow();
 
     const quoteInput = {
-      name: fullCustomerName(parsed.data) || undefined,
-      email: parsed.data.customerEmail,
-      addressLine1: parsed.data.addressLine1 || undefined,
+      name: customerName,
+      email: customerEmail,
+      addressLine1,
       addressLine2: parsed.data.addressLine2,
-      city: parsed.data.city || undefined,
+      city,
       county: parsed.data.county,
-      postcode: parsed.data.postcode || undefined,
+      postcode,
       country: parsed.data.country || "GB",
       parcels,
     };
