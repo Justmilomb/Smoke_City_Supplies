@@ -9,8 +9,6 @@ import ProductCard from "@/components/site/ProductCard";
 import ProductCardSkeleton from "@/components/site/ProductCardSkeleton";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import type { Part, PartCategory } from "@/lib/mockData";
-import { MOTORCYCLE_MANUFACTURERS } from "@/lib/mockData";
-import { Card } from "@/components/ui/card";
 
 const PARTS_PER_PAGE = 24;
 
@@ -114,20 +112,6 @@ export default function StoreHome() {
                 Support
               </span>
             </div>
-          </div>
-        </div>
-
-        {/* Find Parts by Manufacturer */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Find Parts by Manufacturer</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-9 gap-2">
-            {MOTORCYCLE_MANUFACTURERS.map((mfr) => (
-              <Link key={mfr} href={`/store?q=${encodeURIComponent(mfr)}`}>
-                <Card className="border-border/50 px-3 py-2.5 text-center text-sm font-medium hover:border-primary hover:shadow-md transition-all cursor-pointer">
-                  {mfr}
-                </Card>
-              </Link>
-            ))}
           </div>
         </div>
 

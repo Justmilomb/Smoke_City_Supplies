@@ -34,7 +34,7 @@ export default function ProductCard({ part }: { part: Part }) {
               data-testid={`img-product-${part.id}`}
               src={getProductImage(part)}
               alt={part.name}
-              className="h-full w-full object-contain p-8 transition-transform duration-300 group-hover:scale-105"
+              className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"
             />
             <div className="absolute left-4 top-4 flex flex-col gap-2">
               <Badge
@@ -56,8 +56,8 @@ export default function ProductCard({ part }: { part: Part }) {
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="mb-3">
+          <div className="p-4">
+            <div className="mb-2">
               {part.brand && (
                 <div className="mb-0.5 text-xs font-medium text-primary">{part.brand}</div>
               )}
@@ -75,7 +75,7 @@ export default function ProductCard({ part }: { part: Part }) {
               </div>
             </div>
 
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />

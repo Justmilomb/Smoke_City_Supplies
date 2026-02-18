@@ -129,6 +129,16 @@ function buildFileUrl(fileId: string): string {
   return `/api/files/${fileId}`;
 }
 
+function resolveImageUrl(img: string): string {
+  const fileId = parseImageFileId(img);
+  return fileId ? buildFileUrl(fileId) : img;
+}
+
+function resolveImagesArray(images: string[] | null | undefined, fallbackImage: string): string[] {
+  if (images && images.length > 0) return images.map(resolveImageUrl);
+  return fallbackImage ? [fallbackImage] : [];
+}
+
 function orderToApi(
   row: typeof orders.$inferSelect,
   items: ApiOrderItem[]
@@ -256,6 +266,7 @@ export class DbStorage implements IStorage {
 
   private async rowToApiProduct(row: typeof products.$inferSelect): Promise<ApiProduct> {
     const barcode = await this.getBarcodeByProductId(row.id);
+    const primaryImage = row.imageFileId ? buildFileUrl(row.imageFileId) : row.image;
     return {
       id: row.id,
       name: row.name,
@@ -272,7 +283,8 @@ export class DbStorage implements IStorage {
       deliveryEta: row.deliveryEta,
       compatibility: row.compatibility,
       tags: row.tags,
-      image: row.imageFileId ? buildFileUrl(row.imageFileId) : row.image,
+      image: primaryImage,
+      images: resolveImagesArray(row.images, primaryImage),
       imageFileId: row.imageFileId ?? undefined,
       description: row.description,
       specs: row.specs,
@@ -335,6 +347,7 @@ export class DbStorage implements IStorage {
     const barcodeMap = await this.getBarcodeMapForProducts(productIds);
     return rows.map((row) => {
       const barcode = barcodeMap.get(row.id);
+      const primaryImage = row.imageFileId ? buildFileUrl(row.imageFileId) : row.image;
       return {
         id: row.id,
         name: row.name,
@@ -351,7 +364,8 @@ export class DbStorage implements IStorage {
         deliveryEta: row.deliveryEta,
         compatibility: row.compatibility,
         tags: row.tags,
-        image: row.imageFileId ? buildFileUrl(row.imageFileId) : row.image,
+        image: primaryImage,
+        images: resolveImagesArray(row.images, primaryImage),
         imageFileId: row.imageFileId ?? undefined,
         description: row.description,
         specs: row.specs,
@@ -376,6 +390,8 @@ export class DbStorage implements IStorage {
 
   async createProduct(input: InsertProduct): Promise<ApiProduct> {
     const id = `p_${Date.now().toString(36)}`;
+    const imageFromImages = input.images?.length ? input.images[0] : undefined;
+    const primaryImage = imageFromImages ?? input.image;
     const [row] = await this.getDb()
       .insert(products)
       .values({
@@ -394,8 +410,9 @@ export class DbStorage implements IStorage {
         deliveryEta: input.deliveryEta,
         compatibility: input.compatibility,
         tags: input.tags,
-        image: input.image,
-        imageFileId: input.imageFileId ?? parseImageFileId(input.image) ?? null,
+        image: primaryImage,
+        images: input.images ?? (primaryImage ? [primaryImage] : null),
+        imageFileId: input.imageFileId ?? parseImageFileId(primaryImage) ?? null,
         description: input.description,
         specs: input.specs,
         features: input.features ?? null,
@@ -426,8 +443,15 @@ export class DbStorage implements IStorage {
     delete dbPatch.barcodeFormat;
     if (patch.price !== undefined) dbPatch.price = Math.round(patch.price * 100);
     if (patch.rating !== undefined) dbPatch.rating = Math.round(patch.rating * 10);
+    if (patch.images !== undefined) {
+      dbPatch.images = patch.images;
+      if (patch.images.length > 0) {
+        dbPatch.image = patch.images[0];
+        dbPatch.imageFileId = parseImageFileId(patch.images[0]) ?? null;
+      }
+    }
     if (patch.imageFileId !== undefined) dbPatch.imageFileId = patch.imageFileId;
-    if (patch.image !== undefined && patch.imageFileId === undefined) {
+    if (patch.image !== undefined && patch.imageFileId === undefined && patch.images === undefined) {
       dbPatch.imageFileId = parseImageFileId(patch.image) ?? null;
     }
     if (patch.shippingWeightGrams !== undefined) dbPatch.shippingWeightGrams = patch.shippingWeightGrams;
@@ -1112,6 +1136,13 @@ export class MemStorage implements IStorage {
 
   async createProduct(input: InsertProduct): Promise<ApiProduct> {
     const id = `p_${Date.now().toString(36)}`;
+    const imageFromImages = input.images?.length ? input.images[0] : undefined;
+    const rawImage = imageFromImages ?? input.image;
+    const resolvedImage = input.imageFileId
+      ? buildFileUrl(input.imageFileId)
+      : parseImageFileId(rawImage)
+        ? buildFileUrl(parseImageFileId(rawImage)!)
+        : rawImage;
     const product: ApiProduct = {
       id,
       name: input.name,
@@ -1128,12 +1159,9 @@ export class MemStorage implements IStorage {
       deliveryEta: input.deliveryEta,
       compatibility: input.compatibility,
       tags: input.tags,
-      image: input.imageFileId
-        ? buildFileUrl(input.imageFileId)
-        : parseImageFileId(input.image)
-          ? buildFileUrl(parseImageFileId(input.image)!)
-          : input.image,
-      imageFileId: input.imageFileId ?? parseImageFileId(input.image),
+      image: resolvedImage,
+      images: input.images ?? (resolvedImage ? [resolvedImage] : []),
+      imageFileId: input.imageFileId ?? parseImageFileId(rawImage),
       description: input.description,
       specs: input.specs,
       features: input.features,
@@ -1157,11 +1185,16 @@ export class MemStorage implements IStorage {
   async updateProduct(id: string, patch: Partial<ApiProduct>): Promise<ApiProduct | undefined> {
     const existing = this.products.get(id);
     if (!existing) return undefined;
+    let patchImage = patch.image;
+    let patchImages = patch.images;
+    if (patchImages !== undefined && patchImages.length > 0) {
+      patchImage = patchImages[0];
+    }
     const resolvedImageFileId =
       patch.imageFileId !== undefined
         ? patch.imageFileId
-        : patch.image !== undefined
-          ? parseImageFileId(patch.image)
+        : patchImage !== undefined
+          ? parseImageFileId(patchImage)
           : existing.imageFileId;
     const updated: ApiProduct = {
       ...existing,
@@ -1170,7 +1203,8 @@ export class MemStorage implements IStorage {
       image:
         resolvedImageFileId
           ? buildFileUrl(resolvedImageFileId)
-          : (patch.image ?? existing.image),
+          : (patchImage ?? existing.image),
+      images: patchImages ?? existing.images,
     };
     this.products.set(id, updated);
     if (patch.barcode) {

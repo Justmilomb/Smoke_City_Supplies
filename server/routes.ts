@@ -640,72 +640,63 @@ Rules:
     }
   });
 
-  // Vehicle fitment generation via AI API
-  app.post("/api/generate-fitment", requireAuth, apiRateLimiter, async (req, res) => {
-    const { productInfo } = req.body as { productInfo?: string };
-    if (!productInfo || typeof productInfo !== "string" || productInfo.trim().length < 3) {
-      return res.status(400).json({ message: "Please describe the product" });
+  // Public compatibility check — customer enters bike, gets yes/no
+  app.post("/api/check-compatibility", apiRateLimiter, async (req, res) => {
+    const { productName, partNumber, compatibility, bike } = req.body as {
+      productName?: string;
+      partNumber?: string;
+      compatibility?: string[];
+      bike?: string;
+    };
+    if (!bike || typeof bike !== "string" || bike.trim().length < 3) {
+      return res.status(400).json({ message: "Please enter your bike details" });
+    }
+    if (!productName) {
+      return res.status(400).json({ message: "Missing product info" });
+    }
+
+    // If the bike is already listed in the compatibility array, skip AI
+    const bikeLower = bike.trim().toLowerCase();
+    if (compatibility?.some((c) => bikeLower.includes(c.toLowerCase().replace(/\s*\(.*?\)\s*/g, "").trim()))) {
+      return res.json({ compatible: "yes", reason: "Your bike is listed as compatible with this part." });
     }
 
     try {
       const { client, model, provider } = getAIClient();
 
+      const compatList = compatibility?.length ? compatibility.join(", ") : "none listed";
       const completion = await client.chat.completions.create({
         model,
         messages: [
           {
             role: "system",
-            content: `You are a motorcycle and vehicle parts compatibility expert with web search access.
-Your job is to find EVERY genuinely compatible vehicle model for the given part.
-
-METHODOLOGY — follow these steps:
-1. Identify the EXACT manufacturer part number / OEM number from the product name or description.
-2. Search for OEM cross-reference numbers (e.g. the Honda OEM number that an EBC pad replaces). A single aftermarket part often replaces multiple OEM numbers — find ALL of them.
-3. For EACH OEM number AND the aftermarket part number, search these sources:
-   - Wemoto (wemoto.com) parts lookup
-   - CMSNL (cmsnl.com) parts cross-reference
-   - Larsson's motorcycle parts database
-   - Manufacturer parts fiche / OEM cross-reference catalogues
-   - BikeBandit, Fowlers, Parts Giant, David Silver Spares
-   - The aftermarket manufacturer's own application guide (e.g. EBC's own fitment guide, NGK's application list)
-4. Compile the FULL list from all sources.
-
-CONFIDENCE RULE — CRITICAL:
-- ONLY include a model if you found it listed as compatible in at least one real parts database, retailer listing, or the manufacturer's own fitment/application guide.
-- You must be 90%+ confident the part actually fits that model. If unsure, OMIT it.
-- Do NOT guess based on similar engine sizes, shared platforms, or "it probably fits". Only include what is explicitly listed as compatible in a real source.
-- Do NOT fabricate or pad the list. A shorter accurate list is better than a longer inaccurate one.
-
-DEDUP RULES:
-- If the same model name appears with minor variants (different BHP, sub-cc differences, market-specific suffixes), list it ONCE with the widest year range.
-- If a model has genuinely different generations (different frame/engine) with separate year ranges, list each generation separately.
-
-Respond ONLY with valid JSON: {"compatibility":"Model1 (YYYY-YYYY), Model2 (YYYY-YYYY), ..."}
-Format each entry as: "Manufacturer Model (StartYear-EndYear)"
-Do NOT limit the number of results — list every verified model.`,
+            content: `You check if a motorcycle/scooter part fits a specific bike. Answer with JSON: {"compatible":"yes"|"no"|"likely","reason":"one sentence"}\nBe concise. Use max 1 sentence for reason.`,
           },
-          { role: "user", content: `Find all verified compatible vehicle models for: ${productInfo.trim().slice(0, 500)}\n\nFirst identify the part number and all OEM cross-references, then search each source for the full compatibility list.` },
+          {
+            role: "user",
+            content: `Part: ${productName}${partNumber ? ` (${partNumber})` : ""}\nKnown compatible bikes: ${compatList}\nCustomer's bike: ${bike.trim()}\n\nDoes this part fit?`,
+          },
         ],
-        max_tokens: 8192,
-        temperature: 0.1,
+        max_tokens: 100,
+        temperature: 0,
         ...(provider === "nvidia"
           ? { top_p: 0.7 }
-          : { web_search_options: { search_context_size: "high" } }),
+          : { web_search_options: { search_context_size: "low" } }),
       } as any);
 
       const content = completion.choices?.[0]?.message?.content?.trim();
-      if (!content) return res.status(500).json({ message: "No response from AI model" });
+      if (!content) return res.status(500).json({ message: "No response" });
 
       const jsonMatch = content.match(/\{[\s\S]*\}/);
-      const result = JSON.parse(jsonMatch ? jsonMatch[0] : content) as { compatibility?: string };
+      const result = JSON.parse(jsonMatch ? jsonMatch[0] : content) as { compatible?: string; reason?: string };
 
       return res.json({
-        compatibility: (result.compatibility ?? "").slice(0, 10000),
+        compatible: result.compatible ?? "unknown",
+        reason: result.reason ?? "",
       });
     } catch (err) {
-      console.error("[generate-fitment] error:", err);
-      const message = err instanceof Error ? err.message : "Fitment generation failed";
-      return res.status(500).json({ message });
+      console.error("[check-compatibility] error:", err);
+      return res.status(500).json({ message: "Compatibility check failed" });
     }
   });
 

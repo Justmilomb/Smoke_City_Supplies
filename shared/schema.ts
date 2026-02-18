@@ -76,6 +76,7 @@ export const products = pgTable("products", {
   compatibility: jsonb("compatibility").$type<string[]>().notNull(),
   tags: jsonb("tags").$type<string[]>().notNull(),
   image: text("image").notNull(),
+  images: jsonb("images").$type<string[]>(),
   imageFileId: varchar("image_file_id"),
   description: text("description").notNull(),
   specs: jsonb("specs").$type<ProductSpec[]>().notNull(),
@@ -126,6 +127,7 @@ export const insertProductSchema = z.object({
   compatibility: z.array(z.string()),
   tags: z.array(z.string()),
   image: z.string(),
+  images: z.array(z.string()).optional(),
   imageFileId: z.string().optional(),
   description: z.string(),
   specs: z.array(productSpecSchema),
@@ -369,6 +371,7 @@ export type ApiProduct = {
   compatibility: string[];
   tags: string[];
   image: string;
+  images?: string[];
   imageFileId?: string;
   description: string;
   specs: ProductSpec[];

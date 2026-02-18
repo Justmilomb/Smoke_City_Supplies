@@ -1,5 +1,6 @@
+import React from "react";
 import { useRoute, Link } from "wouter";
-import { CheckCircle2, Headphones, ChevronRight, Shield, Sparkles, Star, Truck } from "lucide-react";
+import { CheckCircle2, Headphones, ChevronRight, Loader2, Search, Shield, Sparkles, Star, Truck } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useContactModal } from "@/components/site/ContactModal";
@@ -11,6 +12,7 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
@@ -20,6 +22,11 @@ export default function ProductPage() {
   const { data: allProducts = [] } = useProducts();
   const { state: cartState, actions: cartActions } = useCart();
   const contactModal = useContactModal();
+  const [selectedImageIndex, setSelectedImageIndex] = React.useState(0);
+  const [bikeInput, setBikeInput] = React.useState("");
+  const [compatCheck, setCompatCheck] = React.useState<{ compatible: string; reason: string } | null>(null);
+  const [compatLoading, setCompatLoading] = React.useState(false);
+  const [showCompatForm, setShowCompatForm] = React.useState(false);
 
   usePageMeta({
     title: part?.metaTitle || part?.name || "Product",
@@ -58,7 +65,8 @@ export default function ProductPage() {
     );
   }
 
-  const imageUrl = getProductImage(part);
+  const images = part.images?.length ? part.images : [getProductImage(part)];
+  const imageUrl = images[selectedImageIndex] || images[0];
   const absoluteImage =
     typeof window !== "undefined" && imageUrl
       ? imageUrl.startsWith("http")
@@ -147,6 +155,34 @@ export default function ProductPage() {
 
   const vehicleLabel = part.vehicle === "motorcycle" ? "Motorcycle" : "Scooter";
 
+  const checkCompat = async () => {
+    if (bikeInput.trim().length < 3) return;
+    setCompatLoading(true);
+    setCompatCheck(null);
+    try {
+      const res = await fetch("/api/check-compatibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productName: part.name,
+          partNumber: part.partNumber,
+          compatibility: part.compatibility,
+          bike: bikeInput.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Check failed" }));
+        throw new Error(err.message || "Check failed");
+      }
+      const data = await res.json();
+      setCompatCheck({ compatible: data.compatible, reason: data.reason });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Compatibility check failed");
+    } finally {
+      setCompatLoading(false);
+    }
+  };
+
   return (
     <SiteLayout>
       <script
@@ -174,16 +210,40 @@ export default function ProductPage() {
         </nav>
 
         <div className="grid gap-8 lg:grid-cols-2">
-          <Card className="overflow-hidden border-border/50">
-            <div className="aspect-square bg-gradient-to-br from-muted/50 to-muted/30">
-              <img
-                data-testid="img-product-hero"
-                src={imageUrl}
-                alt={part.name}
-                className="h-full w-full object-contain p-12"
-              />
-            </div>
-          </Card>
+          <div className="space-y-3">
+            <Card className="overflow-hidden border-border/50">
+              <div className="aspect-square bg-gradient-to-br from-muted/50 to-muted/30">
+                <img
+                  data-testid="img-product-hero"
+                  src={imageUrl}
+                  alt={part.name}
+                  className="h-full w-full object-contain p-4"
+                />
+              </div>
+            </Card>
+            {images.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedImageIndex(idx)}
+                    className={`h-16 w-16 shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
+                      idx === selectedImageIndex
+                        ? "border-primary"
+                        : "border-border/50 hover:border-border"
+                    }`}
+                  >
+                    <img
+                      src={img}
+                      alt={`${part.name} ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-col gap-6">
             {part.partNumber && (
@@ -289,7 +349,19 @@ export default function ProductPage() {
 
             {part.compatibility.length > 0 && (
               <div>
-                <div className="mb-2 text-sm font-medium">Compatibility</div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium">Compatibility</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => { setShowCompatForm((v) => !v); setCompatCheck(null); }}
+                  >
+                    <Search className="h-3 w-3" />
+                    Check my bike
+                  </Button>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {part.compatibility.map((comp, idx) => (
                     <Badge key={idx} variant="secondary" className="rounded-md">
@@ -298,6 +370,64 @@ export default function ProductPage() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {!part.compatibility.length && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Compatibility</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() => { setShowCompatForm((v) => !v); setCompatCheck(null); }}
+                >
+                  <Search className="h-3 w-3" />
+                  Check my bike
+                </Button>
+              </div>
+            )}
+
+            {showCompatForm && (
+              <Card className="border-border/50 p-4 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Enter your bike details (e.g. "Honda CBR600RR 2012") and we'll check if this part fits.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g. Yamaha R6 2018"
+                    value={bikeInput}
+                    onChange={(e) => setBikeInput(e.target.value)}
+                    className="h-10"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        checkCompat();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    className="h-10 shrink-0"
+                    disabled={compatLoading || bikeInput.trim().length < 3}
+                    onClick={checkCompat}
+                  >
+                    {compatLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Check"}
+                  </Button>
+                </div>
+                {compatCheck && (
+                  <div className={`rounded-lg p-3 text-sm font-medium ${
+                    compatCheck.compatible === "yes"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : compatCheck.compatible === "likely"
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}>
+                    {compatCheck.compatible === "yes" ? "Yes — " : compatCheck.compatible === "likely" ? "Likely — " : "No — "}
+                    {compatCheck.reason}
+                  </div>
+                )}
+              </Card>
             )}
 
             <Card className="border-border/50 p-6">

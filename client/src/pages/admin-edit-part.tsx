@@ -1,13 +1,13 @@
 import React from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { ImagePlus, Loader2, Sparkles } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
-import AdminImageUpload from "@/components/admin/AdminImageUpload";
+import AdminMultiImageUpload from "@/components/admin/AdminMultiImageUpload";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { useCategories } from "@/lib/store";
 import { useProduct, useProducts, useUpdateProduct } from "@/lib/products";
@@ -64,23 +64,23 @@ export default function AdminEditPart() {
   const createCategory = useCreateCategory();
   const cats = useCategories();
   usePageMeta({ title: product ? `Edit ${product.name}` : "Edit Product", description: "Edit part details and image.", noindex: true });
-  const [preview, setPreview] = React.useState<string>("");
+  const [preview, setPreview] = React.useState<string[]>([]);
   const [addingCategory, setAddingCategory] = React.useState(false);
   const [newCategoryName, setNewCategoryName] = React.useState("");
   const [addingBrand, setAddingBrand] = React.useState(false);
   const [newBrandName, setNewBrandName] = React.useState("");
-  const [fitmentLoading, setFitmentLoading] = React.useState(false);
 
   const brandOptions = React.useMemo(
     () =>
       Array.from(
         new Set(
-          products
-            .map((p) => (p.brand || "").trim())
-            .filter(Boolean)
+          [
+            ...products.map((p) => (p.brand || "").trim()),
+            (product?.brand || "").trim(),
+          ].filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b)),
-    [products]
+    [products, product?.brand]
   );
 
   const formValues = React.useMemo(() => {
@@ -137,14 +137,14 @@ export default function AdminEditPart() {
   });
   const selectedCategory = form.watch("category");
   const categoryOptions = React.useMemo(
-    () => Array.from(new Set([...(cats ?? []), selectedCategory].filter(Boolean))),
-    [cats, selectedCategory]
+    () => Array.from(new Set([...(cats ?? []), product?.category, selectedCategory].filter((v): v is string => Boolean(v)))),
+    [cats, product?.category, selectedCategory]
   );
 
 
   React.useEffect(() => {
     if (product) {
-      setPreview(product.image || "");
+      setPreview(product.images ?? (product.image ? [product.image] : []));
     }
   }, [product]);
 
@@ -168,41 +168,6 @@ export default function AdminEditPart() {
       toast.success("Category added");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add category");
-    }
-  };
-
-  const generateFitment = async () => {
-    const name = form.getValues("name");
-    const brand = form.getValues("brand");
-    const category = form.getValues("category");
-    const description = form.getValues("description");
-    const productInfo = [brand, name, category, description].filter(Boolean).join(" — ");
-    if (productInfo.trim().length < 3) {
-      toast.error("Fill in the product name first");
-      return;
-    }
-    setFitmentLoading(true);
-    try {
-      const res = await fetch("/api/generate-fitment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productInfo }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Fitment generation failed" }));
-        throw new Error(err.message || "Fitment generation failed");
-      }
-      const data = await res.json();
-      if (data.compatibility) {
-        form.setValue("compatibility", data.compatibility, { shouldValidate: true });
-        toast.success("Compatible models found");
-      } else {
-        toast.error("No compatible models returned");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fitment generation failed");
-    } finally {
-      setFitmentLoading(false);
     }
   };
 
@@ -230,7 +195,8 @@ export default function AdminEditPart() {
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean),
-          image: preview || "",
+          image: preview[0] || "",
+          images: preview,
           description: v.description,
           metaTitle: v.metaTitle || undefined,
           metaDescription: v.metaDescription || undefined,
@@ -300,14 +266,14 @@ export default function AdminEditPart() {
             <div className="border-b border-border/60 p-5">
               <div className="flex items-center gap-2">
                 <ImagePlus className="h-4 w-4 text-primary" />
-                <div className="text-sm font-semibold">Image</div>
+                <div className="text-sm font-semibold">Images</div>
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                Take a photo on mobile or drag-and-drop on desktop. JPEG, PNG, GIF, WebP up to 10MB.
+                Upload multiple images. Drag to reorder — first image is the main photo.
               </div>
             </div>
             <div className="p-5">
-              <AdminImageUpload value={preview} onChange={setPreview} />
+              <AdminMultiImageUpload value={preview} onChange={setPreview} />
             </div>
           </Card>
 
@@ -618,23 +584,7 @@ export default function AdminEditPart() {
                   name="compatibility"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel>Compatibility (comma separated)</FormLabel>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-8 gap-1.5 px-2 text-xs"
-                          disabled={fitmentLoading}
-                          onClick={generateFitment}
-                        >
-                          {fitmentLoading ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-3 w-3" />
-                          )}
-                          {fitmentLoading ? "Searching…" : "Find compatible models"}
-                        </Button>
-                      </div>
+                      <FormLabel>Compatibility (comma separated)</FormLabel>
                       <FormControl>
                         <Input placeholder="e.g., Honda CBR600RR (2007-2024), Yamaha R6 (2006-2020)" {...field} className="h-11 rounded-lg" />
                       </FormControl>
