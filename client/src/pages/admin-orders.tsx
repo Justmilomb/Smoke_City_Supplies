@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -95,32 +94,6 @@ async function resendInvoice(orderId: string) {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message ?? "Failed to resend invoice");
-  }
-  return res.json();
-}
-
-async function generateLabel(orderId: string, payload: {
-  name: string;
-  email?: string;
-  addressLine1: string;
-  addressLine2?: string;
-  city: string;
-  county?: string;
-  postcode: string;
-  country: string;
-  selectedRateId?: string;
-  selectedServiceCode?: string;
-}) {
-  const res = await fetch(`${API}/admin/orders/${orderId}/shipping-label`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    const missing = Array.isArray(data?.missingFields) && data.missingFields.length ? ` (${data.missingFields.join(", ")})` : "";
-    throw new Error((data.message ?? "Failed to generate shipping label") + missing);
   }
   return res.json();
 }
@@ -352,35 +325,8 @@ function PackOrderDialog({
 function ActionButtons({ order }: { order: Order }) {
   const queryClient = useQueryClient();
   const [working, setWorking] = React.useState(false);
-  const [labelOpen, setLabelOpen] = React.useState(false);
   const [refundConfirmOpen, setRefundConfirmOpen] = React.useState(false);
   const [packOpen, setPackOpen] = React.useState(false);
-  const customerDisplayName = getCustomerDisplayName(order);
-  const [labelForm, setLabelForm] = React.useState({
-    name: customerDisplayName,
-    email: order.customerEmail || "",
-    addressLine1: order.addressLine1 || "",
-    addressLine2: order.addressLine2 || "",
-    city: order.city || "",
-    county: order.county || "",
-    postcode: order.postcode || "",
-    country: (order.country || "GB").toUpperCase(),
-    selectedRateId: order.shippingRateId || "",
-  });
-
-  React.useEffect(() => {
-    setLabelForm({
-      name: getCustomerDisplayName(order),
-      email: order.customerEmail || "",
-      addressLine1: order.addressLine1 || "",
-      addressLine2: order.addressLine2 || "",
-      city: order.city || "",
-      county: order.county || "",
-      postcode: order.postcode || "",
-      country: (order.country || "GB").toUpperCase(),
-      selectedRateId: order.shippingRateId || "",
-    });
-  }, [order.id, order.customerName, order.customerFirstName, order.customerLastName, order.customerEmail, order.addressLine1, order.addressLine2, order.city, order.county, order.postcode, order.country, order.shippingRateId]);
 
   const onResendInvoice = async () => {
     setWorking(true);
@@ -390,33 +336,6 @@ function ActionButtons({ order }: { order: Order }) {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Invoice resend failed");
-    } finally {
-      setWorking(false);
-    }
-  };
-
-  const onGenerateLabel = async () => {
-    setWorking(true);
-    try {
-      const data = await generateLabel(order.id, {
-        name: labelForm.name.trim(),
-        email: labelForm.email.trim() || undefined,
-        addressLine1: labelForm.addressLine1.trim(),
-        addressLine2: labelForm.addressLine2.trim() || undefined,
-        city: labelForm.city.trim(),
-        county: labelForm.county.trim() || undefined,
-        postcode: labelForm.postcode.trim().toUpperCase(),
-        country: (labelForm.country.trim() || "GB").toUpperCase(),
-        selectedRateId: labelForm.selectedRateId.trim() || undefined,
-      });
-      toast.success(data.trackingNumber ? `Label generated (${data.trackingNumber})` : "Label generated");
-      if (data.shippingLabelUrl) {
-        window.open(data.shippingLabelUrl, "_blank", "noopener,noreferrer");
-      }
-      setLabelOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Label generation failed");
     } finally {
       setWorking(false);
     }
@@ -450,15 +369,6 @@ function ActionButtons({ order }: { order: Order }) {
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" className="h-8" onClick={onResendInvoice} disabled={working || order.paymentStatus !== "paid"}>
         Resend Invoice
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-8"
-        onClick={() => setLabelOpen(true)}
-        disabled={working || order.paymentStatus !== "paid" || order.status !== "processing"}
-      >
-        Generate Label
       </Button>
       <Button
         variant="outline"
@@ -505,72 +415,6 @@ function ActionButtons({ order }: { order: Order }) {
             </Button>
             <Button type="button" variant="destructive" onClick={onRefund} disabled={working}>
               {working ? "Processing..." : "Confirm Refund"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={labelOpen} onOpenChange={setLabelOpen}>
-        <DialogContent className="sm:max-w-[620px]">
-          <DialogHeader>
-            <DialogTitle>Generate Shipping Label</DialogTitle>
-            <DialogDescription>
-              Confirm shipping details, then generate a label via Shippo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-1">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label>Name *</Label>
-                <Input value={labelForm.name} onChange={(e) => setLabelForm((s) => ({ ...s, name: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Email</Label>
-                <Input value={labelForm.email} onChange={(e) => setLabelForm((s) => ({ ...s, email: e.target.value }))} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Address Line 1 *</Label>
-              <Input value={labelForm.addressLine1} onChange={(e) => setLabelForm((s) => ({ ...s, addressLine1: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Address Line 2</Label>
-              <Input value={labelForm.addressLine2} onChange={(e) => setLabelForm((s) => ({ ...s, addressLine2: e.target.value }))} />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label>City *</Label>
-                <Input value={labelForm.city} onChange={(e) => setLabelForm((s) => ({ ...s, city: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>County</Label>
-                <Input value={labelForm.county} onChange={(e) => setLabelForm((s) => ({ ...s, county: e.target.value }))} />
-              </div>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label>Postcode *</Label>
-                <Input value={labelForm.postcode} onChange={(e) => setLabelForm((s) => ({ ...s, postcode: e.target.value.toUpperCase() }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Country *</Label>
-                <Input value={labelForm.country} onChange={(e) => setLabelForm((s) => ({ ...s, country: e.target.value.toUpperCase() }))} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Shipping Service (optional)</Label>
-              <Input
-                placeholder="Leave blank for best available rate"
-                value={labelForm.selectedRateId}
-                onChange={(e) => setLabelForm((s) => ({ ...s, selectedRateId: e.target.value }))}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setLabelOpen(false)} disabled={working}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={onGenerateLabel} disabled={working}>
-              {working ? "Preparing..." : "Prepare Label"}
             </Button>
           </DialogFooter>
         </DialogContent>

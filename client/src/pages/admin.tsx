@@ -60,25 +60,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const testShipping = async () => {
-    try {
-      const res = await fetch("/api/admin/test/shipping", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Shipping test failed");
-      }
-      const data = await res.json();
-      toast.success(`Shipping test label created${data?.label?.trackingNumber ? ` (${data.label.trackingNumber})` : ""}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Shipping test failed");
-    }
-  };
-
   return (
     <SiteLayout>
       <div className="flex flex-col gap-8">
@@ -107,9 +88,6 @@ export default function AdminDashboard() {
         <div className="flex flex-wrap gap-3">
           <Button variant="outline" onClick={testResend}>
             Test Resend
-          </Button>
-          <Button variant="outline" onClick={testShipping}>
-            Test Shipping
           </Button>
         </div>
 

@@ -46,7 +46,6 @@ import {
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
 import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderCancelledEmail, sendOrderConfirmationEmail, sendOrderDeliveredEmail, sendOrderProcessingEmail, sendOrderShippedEmail } from "./email";
 import { quoteRoyalMailFlatRates } from "./shipping/royalMailManual";
-import { isShippoEnabled, quoteShippoRates, createShippoShipmentAndLabel, buildAddressFrom, buildAddressTo } from "./shipping/shippo";
 import { buildPackingSlipHtml, buildParcelsForItems, dispatchAdviceNow } from "./shippingLogic";
 import { z } from "zod";
 
@@ -319,9 +318,6 @@ ${urls
 
     return res.json({ ok: true, to, message: "Resend test email sent" });
   });
-
-  // Royal Mail test endpoint commented out — using Shippo for shipping
-  // app.post("/api/admin/test/shipping", requireAuth, apiRateLimiter, async (req, res) => { ... });
 
   app.post("/api/upload", requireAuth, apiRateLimiter, uploadMiddleware.single("image"), async (req, res) => {
     if (!req.file) {
@@ -810,18 +806,12 @@ Rules:
     };
 
     let rates: import("./shipping/royalMailManual").ShippingQuote[] = [];
-    if (isShippoEnabled()) {
-      rates = await quoteShippoRates(quoteInput as import("./shipping/royalMailManual").ShippingQuoteInput);
+    try {
+      rates = quoteRoyalMailFlatRates(quoteInput);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to quote shipping";
+      return res.status(400).json({ message });
     }
-    // Royal Mail flat rate fallback commented out — Shippo is the primary provider
-    // if (!rates.length) {
-    //   try {
-    //     rates = quoteRoyalMailFlatRates(quoteInput);
-    //   } catch (err) {
-    //     const message = err instanceof Error ? err.message : "Unable to quote shipping";
-    //     return res.status(400).json({ message });
-    //   }
-    // }
 
     if (!rates.length) {
       return res.status(400).json({ message: "No shipping options available. Please check your address and try again." });
@@ -899,18 +889,12 @@ Rules:
     };
 
     let liveRates: import("./shipping/royalMailManual").ShippingQuote[] = [];
-    if (isShippoEnabled()) {
-      liveRates = await quoteShippoRates(checkoutQuoteInput as import("./shipping/royalMailManual").ShippingQuoteInput);
+    try {
+      liveRates = quoteRoyalMailFlatRates(checkoutQuoteInput);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to quote shipping";
+      return res.status(400).json({ message });
     }
-    // Royal Mail flat rate fallback commented out — Shippo is the primary provider
-    // if (!liveRates.length) {
-    //   try {
-    //     liveRates = quoteRoyalMailFlatRates(checkoutQuoteInput);
-    //   } catch (err) {
-    //     const message = err instanceof Error ? err.message : "Unable to quote shipping";
-    //     return res.status(400).json({ message });
-    //   }
-    // }
 
     if (!liveRates.length) {
       return res.status(400).json({ message: "No shipping options available for this address. Please check your details." });
@@ -1073,35 +1057,6 @@ Rules:
     } catch (err) {
       console.error("[stripe webhook] error:", err);
       return res.status(400).send(`Webhook Error: ${err instanceof Error ? err.message : "unknown"}`);
-    }
-  });
-
-  // Shippo webhook for tracking updates
-  app.post("/api/shippo/webhook", async (req, res) => {
-    try {
-      const { event, data } = req.body || {};
-      console.log("[shippo webhook] event:", event);
-
-      if (event === "track_updated" && data?.tracking_number) {
-        // Update order tracking status if we can find the order by tracking number
-        const trackingNumber = data.tracking_number;
-        const trackingStatus = data.tracking_status?.status || "UNKNOWN";
-        console.log(`[shippo webhook] Tracking update: ${trackingNumber} -> ${trackingStatus}`);
-
-        // If tracking shows delivered, we could auto-update the order status
-        // For now, just log it — order status updates are done manually in admin
-      }
-
-      if (event === "transaction_created" || event === "transaction_updated") {
-        const labelUrl = data?.label_url;
-        const trackingNumber = data?.tracking_number;
-        console.log(`[shippo webhook] Transaction: label=${labelUrl}, tracking=${trackingNumber}`);
-      }
-
-      return res.json({ received: true });
-    } catch (err) {
-      console.error("[shippo webhook] error:", err);
-      return res.status(400).json({ error: "Webhook processing failed" });
     }
   });
 
@@ -1301,130 +1256,6 @@ Rules:
     const html = buildPackingSlipHtml(order);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.send(html);
-  });
-
-  app.post("/api/admin/orders/:id/shipping-label", requireAuth, apiRateLimiter, async (req, res) => {
-    const orderId = paramId(req);
-    const order = await storage.getOrder(orderId);
-    if (!order) return res.status(404).json({ message: "Order not found" });
-
-    if (order.paymentStatus !== "paid") {
-      return res.status(400).json({ message: "Shipping labels can only be generated for paid orders" });
-    }
-
-    if (order.status !== "processing") {
-      return res.status(400).json({ message: "Order status must be processing before creating a label" });
-    }
-
-    const labelPayloadSchema = z.object({
-      name: z.string().min(1).optional(),
-      email: z.string().email().optional(),
-      addressLine1: z.string().min(1).optional(),
-      addressLine2: z.string().optional(),
-      city: z.string().min(1).optional(),
-      county: z.string().optional(),
-      postcode: z.string().min(1).optional(),
-      country: z.string().min(2).max(2).optional(),
-      selectedRateId: z.string().min(1).optional(),
-      selectedServiceCode: z.string().min(1).optional(),
-    });
-    const parsedPayload = labelPayloadSchema.safeParse(req.body ?? {});
-    if (!parsedPayload.success) {
-      return res.status(400).json({
-        message: "Invalid shipping label details",
-        errors: parsedPayload.error.flatten().fieldErrors,
-      });
-    }
-
-    const shippingInput = {
-      name: parsedPayload.data.name || fullCustomerName(order) || "",
-      email: parsedPayload.data.email || order.customerEmail,
-      addressLine1: parsedPayload.data.addressLine1 || order.addressLine1 || "",
-      addressLine2: parsedPayload.data.addressLine2 || order.addressLine2,
-      city: parsedPayload.data.city || order.city || "",
-      county: parsedPayload.data.county || order.county,
-      postcode: parsedPayload.data.postcode || order.postcode || "",
-      country: (parsedPayload.data.country || order.country || "GB").toUpperCase(),
-      selectedRateId: parsedPayload.data.selectedRateId || order.shippingRateId || "",
-      selectedServiceCode:
-        parsedPayload.data.selectedServiceCode || order.shippingRateId || order.shippingServiceLevel || "",
-    };
-
-    const missingFields = [
-      !shippingInput.name ? "name" : "",
-      !shippingInput.addressLine1 ? "addressLine1" : "",
-      !shippingInput.city ? "city" : "",
-      !shippingInput.postcode ? "postcode" : "",
-      !shippingInput.country ? "country" : "",
-    ].filter(Boolean);
-    if (missingFields.length) {
-      return res.status(400).json({
-        message: "Missing required shipping details",
-        missingFields,
-      });
-    }
-
-    if (!isShippoEnabled()) {
-      return res.status(400).json({ message: "Shippo shipping is not configured. Set SHIPPO_API_KEY in environment." });
-    }
-
-    const productMap = await getProductMap();
-    const parcels = buildParcelsForItems(productMap, order.items.map((item) => ({
-      productId: item.productId,
-      productName: item.productName,
-      quantity: item.quantity,
-      priceEach: item.priceEach,
-    })));
-
-    let label;
-    try {
-      label = await createShippoShipmentAndLabel({
-        addressFrom: buildAddressFrom(),
-        addressTo: buildAddressTo({
-          name: shippingInput.name,
-          email: shippingInput.email,
-          addressLine1: shippingInput.addressLine1,
-          addressLine2: shippingInput.addressLine2,
-          city: shippingInput.city,
-          county: shippingInput.county,
-          postcode: shippingInput.postcode,
-          country: shippingInput.country,
-          parcels,
-        }),
-        parcels,
-        serviceLevelToken: shippingInput.selectedRateId || shippingInput.selectedServiceCode || undefined,
-        metadata: `Order ${order.id}`,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Shipping label generation failed";
-      console.error("[shipping-label] Shippo error:", message);
-      return res.status(400).json({ message });
-    }
-
-    const shippingLabelUrl = label.labelUrl || "";
-    const shippingLabelFileId: string | undefined = undefined;
-
-    if (!shippingLabelUrl) {
-      return res.status(500).json({ message: "Shipping provider did not return a usable label" });
-    }
-
-    const updated = await storage.recordShippingLabel(order.id, {
-      shippingLabelProvider: label.provider,
-      shippingLabelId: label.labelId,
-      shippingLabelUrl,
-      shippingLabelFileId,
-      trackingNumber: label.trackingNumber,
-      labelCreatedAt: new Date().toISOString(),
-    });
-
-    return res.json({
-      ok: true,
-      order: updated,
-      shippingLabelUrl,
-      trackingNumber: label.trackingNumber,
-      selectedService: label.serviceName,
-      shippingAddress: orderToAddressText(order),
-    });
   });
 
   // Categories
