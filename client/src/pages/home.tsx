@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Settings, Shield, Truck, Phone, ArrowRight, Package, Heart, Wrench, Loader2 } from "lucide-react";
+import { Settings, Shield, Truck, Phone, ArrowRight, Package, Heart, Wrench, Loader2, Clock } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -22,9 +22,15 @@ export default function Home() {
         {/* Hero Section */}
         <section className="grid lg:grid-cols-2 gap-10 items-center py-4">
           <div>
-            <div className="inline-flex items-center gap-2 border border-accent bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent mb-5 rounded-md">
-              <Heart className="h-4 w-4" />
-              Real Service, Real People
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+              <div className="inline-flex items-center gap-2 border border-accent bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent rounded-md">
+                <Heart className="h-4 w-4" />
+                Real Service, Real People
+              </div>
+              <div className="inline-flex items-center gap-2 border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary rounded-md">
+                <Clock className="h-4 w-4" />
+                Shop Online 24/7
+              </div>
             </div>
             <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl leading-tight mb-5">
               Parts <span className="text-primary">Made</span> Right,
@@ -33,7 +39,7 @@ export default function Home() {
             </h1>
             <div className="max-w-lg mb-8 text-muted-foreground md:text-lg">
               <p className="md:hidden">
-                Real motorcycle parts support from real people. Fast answers, right-fit parts, and UK-wide delivery.
+                Real motorcycle parts support from real people. Fast answers, right-fit parts, and UK-wide delivery. Order online 24/7.
               </p>
               <div className="hidden space-y-4 md:block">
                 <p>
@@ -124,11 +130,11 @@ export default function Home() {
           </div>
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary text-primary-foreground rounded-lg">
-              <Shield className="h-6 w-6" />
+              <Clock className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="font-semibold text-base mb-1">Secure Checkout</h3>
-              <p className="text-sm text-muted-foreground">Stripe-powered payment processing</p>
+              <h3 className="font-semibold text-base mb-1">Open 24/7</h3>
+              <p className="text-sm text-muted-foreground">Order any time — day or night, every day of the year</p>
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -137,7 +143,7 @@ export default function Home() {
             </div>
             <div>
               <h3 className="font-semibold text-base mb-1">Human Service</h3>
-              <p className="text-sm text-muted-foreground">Real help from someone who cares</p>
+              <p className="text-sm text-muted-foreground">Real help from someone who cares — Mon–Sat 9am–6pm</p>
             </div>
           </div>
         </section>
@@ -226,11 +232,15 @@ export default function Home() {
               Why Smoke City is Different
             </h2>
             <p className="mb-6 text-muted-foreground md:text-lg">
-              <span className="md:hidden">Real people, real advice, right parts.</span>
+              <span className="md:hidden">Real people, real advice, right parts — order online 24/7.</span>
               <span className="hidden md:inline">
               In a world of faceless corporations and automated responses, we're doing things the old way—with actual human care and expertise. When you order from Smoke City, you're not a ticket number in a queue. You're a fellow rider who deserves respect, honest advice, and parts that work.
               </span>
             </p>
+            <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 mb-4">
+              <Clock className="h-5 w-5 text-primary" />
+              <span className="font-semibold text-primary">Online store open 24 hours a day, 7 days a week</span>
+            </div>
             <p className="text-foreground font-medium md:text-lg">
               That's not just our promise—that's how we run every single day.
             </p>
@@ -273,11 +283,15 @@ export default function Home() {
 
         {/* CTA Section */}
         <section className="border-2 border-primary bg-gradient-to-br from-foreground via-foreground to-foreground/90 text-background px-8 py-12 text-center md:py-16 rounded-2xl shadow-2xl">
+          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm font-semibold text-background/90 mb-4">
+            <Clock className="h-4 w-4" />
+            Online store open 24/7
+          </div>
           <h2 className="text-2xl font-bold md:text-3xl mb-3">
             Ready to experience real service?
           </h2>
           <p className="text-background/80 text-base md:text-lg max-w-2xl mx-auto mb-6">
-            Browse our catalog, find your part, or reach out if you need guidance. Either way, you'll get the kind of service that's become rare—genuine, knowledgeable, and human.
+            Browse our catalog any time — day or night. Find your part, or reach out if you need guidance. Genuine, knowledgeable service whenever you need it.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button variant="secondary" size="lg" className="gap-2 bg-background text-foreground hover:bg-background/90 shadow-lg font-semibold" asChild>

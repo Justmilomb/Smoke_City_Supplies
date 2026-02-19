@@ -166,7 +166,10 @@ export default function ContactPage() {
                 {supportPhone}
               </a>
               <p className="mt-2 text-xs text-muted-foreground">
-                Mon-Sat, 9am-6pm
+                Mon–Sat, 9am–6pm
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Online store open <span className="font-semibold text-foreground">24/7</span> — order any time
               </p>
             </Card>
 
@@ -176,7 +179,7 @@ export default function ContactPage() {
               </div>
               <h3 className="mb-2 font-semibold">Response Time</h3>
               <p className="text-sm text-muted-foreground">
-                Most messages are answered within 24 hours.
+                Most messages are answered within 24 hours. The store itself is open <span className="font-semibold text-foreground">24/7</span> — browse and order any time.
               </p>
             </Card>
           </div>

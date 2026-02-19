@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { MapPin, Shield, Award, Headphones } from "lucide-react";
+import { MapPin, Shield, Award, Headphones, Clock } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import { useCategories } from "@/lib/store";
 import { useProducts } from "@/lib/products";
@@ -99,6 +99,10 @@ export default function StoreHome() {
               UK-wide delivery — Online only
             </div>
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5 font-semibold text-primary">
+                <Clock className="h-4 w-4 text-primary" />
+                Open 24/7
+              </span>
               <span className="flex items-center gap-1.5">
                 <Shield className="h-4 w-4 text-primary" />
                 Genuine Parts

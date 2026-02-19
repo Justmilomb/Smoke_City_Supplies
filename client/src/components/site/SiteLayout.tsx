@@ -311,12 +311,14 @@ export default function SiteLayout({
             </p>
             <div className="mt-5 grid grid-cols-2 gap-4 text-sm text-muted-foreground max-w-xs">
               <div>
-                <div className="font-medium text-foreground mb-1">Hours</div>
-                <div>Mon–Sat 9am–6pm</div>
+                <div className="font-medium text-foreground mb-1">Online Store</div>
+                <div className="font-semibold text-primary">Open 24/7</div>
+                <div className="text-xs mt-0.5">Order any time, day or night</div>
               </div>
               <div>
-                <div className="font-medium text-foreground mb-1">Delivery</div>
-                <div>UK-wide shipping</div>
+                <div className="font-medium text-foreground mb-1">Phone &amp; Email</div>
+                <div>Mon–Sat 9am–6pm</div>
+                <div className="text-xs mt-0.5">UK-wide delivery</div>
               </div>
             </div>
           </div>
@@ -391,7 +393,7 @@ export default function SiteLayout({
               © {new Date().getFullYear()} Smoke City Supplies. All rights reserved.
             </p>
             <p className="text-xs text-muted-foreground text-center sm:text-right">
-              Built with care. Real service, every time.
+              Built with care. Real service, 24/7.
             </p>
           </div>
         </div>
