@@ -84,32 +84,6 @@ export default function AdminEditPart() {
     [products, product?.brand]
   );
 
-  const formValues = React.useMemo(() => {
-    if (!product) return undefined;
-    return {
-      name: product.name,
-      vehicle: (product.vehicle as "motorcycle" | "scooter") ?? "motorcycle",
-      category: product.category,
-      subcategory: product.subcategory ?? "",
-      brand: product.brand ?? "",
-      price: product.price,
-      deliveryEta: product.deliveryEta,
-      stock: (product.stock as "in-stock" | "low" | "out") ?? "in-stock",
-      compatibility: product.compatibility?.join(", ") ?? "",
-      tags: product.tags?.join(", ") ?? "",
-      description: product.description,
-      metaTitle: product.metaTitle ?? "",
-      metaDescription: product.metaDescription ?? "",
-      metaKeywords: product.metaKeywords ?? "",
-      shippingWeightGrams: product.shippingWeightGrams ?? 1000,
-      shippingLengthCm: product.shippingLengthCm ?? 20,
-      shippingWidthCm: product.shippingWidthCm ?? 15,
-      shippingHeightCm: product.shippingHeightCm ?? 10,
-      barcode: product.barcode ?? "",
-      barcodeFormat: product.barcodeFormat ?? "",
-    };
-  }, [product]);
-
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -134,8 +108,39 @@ export default function AdminEditPart() {
       barcode: "",
       barcodeFormat: "",
     },
-    ...(formValues ? { values: formValues } : {}),
   });
+
+  // Reset form once when product loads (or when editing a different product).
+  // Using product?.id as dep so refetches of the same product don't wipe user edits.
+  const productId = product?.id;
+  React.useEffect(() => {
+    if (!product) return;
+    form.reset({
+      name: product.name,
+      vehicle: (product.vehicle as "motorcycle" | "scooter") ?? "motorcycle",
+      category: product.category,
+      subcategory: product.subcategory ?? "",
+      brand: product.brand ?? "",
+      price: product.price,
+      deliveryEta: product.deliveryEta,
+      stock: (["in-stock", "low", "out"].includes(product.stock ?? "")
+        ? product.stock
+        : "in-stock") as "in-stock" | "low" | "out",
+      compatibility: product.compatibility?.join(", ") ?? "",
+      tags: product.tags?.join(", ") ?? "",
+      description: product.description,
+      metaTitle: product.metaTitle ?? "",
+      metaDescription: product.metaDescription ?? "",
+      metaKeywords: product.metaKeywords ?? "",
+      shippingWeightGrams: product.shippingWeightGrams ?? 1000,
+      shippingLengthCm: product.shippingLengthCm ?? 20,
+      shippingWidthCm: product.shippingWidthCm ?? 15,
+      shippingHeightCm: product.shippingHeightCm ?? 10,
+      barcode: product.barcode ?? "",
+      barcodeFormat: product.barcodeFormat ?? "",
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
   const selectedCategory = form.watch("category");
   const categoryOptions = React.useMemo(
     () => Array.from(new Set([...(cats ?? []), product?.category, selectedCategory].filter((v): v is string => Boolean(v)))),

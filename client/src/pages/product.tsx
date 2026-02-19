@@ -419,11 +419,9 @@ export default function ProductPage() {
                   <div className={`rounded-lg p-3 text-sm font-medium ${
                     compatCheck.compatible === "yes"
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : compatCheck.compatible === "likely"
-                        ? "bg-amber-50 text-amber-700 border border-amber-200"
-                        : "bg-rose-50 text-rose-700 border border-rose-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
                   }`}>
-                    {compatCheck.compatible === "yes" ? "Yes — " : compatCheck.compatible === "likely" ? "Likely — " : "No — "}
+                    {compatCheck.compatible === "yes" ? "Yes — " : "No — "}
                     {compatCheck.reason}
                   </div>
                 )}

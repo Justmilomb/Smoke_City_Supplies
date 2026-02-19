@@ -669,7 +669,7 @@ Rules:
         messages: [
           {
             role: "system",
-            content: `You check if a motorcycle/scooter part fits a specific bike. Answer with JSON: {"compatible":"yes"|"no"|"likely","reason":"one sentence"}\nBe concise. Use max 1 sentence for reason.`,
+            content: `You check if a motorcycle/scooter part fits a specific bike. Answer ONLY with JSON: {"compatible":"yes"|"no","reason":"one sentence"}. Never use "likely" — commit to yes or no. Be concise. Use max 1 sentence for reason.`,
           },
           {
             role: "user",
@@ -689,8 +689,11 @@ Rules:
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       const result = JSON.parse(jsonMatch ? jsonMatch[0] : content) as { compatible?: string; reason?: string };
 
+      // Normalise — treat "likely" / anything non-"no" as "yes"
+      const raw = (result.compatible ?? "").toLowerCase();
+      const compatible = raw === "no" ? "no" : "yes";
       return res.json({
-        compatible: result.compatible ?? "unknown",
+        compatible,
         reason: result.reason ?? "",
       });
     } catch (err) {

@@ -359,27 +359,7 @@ export default function AdminInventory() {
         </div>
 
         <Card className="p-5 border-border/50 space-y-4">
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-            Use this page on your phone for best barcode scanning performance.
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
-            <Input
-              value={scanValue}
-              onChange={(e) => setScanValue(e.target.value)}
-              placeholder="Scan or enter barcode"
-              className="h-11 rounded-lg"
-            />
-            <Button className="h-11 gap-2" variant="outline" onClick={startCameraScan} disabled={loading || scanning}>
-              <ScanLine className="h-4 w-4" />
-              {scanning ? `Scanning (${scanSource || "camera"})...` : "Scan"}
-            </Button>
-            <Button className="h-11" onClick={() => resolveBarcode()} disabled={loading}>
-              Find Product
-            </Button>
-          </div>
-
-          {/* Camera preview */}
+          {/* Camera preview — shown first so it's immediately visible when scanning */}
           <div className={`relative overflow-hidden rounded-lg bg-black ${scanning ? "block" : "hidden"}`}>
             <video
               ref={videoRef}
@@ -407,6 +387,26 @@ export default function AdminInventory() {
             <div className="absolute bottom-3 left-0 right-0 text-center text-sm text-white/80">
               Point at a barcode
             </div>
+          </div>
+
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            Use this page on your phone for best barcode scanning performance.
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+            <Input
+              value={scanValue}
+              onChange={(e) => setScanValue(e.target.value)}
+              placeholder="Scan or enter barcode"
+              className="h-11 rounded-lg"
+            />
+            <Button className="h-11 gap-2" variant="outline" onClick={startCameraScan} disabled={loading || scanning}>
+              <ScanLine className="h-4 w-4" />
+              {scanning ? `Scanning (${scanSource || "camera"})...` : "Scan"}
+            </Button>
+            <Button className="h-11" onClick={() => resolveBarcode()} disabled={loading}>
+              Find Product
+            </Button>
           </div>
 
           {resolved && (
@@ -460,12 +460,25 @@ export default function AdminInventory() {
                 </Button>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex flex-wrap gap-2">
                 <Link href={`/admin/edit/${resolved.product.id}`}>
                   <Button variant="secondary" className="h-10" asChild>
                     <a>Open Product</a>
                   </Button>
                 </Link>
+                <Button
+                  variant="outline"
+                  className="h-10 gap-2"
+                  onClick={() => {
+                    setResolved(null);
+                    setScanValue("");
+                    setScanFormat("unknown");
+                    startCameraScan();
+                  }}
+                >
+                  <ScanLine className="h-4 w-4" />
+                  Scan Another
+                </Button>
               </div>
             </div>
           )}

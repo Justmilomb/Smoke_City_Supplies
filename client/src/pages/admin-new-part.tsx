@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, ScanLine } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,6 +62,7 @@ export default function AdminNewPart() {
   const createCategory = useCreateCategory();
   const [, setLoc] = useLocation();
 
+  const [created, setCreated] = React.useState(false);
   const [preview, setPreview] = React.useState<string[]>([]);
   const [addingCategory, setAddingCategory] = React.useState(false);
   const [newCategoryName, setNewCategoryName] = React.useState("");
@@ -228,12 +229,44 @@ export default function AdminNewPart() {
       {
         onSuccess: () => {
           toast.success("Part added");
-          setLoc("/admin/parts");
+          setCreated(true);
         },
         onError: (err) => toast.error(err.message),
       }
     );
   };
+
+  if (created) {
+    return (
+      <SiteLayout>
+        <div className="flex flex-col gap-6 max-w-md mx-auto py-12">
+          <div className="text-center">
+            <div className="text-4xl mb-4">✓</div>
+            <h1 className="text-2xl font-bold tracking-tight">Product Created!</h1>
+            <p className="mt-2 text-muted-foreground">What would you like to do next?</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button
+              size="lg"
+              className="h-14 gap-3 text-base"
+              onClick={() => setLoc("/admin/inventory")}
+            >
+              <ScanLine className="h-5 w-5" />
+              Scan Another Barcode
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-14 text-base"
+              onClick={() => setLoc("/admin/parts")}
+            >
+              Go Back to Products
+            </Button>
+          </div>
+        </div>
+      </SiteLayout>
+    );
+  }
 
   return (
     <SiteLayout>

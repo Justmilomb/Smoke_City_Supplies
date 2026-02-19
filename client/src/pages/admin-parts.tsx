@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Edit3, Minus, Plus, Trash2 } from "lucide-react";
+import { Edit3, Minus, Plus, ScanLine, Trash2 } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { useProducts, useDeleteProduct, useUpdateProductQuantity } from "@/lib/products";
@@ -44,6 +44,9 @@ export default function AdminParts() {
     });
   };
 
+  // Stable sort by ID so order doesn't jump when quantities change
+  const sortedParts = [...parts].sort((a, b) => a.id.localeCompare(b.id));
+
   if (isLoading) {
     return (
       <SiteLayout>
@@ -67,20 +70,30 @@ export default function AdminParts() {
             </div>
             <BackButton fallback="/admin" />
           </div>
-          <Link href="/admin/new">
-            <Button size="lg" className="gap-2" asChild>
-              <a data-testid="link-admin-add">
-                <Plus className="h-5 w-5" />
-                Add Product
-              </a>
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/admin/inventory">
+              <Button size="lg" variant="outline" className="gap-2" asChild>
+                <a>
+                  <ScanLine className="h-5 w-5" />
+                  Scan Barcode
+                </a>
+              </Button>
+            </Link>
+            <Link href="/admin/new">
+              <Button size="lg" className="gap-2" asChild>
+                <a data-testid="link-admin-add">
+                  <Plus className="h-5 w-5" />
+                  Add Product
+                </a>
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <Card className="border-border/50 overflow-hidden">
           {isMobile ? (
             <div className="divide-y divide-border/60">
-              {parts.map((p) => (
+              {sortedParts.map((p) => (
                 <div
                   key={p.id}
                   data-testid={`row-admin-part-${p.id}`}
@@ -118,7 +131,7 @@ export default function AdminParts() {
                           </Badge>
                         )}
                       </div>
-                      <div className="mt-2 text-sm font-medium tabular-nums">${p.price.toFixed(2)}</div>
+                      <div className="mt-2 text-sm font-medium tabular-nums">£{p.price.toFixed(2)}</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -188,7 +201,7 @@ export default function AdminParts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {parts.map((p) => (
+                {sortedParts.map((p) => (
                   <TableRow key={p.id} data-testid={`row-admin-part-${p.id}`}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -208,7 +221,7 @@ export default function AdminParts() {
                     </TableCell>
                     <TableCell className="text-sm">{p.vehicle}</TableCell>
                     <TableCell className="text-sm">{p.category}</TableCell>
-                    <TableCell className="text-sm tabular-nums">${p.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm tabular-nums">£{p.price.toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge data-testid={`badge-admin-stock-${p.id}`} variant="outline" className={`rounded-md ${stockTone(p.stock)}`}>
                         {p.stock}

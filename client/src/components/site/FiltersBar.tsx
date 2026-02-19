@@ -142,7 +142,6 @@ export default function FiltersBar({
 
   const activeCount =
     (value.q ? 1 : 0) +
-    (value.vehicle !== "all" ? 1 : 0) +
     (value.category !== "all" ? 1 : 0) +
     (value.sort !== "relevance" ? 1 : 0) +
     (value.model ? 1 : 0) +
@@ -190,26 +189,6 @@ export default function FiltersBar({
           />
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:flex md:items-center md:gap-3">
-            <Select
-              value={value.vehicle}
-              onValueChange={(v) => push({ ...value, vehicle: v as CatalogFilters["vehicle"] })}
-            >
-              <SelectTrigger data-testid="select-vehicle" className="h-10 w-full rounded-lg md:w-[160px]">
-                <SelectValue placeholder="Vehicle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem data-testid="option-vehicle-all" value="all">
-                  All Vehicles
-                </SelectItem>
-                <SelectItem data-testid="option-vehicle-motorcycle" value="motorcycle">
-                  Motorcycle
-                </SelectItem>
-                <SelectItem data-testid="option-vehicle-scooter" value="scooter">
-                  Scooter
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
             <Select
               value={value.model || "all"}
               onValueChange={(v) => push({ ...value, model: v === "all" ? "" : v })}
