@@ -563,7 +563,7 @@ export class DbStorage implements IStorage {
     const resolved = await this.resolveBarcode(input.code);
     if (!resolved.product || !resolved.barcode) return undefined;
 
-    const nextQty = resolved.product.quantity + input.quantity;
+    const nextQty = (resolved.product.quantity ?? 0) + input.quantity;
     const updated = await this.updateProductQuantity(resolved.product.id, nextQty);
     if (!updated) return undefined;
 
@@ -1296,7 +1296,7 @@ export class MemStorage implements IStorage {
 
     const updated = await this.updateProductQuantity(
       resolved.product.id,
-      resolved.product.quantity + input.quantity
+      (resolved.product.quantity ?? 0) + input.quantity
     );
     if (!updated) return undefined;
 

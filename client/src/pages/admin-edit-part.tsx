@@ -85,6 +85,36 @@ export default function AdminEditPart() {
     [products, product?.brand, extraBrands]
   );
 
+  // Derive form values from product data — react-hook-form's `values` option
+  // auto-resets the form whenever this changes (e.g. product loads or ID changes).
+  // `keepDirtyValues` preserves any fields the user has already edited.
+  const productValues = React.useMemo<FormValues | undefined>(() => {
+    if (!product) return undefined;
+    return {
+      name: product.name,
+      vehicle: (product.vehicle as "motorcycle" | "scooter") ?? "motorcycle",
+      category: product.category,
+      brand: product.brand ?? "",
+      price: product.price,
+      deliveryEta: product.deliveryEta,
+      stock: (["in-stock", "low", "out"].includes(product.stock ?? "")
+        ? product.stock
+        : "in-stock") as "in-stock" | "low" | "out",
+      compatibility: product.compatibility?.join(", ") ?? "",
+      tags: product.tags?.join(", ") ?? "",
+      description: product.description,
+      metaTitle: product.metaTitle ?? "",
+      metaDescription: product.metaDescription ?? "",
+      metaKeywords: product.metaKeywords ?? "",
+      shippingWeightGrams: product.shippingWeightGrams ?? 1000,
+      shippingLengthCm: product.shippingLengthCm ?? 20,
+      shippingWidthCm: product.shippingWidthCm ?? 15,
+      shippingHeightCm: product.shippingHeightCm ?? 10,
+      barcode: product.barcode ?? "",
+      barcodeFormat: product.barcodeFormat ?? "",
+    };
+  }, [product]);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -108,38 +138,9 @@ export default function AdminEditPart() {
       barcode: "",
       barcodeFormat: "",
     },
+    values: productValues,
+    resetOptions: { keepDirtyValues: true },
   });
-
-  // Reset form once when product loads (or when editing a different product).
-  // Using product?.id as dep so refetches of the same product don't wipe user edits.
-  const productId = product?.id;
-  React.useEffect(() => {
-    if (!product) return;
-    form.reset({
-      name: product.name,
-      vehicle: (product.vehicle as "motorcycle" | "scooter") ?? "motorcycle",
-      category: product.category,
-      brand: product.brand ?? "",
-      price: product.price,
-      deliveryEta: product.deliveryEta,
-      stock: (["in-stock", "low", "out"].includes(product.stock ?? "")
-        ? product.stock
-        : "in-stock") as "in-stock" | "low" | "out",
-      compatibility: product.compatibility?.join(", ") ?? "",
-      tags: product.tags?.join(", ") ?? "",
-      description: product.description,
-      metaTitle: product.metaTitle ?? "",
-      metaDescription: product.metaDescription ?? "",
-      metaKeywords: product.metaKeywords ?? "",
-      shippingWeightGrams: product.shippingWeightGrams ?? 1000,
-      shippingLengthCm: product.shippingLengthCm ?? 20,
-      shippingWidthCm: product.shippingWidthCm ?? 15,
-      shippingHeightCm: product.shippingHeightCm ?? 10,
-      barcode: product.barcode ?? "",
-      barcodeFormat: product.barcodeFormat ?? "",
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId]);
   const selectedCategory = form.watch("category");
   const categoryOptions = React.useMemo(
     () => Array.from(new Set([...(cats ?? []), product?.category, selectedCategory].filter((v): v is string => Boolean(v)))),
@@ -159,7 +160,6 @@ export default function AdminEditPart() {
       v.name && `Product: ${v.name}`,
       v.brand && `Brand: ${v.brand}`,
       v.category && `Category: ${v.category}`,
-      v.subcategory && `Subcategory: ${v.subcategory}`,
       v.description && `Description: ${v.description}`,
       v.compatibility && `Compatibility: ${v.compatibility}`,
       v.tags && `Tags: ${v.tags}`,
@@ -179,9 +179,9 @@ export default function AdminEditPart() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "SEO generation failed");
-      if (data.metaTitle) form.setValue("metaTitle", data.metaTitle);
-      if (data.metaDescription) form.setValue("metaDescription", data.metaDescription);
-      if (data.metaKeywords) form.setValue("metaKeywords", data.metaKeywords);
+      if (data.metaTitle) form.setValue("metaTitle", data.metaTitle, { shouldDirty: true });
+      if (data.metaDescription) form.setValue("metaDescription", data.metaDescription, { shouldDirty: true });
+      if (data.metaKeywords) form.setValue("metaKeywords", data.metaKeywords, { shouldDirty: true });
       toast.success("SEO fields generated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "SEO generation failed");
@@ -204,7 +204,7 @@ export default function AdminEditPart() {
         slug: slugify(name),
         vehicleType,
       });
-      form.setValue("category", created.name, { shouldValidate: true });
+      form.setValue("category", created.name, { shouldValidate: true, shouldDirty: true });
       setNewCategoryName("");
       setAddingCategory(false);
       toast.success("Category added");
@@ -466,7 +466,7 @@ export default function AdminEditPart() {
                           const name = newBrandName.trim();
                           if (!name) { toast.error("Enter a brand name"); return; }
                           setExtraBrands((prev) => [...prev, name]);
-                          form.setValue("brand", name, { shouldValidate: true });
+                          form.setValue("brand", name, { shouldValidate: true, shouldDirty: true });
                           setNewBrandName("");
                           setAddingBrand(false);
                           toast.success("Brand added");

@@ -128,7 +128,6 @@ export default function AdminNewPart() {
       v.name && `Product: ${v.name}`,
       v.brand && `Brand: ${v.brand}`,
       v.category && `Category: ${v.category}`,
-      v.subcategory && `Subcategory: ${v.subcategory}`,
       v.description && `Description: ${v.description}`,
       v.compatibility && `Compatibility: ${v.compatibility}`,
       v.tags && `Tags: ${v.tags}`,
