@@ -116,7 +116,7 @@ export const insertProductSchema = z.object({
   partNumber: z.string().optional(),
   vehicle: z.string().min(1),
   category: z.string().min(1),
-  subcategory: z.string().min(1),
+  subcategory: z.string().optional(),
   brand: z.string().min(1),
   price: z.number().positive(),
   rating: z.number(),

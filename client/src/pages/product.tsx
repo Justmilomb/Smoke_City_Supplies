@@ -260,11 +260,6 @@ export default function ProductPage() {
               <Badge variant="outline" className="rounded-md">
                 {vehicleLabel}
               </Badge>
-              {part.subcategory && (
-                <Badge variant="outline" className="rounded-md">
-                  {part.subcategory}
-                </Badge>
-              )}
               <Badge variant="outline" className="rounded-md">
                 {part.category}
               </Badge>

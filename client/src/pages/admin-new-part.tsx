@@ -26,7 +26,6 @@ const schema = z.object({
   name: z.string().min(3, "Name is too short"),
   vehicle: z.enum(["motorcycle", "scooter"]),
   category: z.string().min(1, "Pick a category"),
-  subcategory: z.string().min(1, "Add a subcategory"),
   brand: z.string().min(1, "Pick or add a company"),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
   deliveryEta: z.string().min(2, "Add a delivery time"),
@@ -90,7 +89,6 @@ export default function AdminNewPart() {
       name: "",
       vehicle: "motorcycle",
       category: cats[0] ?? "Brakes",
-      subcategory: "",
       brand: "",
       price: 0,
       deliveryEta: "Next-day delivery",
@@ -193,7 +191,6 @@ export default function AdminNewPart() {
         name: v.name,
         vehicle,
         category,
-        subcategory: v.subcategory,
         brand: v.brand,
         price: v.price,
         rating: 4.6,
@@ -215,7 +212,6 @@ export default function AdminNewPart() {
         specs: [
           { label: "Vehicle", value: vehicle },
           { label: "Category", value: category },
-          { label: "Subcategory", value: v.subcategory },
           { label: "Brand", value: v.brand },
         ],
         metaTitle: v.metaTitle || undefined,
@@ -399,19 +395,6 @@ export default function AdminNewPart() {
                 )}
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="subcategory"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Subcategory</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Brake Pads" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="brand"

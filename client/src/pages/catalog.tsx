@@ -76,10 +76,68 @@ export default function CatalogPage() {
     if (filters.inStockOnly) list = list.filter((p) => p.stock === "in-stock");
 
     if (q) {
+      const terms = q.split(/\s+/).filter(Boolean);
+
+      const score = (p: (typeof parts)[number]): number => {
+        const name = (p.name ?? "").toLowerCase();
+        const brand = (p.brand ?? "").toLowerCase();
+        const desc = (p.description ?? "").toLowerCase();
+        const cat = (p.category ?? "").toLowerCase();
+        const partNo = (p.partNumber ?? "").toLowerCase();
+        const tags = (p.tags ?? []).join(" ").toLowerCase();
+        const compat = (p.compatibility ?? []).join(" ").toLowerCase();
+
+        let s = 0;
+
+        // Full-query phrase matches (highest weight)
+        if (name === q)             s += 200;
+        else if (name.startsWith(q + " ") || name.startsWith(q)) s += 80;
+        else if (name.includes(q))  s += 50;
+
+        if (brand === q)            s += 160;
+        else if (brand.includes(q)) s += 40;
+
+        if (partNo === q)           s += 180;
+        else if (partNo.includes(q)) s += 60;
+
+        if (cat.includes(q))        s += 25;
+        if (tags.includes(q))       s += 25;
+        if (compat.includes(q))     s += 20;
+        if (desc.includes(q))       s += 15;
+
+        // Per-term matches — every word in a multi-word query must contribute
+        for (const t of terms) {
+          if (name.includes(t))     s += 20;
+          if (brand.includes(t))    s += 16;
+          if (partNo.includes(t))   s += 14;
+          if (cat.includes(t))      s += 10;
+          if (tags.includes(t))     s += 10;
+          if (compat.includes(t))   s += 8;
+          if (desc.includes(t))     s += 6;
+        }
+
+        return s;
+      };
+
+      // Keep only products that have at least one matching term across any field
       list = list.filter((p) => {
-        const hay = `${p.name} ${p.category} ${p.vehicle} ${p.partNumber ?? ""} ${p.brand ?? ""} ${p.tags?.join(" ") ?? ""} ${p.compatibility?.join(" ") ?? ""}`.toLowerCase();
-        return hay.includes(q);
+        const name = (p.name ?? "").toLowerCase();
+        const brand = (p.brand ?? "").toLowerCase();
+        const desc = (p.description ?? "").toLowerCase();
+        const cat = (p.category ?? "").toLowerCase();
+        const partNo = (p.partNumber ?? "").toLowerCase();
+        const tags = (p.tags ?? []).join(" ").toLowerCase();
+        const compat = (p.compatibility ?? []).join(" ").toLowerCase();
+        const hay = `${name} ${brand} ${desc} ${cat} ${partNo} ${tags} ${compat}`;
+        // Every term must appear somewhere in the product's fields
+        return terms.every((t) => hay.includes(t));
       });
+
+      // When sorting by relevance, rank by score; otherwise preserve chosen sort
+      if (filters.sort === "relevance") {
+        list.sort((a, b) => score(b) - score(a));
+        return list;
+      }
     }
 
     if (filters.sort === "price-asc") list.sort((a, b) => a.price - b.price);
