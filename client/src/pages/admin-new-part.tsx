@@ -68,18 +68,20 @@ export default function AdminNewPart() {
   const [newCategoryName, setNewCategoryName] = React.useState("");
   const [addingBrand, setAddingBrand] = React.useState(false);
   const [newBrandName, setNewBrandName] = React.useState("");
+  const [extraBrands, setExtraBrands] = React.useState<string[]>([]);
   const [seoGenerating, setSeoGenerating] = React.useState(false);
 
   const brandOptions = React.useMemo(
     () =>
       Array.from(
         new Set(
-          products
-            .map((p) => (p.brand || "").trim())
-            .filter(Boolean)
+          [
+            ...products.map((p) => (p.brand || "").trim()),
+            ...extraBrands,
+          ].filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b)),
-    [products]
+    [products, extraBrands]
   );
 
   const form = useForm<FormValues>({
@@ -461,10 +463,11 @@ export default function AdminNewPart() {
                         onClick={() => {
                           const name = newBrandName.trim();
                           if (!name) { toast.error("Enter a brand name"); return; }
+                          setExtraBrands((prev) => [...prev, name]);
                           form.setValue("brand", name, { shouldValidate: true });
                           setNewBrandName("");
                           setAddingBrand(false);
-                          toast.success("Brand set — it will be saved with the product");
+                          toast.success("Brand added");
                         }}
                       >
                         Save brand
