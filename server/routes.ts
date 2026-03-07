@@ -47,6 +47,16 @@ import {
   startGoogleMerchantFeedScheduler,
   writeGoogleMerchantFeedFile,
 } from "./googleMerchantFeed";
+import {
+  isEbayConfigured,
+  getEbayAccessToken,
+  syncProductToEbay,
+  unsyncProductFromEbay,
+  syncProductQuantityToEbay,
+  bulkSyncProducts,
+  pullStockFromEbay,
+  startEbayStockSyncScheduler,
+} from "./ebay";
 import { createInvoiceNumber, renderInvoiceHtml, renderInvoicePdfBuffer } from "./invoice";
 import { sendAdminOrderAlertEmail, sendContactFormEmail, sendInvoiceEmail, sendOrderCancelledEmail, sendOrderConfirmationEmail, sendOrderDeliveredEmail, sendOrderProcessingEmail, sendOrderShippedEmail } from "./email";
 import { quoteRoyalMailFlatRates } from "./shipping/royalMailManual";
@@ -106,6 +116,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   }
 
   startGoogleMerchantFeedScheduler();
+  startEbayStockSyncScheduler();
 
   async function ensureInvoiceSent(order: ApiOrder): Promise<ApiOrder> {
     const invoiceNumber = order.invoiceNumber || createInvoiceNumber();
@@ -420,6 +431,12 @@ ${urls
       }
     }
     writeGoogleMerchantFeedFile("bulk-update").catch(() => {});
+    if (isEbayConfigured()) {
+      const ebayLinked = results.filter((p) => p.ebayListingId);
+      if (ebayLinked.length > 0) {
+        bulkSyncProducts(ebayLinked).catch(() => {});
+      }
+    }
     return res.json({ updated: results.length, products: results });
   });
 
@@ -432,6 +449,9 @@ ${urls
     const seo = await generateProductSeo({ ...existing, ...patch, ...sanitized } as InsertProduct);
     const updated = await storage.updateProduct(id, { ...patch, ...sanitized, ...seo });
     writeGoogleMerchantFeedFile("update-product").catch(() => {});
+    if (updated?.ebayListingId && isEbayConfigured()) {
+      syncProductToEbay(updated).catch(() => {});
+    }
     pingIndexNow(req, [`/product/${id}`, "/store", "/sitemap.xml"]);
     return res.json(updated);
   });
@@ -445,17 +465,105 @@ ${urls
     const updated = await storage.updateProductQuantity(id, quantity);
     if (!updated) return res.status(404).json({ message: "Product not found" });
     writeGoogleMerchantFeedFile("update-quantity").catch(() => {});
+    if (updated?.ebayListingId && isEbayConfigured()) {
+      syncProductQuantityToEbay(updated).catch(() => {});
+    }
     pingIndexNow(req, [`/product/${id}`, "/store", "/sitemap.xml"]);
     return res.json(updated);
   });
 
   app.delete("/api/products/:id", requireAuth, apiRateLimiter, async (req, res) => {
     const id = paramId(req);
+    const existing = await storage.getProduct(id);
+    if (existing?.ebayListingId && isEbayConfigured()) {
+      unsyncProductFromEbay(existing).catch(() => {});
+    }
     const deleted = await storage.deleteProduct(id);
     if (!deleted) return res.status(404).json({ message: "Product not found" });
     writeGoogleMerchantFeedFile("delete-product").catch(() => {});
     pingIndexNow(req, [`/product/${id}`, "/store", "/sitemap.xml"]);
     return res.status(204).send();
+  });
+
+  // ── eBay Sync Routes ──────────────────────────────────────────────────
+
+  app.get("/api/admin/ebay/status", requireAuth, async (_req, res) => {
+    if (!isEbayConfigured()) {
+      return res.json({ connected: false, reason: "eBay credentials not configured" });
+    }
+    try {
+      await getEbayAccessToken();
+      return res.json({ connected: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.json({ connected: false, reason: msg });
+    }
+  });
+
+  app.post("/api/admin/ebay/sync/:id", requireAuth, apiRateLimiter, async (req, res) => {
+    if (!isEbayConfigured()) {
+      return res.status(400).json({ message: "eBay not configured" });
+    }
+    const id = paramId(req);
+    const product = await storage.getProduct(id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    try {
+      const result = await syncProductToEbay(product);
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await storage.updateProduct(id, { ebaySyncStatus: "error" } as Partial<ApiProduct>).catch(() => {});
+      return res.status(500).json({ message: msg });
+    }
+  });
+
+  app.post("/api/admin/ebay/sync-bulk", requireAuth, apiRateLimiter, async (req, res) => {
+    if (!isEbayConfigured()) {
+      return res.status(400).json({ message: "eBay not configured" });
+    }
+    const { ids } = req.body as { ids?: string[] };
+    let products: ApiProduct[];
+
+    if (ids && ids.length > 0) {
+      const allProducts = await Promise.all(ids.map((id) => storage.getProduct(id)));
+      products = allProducts.filter((p): p is ApiProduct => p !== null && p !== undefined);
+    } else {
+      products = await storage.listProducts();
+    }
+
+    const result = await bulkSyncProducts(products);
+    return res.json(result);
+  });
+
+  app.post("/api/admin/ebay/unsync/:id", requireAuth, apiRateLimiter, async (req, res) => {
+    if (!isEbayConfigured()) {
+      return res.status(400).json({ message: "eBay not configured" });
+    }
+    const id = paramId(req);
+    const product = await storage.getProduct(id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    try {
+      await unsyncProductFromEbay(product);
+      return res.json({ success: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ message: msg });
+    }
+  });
+
+  app.post("/api/admin/ebay/pull-stock", requireAuth, apiRateLimiter, async (_req, res) => {
+    if (!isEbayConfigured()) {
+      return res.status(400).json({ message: "eBay not configured" });
+    }
+    try {
+      await pullStockFromEbay();
+      return res.json({ success: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ message: msg });
+    }
   });
 
   // Barcode + inventory admin workflows

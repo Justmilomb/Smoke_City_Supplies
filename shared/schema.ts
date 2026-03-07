@@ -88,6 +88,10 @@ export const products = pgTable("products", {
   shippingLengthCm: integer("shipping_length_cm"),
   shippingWidthCm: integer("shipping_width_cm"),
   shippingHeightCm: integer("shipping_height_cm"),
+  ebayListingId: text("ebay_listing_id"),
+  ebayOfferId: text("ebay_offer_id"),
+  ebaySyncedAt: timestamp("ebay_synced_at"),
+  ebaySyncStatus: varchar("ebay_sync_status", { length: 20 }),
 });
 
 export const barcodes = pgTable("barcodes", {
@@ -141,6 +145,10 @@ export const insertProductSchema = z.object({
   shippingHeightCm: z.number().int().min(1).optional(),
   barcode: z.string().optional(),
   barcodeFormat: z.string().optional(),
+  ebayListingId: z.string().optional(),
+  ebayOfferId: z.string().optional(),
+  ebaySyncedAt: z.string().optional(),
+  ebaySyncStatus: z.enum(["synced", "pending", "error"]).optional(),
 });
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
@@ -422,6 +430,10 @@ export type ApiProduct = {
   shippingHeightCm?: number;
   barcode?: string;
   barcodeFormat?: string;
+  ebayListingId?: string;
+  ebayOfferId?: string;
+  ebaySyncedAt?: string;
+  ebaySyncStatus?: string;
 };
 
 export type ApiOrderItem = {

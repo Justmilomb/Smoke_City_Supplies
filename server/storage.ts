@@ -308,6 +308,10 @@ export class DbStorage implements IStorage {
       shippingHeightCm: row.shippingHeightCm ?? undefined,
       barcode: barcode?.code,
       barcodeFormat: barcode?.format,
+      ebayListingId: row.ebayListingId ?? undefined,
+      ebayOfferId: row.ebayOfferId ?? undefined,
+      ebaySyncedAt: row.ebaySyncedAt?.toISOString() ?? undefined,
+      ebaySyncStatus: row.ebaySyncStatus ?? undefined,
     };
   }
 
@@ -389,6 +393,10 @@ export class DbStorage implements IStorage {
         shippingHeightCm: row.shippingHeightCm ?? undefined,
         barcode: barcode?.code,
         barcodeFormat: barcode?.format,
+        ebayListingId: row.ebayListingId ?? undefined,
+        ebayOfferId: row.ebayOfferId ?? undefined,
+        ebaySyncedAt: row.ebaySyncedAt?.toISOString() ?? undefined,
+        ebaySyncStatus: row.ebaySyncStatus ?? undefined,
       };
     });
   }
@@ -468,6 +476,13 @@ export class DbStorage implements IStorage {
     if (patch.shippingLengthCm !== undefined) dbPatch.shippingLengthCm = patch.shippingLengthCm;
     if (patch.shippingWidthCm !== undefined) dbPatch.shippingWidthCm = patch.shippingWidthCm;
     if (patch.shippingHeightCm !== undefined) dbPatch.shippingHeightCm = patch.shippingHeightCm;
+    if (patch.ebaySyncedAt !== undefined) {
+      dbPatch.ebaySyncedAt = patch.ebaySyncedAt ? new Date(patch.ebaySyncedAt) : null;
+    }
+    // Convert undefined eBay fields to null for DB
+    if ("ebayListingId" in patch) dbPatch.ebayListingId = patch.ebayListingId ?? null;
+    if ("ebayOfferId" in patch) dbPatch.ebayOfferId = patch.ebayOfferId ?? null;
+    if ("ebaySyncStatus" in patch) dbPatch.ebaySyncStatus = patch.ebaySyncStatus ?? null;
 
     const [row] = await this.getDb().update(products).set(dbPatch).where(eq(products.id, id)).returning();
 

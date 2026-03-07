@@ -49,6 +49,10 @@ export type Part = {
   shippingHeightCm?: number;
   barcode?: string;
   barcodeFormat?: string;
+  ebayListingId?: string;
+  ebayOfferId?: string;
+  ebaySyncedAt?: string;
+  ebaySyncStatus?: string;
 };
 
 /** Motorcycle manufacturers for filter grouping */

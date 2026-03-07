@@ -10,7 +10,7 @@ import BackButton from "@/components/site/BackButton";
 import AdminMultiImageUpload from "@/components/admin/AdminMultiImageUpload";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { useCategories } from "@/lib/store";
-import { useProduct, useProducts, useUpdateProduct } from "@/lib/products";
+import { useProduct, useProducts, useUpdateProduct, useEbaySyncProduct, useEbayUnsync } from "@/lib/products";
 import { useCreateCategory } from "@/lib/categories";
 import type { PartCategory, VehicleType } from "@/lib/mockData";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -62,6 +63,8 @@ export default function AdminEditPart() {
   const { data: product, isLoading } = useProduct(id);
   const { data: products = [] } = useProducts();
   const updateProduct = useUpdateProduct();
+  const ebaySync = useEbaySyncProduct();
+  const ebayUnsync = useEbayUnsync();
   const createCategory = useCreateCategory();
   const cats = useCategories();
   usePageMeta({ title: product ? `Edit ${product.name}` : "Edit Product", description: "Edit part details and image.", noindex: true });
@@ -634,6 +637,67 @@ export default function AdminEditPart() {
                       </FormItem>
                     )}
                   />
+                </div>
+
+                {/* eBay Sync */}
+                <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">eBay Listing</span>
+                      {product.ebaySyncStatus === "synced" && (
+                        <Badge className="bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 text-xs">Synced</Badge>
+                      )}
+                      {product.ebaySyncStatus === "pending" && (
+                        <Badge className="bg-amber-500/12 text-amber-700 dark:text-amber-300 text-xs">Pending</Badge>
+                      )}
+                      {product.ebaySyncStatus === "error" && (
+                        <Badge className="bg-rose-500/12 text-rose-700 dark:text-rose-300 text-xs">Error</Badge>
+                      )}
+                      {!product.ebaySyncStatus && (
+                        <Badge variant="outline" className="text-xs">Not listed</Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                        disabled={ebaySync.isPending}
+                        onClick={() => {
+                          ebaySync.mutate(id!, {
+                            onSuccess: () => toast.success("Synced to eBay"),
+                            onError: (err) => toast.error(err.message),
+                          });
+                        }}
+                      >
+                        {ebaySync.isPending ? "Syncing..." : product.ebayListingId ? "Update on eBay" : "Sync to eBay"}
+                      </Button>
+                      {product.ebayListingId && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs text-rose-600"
+                          disabled={ebayUnsync.isPending}
+                          onClick={() => {
+                            if (!confirm("Remove this product from eBay?")) return;
+                            ebayUnsync.mutate(id!, {
+                              onSuccess: () => toast.success("Removed from eBay"),
+                              onError: (err) => toast.error(err.message),
+                            });
+                          }}
+                        >
+                          {ebayUnsync.isPending ? "Removing..." : "Remove from eBay"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {product.ebaySyncedAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Last synced: {new Date(product.ebaySyncedAt).toLocaleString()}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">

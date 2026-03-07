@@ -169,3 +169,81 @@ export function useDeleteProduct() {
     onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
   });
 }
+
+// ── eBay Sync Hooks ──────────────────────────────────────────────────────
+
+export function useEbayStatus() {
+  return useQuery({
+    queryKey: ["ebay", "status"] as const,
+    queryFn: async () => {
+      const res = await fetch(`${API}/admin/ebay/status`);
+      if (!res.ok) throw new Error("Failed to check eBay status");
+      return res.json() as Promise<{ connected: boolean; reason?: string }>;
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useEbaySyncProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API}/admin/ebay/sync/${id}`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to sync to eBay");
+      }
+      return res.json() as Promise<{ success: boolean; listingId: string; offerId: string }>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
+  });
+}
+
+export function useEbayBulkSync() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids?: string[]) => {
+      const res = await fetch(`${API}/admin/ebay/sync-bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to bulk sync to eBay");
+      }
+      return res.json() as Promise<{ synced: number; failed: number; errors: string[] }>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
+  });
+}
+
+export function useEbayUnsync() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API}/admin/ebay/unsync/${id}`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to remove from eBay");
+      }
+      return res.json() as Promise<{ success: boolean }>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
+  });
+}
+
+export function useEbayPullStock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${API}/admin/ebay/pull-stock`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to pull eBay stock");
+      }
+      return res.json() as Promise<{ success: boolean }>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
+  });
+}

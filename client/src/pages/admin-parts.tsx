@@ -1,9 +1,9 @@
 import React from "react";
 import { Link } from "wouter";
-import { Edit3, Minus, Plus, ScanLine, Trash2, Search, X, CheckSquare, Image, DollarSign, Package } from "lucide-react";
+import { Edit3, Minus, Plus, ScanLine, Trash2, Search, X, CheckSquare, Image, DollarSign, Package, RefreshCw } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
-import { useProducts, useDeleteProduct, useUpdateProductQuantity, useBulkUpdateProducts } from "@/lib/products";
+import { useProducts, useDeleteProduct, useUpdateProductQuantity, useBulkUpdateProducts, useEbaySyncProduct, useEbayBulkSync, useEbayPullStock } from "@/lib/products";
 import { getProductImage } from "@/lib/mockData";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -30,6 +30,9 @@ export default function AdminParts() {
   const deleteProduct = useDeleteProduct();
   const updateQuantity = useUpdateProductQuantity();
   const bulkUpdate = useBulkUpdateProducts();
+  const ebaySync = useEbaySyncProduct();
+  const ebayBulkSync = useEbayBulkSync();
+  const ebayPullStock = useEbayPullStock();
   const isMobile = useIsMobile();
 
   // Filters
@@ -141,6 +144,11 @@ export default function AdminParts() {
         onSuccess: (d) => { toast.success(`${d.updated} products image updated`); setSelected(new Set()); setBulkAction(""); setBulkValue(""); },
         onError: (err) => toast.error(err.message),
       });
+    } else if (bulkAction === "sync-ebay") {
+      ebayBulkSync.mutate(ids, {
+        onSuccess: (d) => { toast.success(`${d.synced} synced, ${d.failed} failed`); setSelected(new Set()); setBulkAction(""); },
+        onError: (err) => toast.error(err.message),
+      });
     } else if (bulkAction === "delete") {
       if (!confirm(`Delete ${ids.length} products? This cannot be undone.`)) return;
       Promise.all(ids.map((id) => deleteProduct.mutateAsync(id)))
@@ -175,7 +183,37 @@ export default function AdminParts() {
             </div>
             <BackButton fallback="/admin" />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2"
+              disabled={ebayBulkSync.isPending}
+              onClick={() => {
+                ebayBulkSync.mutate(undefined, {
+                  onSuccess: (d) => toast.success(`eBay: ${d.synced} synced, ${d.failed} failed`),
+                  onError: (err) => toast.error(err.message),
+                });
+              }}
+            >
+              <RefreshCw className={`h-5 w-5 ${ebayBulkSync.isPending ? "animate-spin" : ""}`} />
+              Sync All eBay
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2"
+              disabled={ebayPullStock.isPending}
+              onClick={() => {
+                ebayPullStock.mutate(undefined, {
+                  onSuccess: () => toast.success("eBay stock pulled"),
+                  onError: (err) => toast.error(err.message),
+                });
+              }}
+            >
+              <Package className={`h-5 w-5 ${ebayPullStock.isPending ? "animate-spin" : ""}`} />
+              Pull eBay Stock
+            </Button>
             <Link href="/admin/inventory">
               <Button size="lg" variant="outline" className="gap-2" asChild>
                 <a>
@@ -251,6 +289,7 @@ export default function AdminParts() {
                 <SelectItem value="set-quantity">Set Quantity</SelectItem>
                 <SelectItem value="set-price">Set Price</SelectItem>
                 <SelectItem value="set-image">Set Image URL</SelectItem>
+                <SelectItem value="sync-ebay">Sync to eBay</SelectItem>
                 <SelectItem value="delete">Delete</SelectItem>
               </SelectContent>
             </Select>
@@ -390,6 +429,7 @@ export default function AdminParts() {
                   <TableHead>Stock</TableHead>
                   <TableHead>Qty</TableHead>
                   <TableHead>Barcode</TableHead>
+                  <TableHead>eBay</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -454,6 +494,20 @@ export default function AdminParts() {
                         <span className="font-mono">{p.barcode}</span>
                       ) : (
                         <span className="text-muted-foreground">Unlinked</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {p.ebaySyncStatus === "synced" && (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" title="Synced to eBay" />
+                      )}
+                      {p.ebaySyncStatus === "pending" && (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" title="Pending" />
+                      )}
+                      {p.ebaySyncStatus === "error" && (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-500" title="eBay sync error" />
+                      )}
+                      {!p.ebaySyncStatus && (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" title="Not listed on eBay" />
                       )}
                     </TableCell>
                     <TableCell className="text-right">

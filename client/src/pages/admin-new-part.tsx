@@ -10,7 +10,7 @@ import BackButton from "@/components/site/BackButton";
 import AdminMultiImageUpload from "@/components/admin/AdminMultiImageUpload";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { useCategories } from "@/lib/store";
-import { useCreateProduct, useProducts } from "@/lib/products";
+import { useCreateProduct, useProducts, useEbaySyncProduct } from "@/lib/products";
 import { useCreateCategory } from "@/lib/categories";
 import type { PartCategory, VehicleType } from "@/lib/mockData";
 import { toast } from "sonner";
@@ -63,7 +63,9 @@ export default function AdminNewPart() {
   const createCategory = useCreateCategory();
   const [, setLoc] = useLocation();
 
-  const [created, setCreated] = React.useState(false);
+  const [createdId, setCreatedId] = React.useState<string | null>(null);
+  const created = !!createdId;
+  const ebaySync = useEbaySyncProduct();
   const [preview, setPreview] = React.useState<string[]>([]);
   const [addingCategory, setAddingCategory] = React.useState(false);
   const [newCategoryName, setNewCategoryName] = React.useState("");
@@ -222,9 +224,9 @@ export default function AdminNewPart() {
         barcodeFormat: v.barcodeFormat || undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: (product) => {
           toast.success("Part added");
-          setCreated(true);
+          setCreatedId(product.id);
         },
         onError: (err) => toast.error(err.message),
       }
@@ -241,6 +243,20 @@ export default function AdminNewPart() {
             <p className="mt-2 text-muted-foreground">What would you like to do next?</p>
           </div>
           <div className="flex flex-col gap-3">
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-14 gap-3 text-base"
+              disabled={ebaySync.isPending || ebaySync.isSuccess}
+              onClick={() => {
+                ebaySync.mutate(createdId!, {
+                  onSuccess: () => toast.success("Synced to eBay"),
+                  onError: (err) => toast.error(err.message),
+                });
+              }}
+            >
+              {ebaySync.isPending ? "Syncing..." : ebaySync.isSuccess ? "Synced to eBay" : "Sync to eBay"}
+            </Button>
             <Button
               size="lg"
               className="h-14 gap-3 text-base"
