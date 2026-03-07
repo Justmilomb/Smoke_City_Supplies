@@ -1,6 +1,6 @@
 import type { ApiProduct, BikeFinderInput, BikeFinderResult } from "@shared/schema";
 import { BIKE_DATA } from "@shared/bike-data";
-import { getNvidiaClient, getPerplexityClient } from "./ai";
+import { getNvidiaClient } from "./ai";
 import { storage } from "./storage";
 
 type NormalizedBike = {
@@ -8,64 +8,21 @@ type NormalizedBike = {
   displayName: string;
 };
 
-/** Normalize a string for fuzzy comparison: lowercase, strip spaces/hyphens/dots, remove trailing "cc" */
 function normalizeBikeString(s: string): string {
   return s.toLowerCase().replace(/[-\s.]/g, "").replace(/cc$/, "");
 }
 
-/** Known makes extracted from BIKE_DATA for regex-based parsing */
 const KNOWN_MAKES = BIKE_DATA.map((b) => b.make);
 
-/** Parse free text into make/model/cc/year using regex when AI is unavailable */
-function parseRawBikeText(text: string): { make?: string; model?: string; cc?: string; year?: string; displayName: string } {
-  const cleaned = text.replace(/\s+/g, " ").trim();
-
-  // Try to extract make by matching known makes
-  let make: string | undefined;
-  const textLower = cleaned.toLowerCase();
-  for (const knownMake of KNOWN_MAKES) {
-    if (textLower.startsWith(knownMake.toLowerCase())) {
-      make = knownMake;
-      break;
-    }
-    const normalized = normalizeBikeString(knownMake);
-    if (normalizeBikeString(cleaned).startsWith(normalized)) {
-      make = knownMake;
-      break;
-    }
-  }
-
-  // Extract year (4-digit number between 1970-2030)
-  const yearMatch = cleaned.match(/\b(19[7-9]\d|20[0-3]\d)\b/);
-  const year = yearMatch ? yearMatch[1] : undefined;
-
-  // Extract CC (number followed by "cc")
-  const ccMatch = cleaned.match(/\b(\d{2,4})\s*cc\b/i);
-  const cc = ccMatch ? ccMatch[1] : undefined;
-
-  // Model = remainder after removing make, year, cc
-  let remainder = cleaned;
-  if (make) {
-    remainder = remainder.replace(new RegExp(`^${make.replace(/[-]/g, "[-\\s]?")}\\s*`, "i"), "");
-  }
-  if (year) remainder = remainder.replace(year, "").trim();
-  if (ccMatch) remainder = remainder.replace(ccMatch[0], "").trim();
-  const model = remainder.replace(/\s+/g, " ").trim() || undefined;
-
-  const displayName = cleaned;
-  return { make, model, cc, year, displayName };
+function parseRawBikeText(text: string): { displayName: string } {
+  return { displayName: text.replace(/\s+/g, " ").trim() };
 }
 
-/**
- * Step 1: Normalize bike input using NVIDIA AI (fix typos, standardize format).
- * Falls back to regex parsing if NVIDIA unavailable.
- */
 export async function normalizeBikeInput(input: BikeFinderInput): Promise<NormalizedBike> {
   const rawText = input.freeText
     ? input.freeText.trim()
     : [input.make, input.model, input.cc ? `${input.cc}cc` : "", input.year].filter(Boolean).join(" ");
 
-  // If structured input, build the key directly without AI
   if (input.make && input.model) {
     const parts = [input.make.trim(), input.model.trim()];
     if (input.cc) parts.push(`${input.cc}cc`);
@@ -75,140 +32,161 @@ export async function normalizeBikeInput(input: BikeFinderInput): Promise<Normal
     return { normalizedKey, displayName };
   }
 
-  // For free text, try NVIDIA normalization with timeout
   const nvidia = getNvidiaClient();
   if (nvidia) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-
       const completion = await nvidia.client.chat.completions.create({
         model: nvidia.model,
         messages: [
           {
             role: "system",
-            content: `You normalize motorcycle/scooter names. Given user input (possibly with typos), return JSON: {"make":"...","model":"...","cc":"...","year":"...","displayName":"Make Model CCcc Year"}. Fill in what you can identify. If cc or year is unknown, omit those fields. Respond ONLY with valid JSON.`,
+            content: `You normalize motorcycle/scooter names. Given user input (possibly with typos), return JSON: {"displayName":"Make Model"}. Do NOT add cc or year unless the user typed it. Respond ONLY with valid JSON.`,
           },
           { role: "user", content: rawText },
         ],
         max_tokens: 150,
         temperature: 0,
         top_p: 0.7,
-        signal: controller.signal,
       } as any);
-
-      clearTimeout(timeout);
 
       const content = completion.choices?.[0]?.message?.content?.trim();
       if (content) {
         const jsonMatch = content.match(/\{[\s\S]*\}/);
-        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content) as {
-          make?: string;
-          model?: string;
-          cc?: string;
-          year?: string;
-          displayName?: string;
-        };
-        const displayName =
-          parsed.displayName ||
-          [parsed.make, parsed.model, parsed.cc ? `${parsed.cc}cc` : "", parsed.year].filter(Boolean).join(" ");
+        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content) as { displayName?: string };
+        const displayName = parsed.displayName || rawText;
         const normalizedKey = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
         return { normalizedKey, displayName };
       }
     } catch (err: any) {
-      console.error("[bike-finder] NVIDIA normalization failed, using fallback:", err?.message || err);
+      console.error("[bike-finder] NVIDIA normalization failed:", err?.message || err);
     }
   }
 
-  // Regex fallback: parse known makes, year, cc from text
-  const parsed = parseRawBikeText(rawText);
-  const displayName = parsed.displayName;
+  const { displayName } = parseRawBikeText(rawText);
   const normalizedKey = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   return { normalizedKey, displayName };
 }
 
 /**
- * Step 2: Check compatibility — AI first, local word-overlap fallback.
- * Returns a flat list of compatible product IDs.
+ * Check each product against the bike using Serper (web search) + NVIDIA (reasoning).
+ * For each product, search the web to see if it's compatible, then ask NVIDIA yes/no.
  */
-export async function checkCompatibilityBatch(
-  displayName: string,
-  products: ApiProduct[]
+
+async function serperSearch(query: string): Promise<string> {
+  const apiKey = process.env.SERPER_API_KEY;
+  if (!apiKey) return "";
+
+  try {
+    const res = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: query, num: 3 }),
+    });
+    if (!res.ok) return "";
+    const data = await res.json() as {
+      organic?: Array<{ title?: string; snippet?: string }>;
+      answerBox?: { answer?: string; snippet?: string };
+    };
+
+    const parts: string[] = [];
+    if (data.answerBox?.answer) parts.push(data.answerBox.answer);
+    if (data.answerBox?.snippet) parts.push(data.answerBox.snippet);
+    for (const r of data.organic ?? []) {
+      if (r.snippet) parts.push(r.snippet);
+    }
+    return parts.join(" ").substring(0, 1500);
+  } catch {
+    return "";
+  }
+}
+
+async function isProductCompatible(
+  bike: string,
+  product: ApiProduct,
+  nvidia: { client: any; model: string },
+): Promise<boolean> {
+  // Search: "Is [product] compatible with [bike]?"
+  const searchQuery = `${product.name} ${product.brand || ""} compatible ${bike}`;
+  const webData = await serperSearch(searchQuery);
+
+  const completion = await nvidia.client.chat.completions.create({
+    model: nvidia.model,
+    messages: [
+      {
+        role: "system",
+        content: `You decide if a motorcycle part is compatible with a bike. You will get the bike name, the product, and web search results. Answer ONLY "yes" or "no".
+
+Say "yes" if:
+- The web results confirm it fits this bike
+- It's a universal part (chain lube, brake fluid, tools, grips, luggage, phone mounts, covers, cleaning products, etc.)
+- It's a generic consumable that could reasonably fit (oil, brake pads, spark plugs, filters)
+- You're not sure — default to "yes"
+
+Say "no" ONLY if the web results clearly say it does NOT fit this bike.`,
+      },
+      {
+        role: "user",
+        content: `Bike: ${bike}\nProduct: ${product.name} (${product.category}, ${product.brand || "generic"})\n\nWeb search results:\n${webData || "No results found"}\n\nIs this product compatible? Answer yes or no only.`,
+      },
+    ],
+    max_tokens: 10,
+    temperature: 0,
+  } as any);
+
+  const answer = completion.choices?.[0]?.message?.content?.trim().toLowerCase() || "";
+  return answer.startsWith("yes");
+}
+
+// Process products in batches to avoid hammering APIs
+async function checkInBatches(
+  bike: string,
+  products: ApiProduct[],
+  nvidia: { client: any; model: string },
+  batchSize: number,
 ): Promise<string[]> {
-  const compatibleIds = new Set<string>();
+  const compatibleIds: string[] = [];
 
-  // Ask Perplexity: does each product work with this bike?
-  const perplexity = getPerplexityClient();
-  if (perplexity && products.length > 0) {
-    try {
-      const productList = products
-        .map((p) => `${p.id}: ${p.name} (${p.category})`)
-        .join("\n");
-
-      const completion = await perplexity.client.chat.completions.create({
-        model: perplexity.model,
-        messages: [
-          {
-            role: "system",
-            content: `You help match motorcycle parts to bikes. The user will give you a bike and a list of products from a store. For each product, decide: would this product work on / be useful for this bike? Search the web for the bike's specs if needed.
-
-Say YES to:
-- Parts that directly fit (correct oil weight, filter size, tyre size, etc.)
-- Universal parts any bike can use (chain lube, brake fluid, tools, cleaning products, luggage, phone mounts, covers, locks, grips, etc.)
-- Generic consumables (brake pads, oil filters, spark plugs) — these are generic fitments sold to suit many bikes
-
-Only say NO if a part is clearly wrong for this bike (e.g. wrong tyre size, wrong battery voltage).
-
-When in doubt, say YES.
-
-Return ONLY a JSON array of the compatible product IDs. Example: ["id1","id2","id3"]`,
-          },
-          {
-            role: "user",
-            content: `Bike: ${displayName}\n\nProducts:\n${productList}`,
-          },
-        ],
-        max_tokens: 4096,
-        temperature: 0,
-      } as any);
-
-      const content = completion.choices?.[0]?.message?.content?.trim();
-      console.log("[bike-finder] Perplexity response:", content?.substring(0, 300));
-      if (content) {
-        const arrayMatch = content.match(/\[[\s\S]*\]/);
-        if (arrayMatch) {
-          const aiIds: string[] = JSON.parse(arrayMatch[0]);
-          const validProductIds = new Set(products.map((p) => p.id));
-          for (const id of aiIds) {
-            if (validProductIds.has(id)) {
-              compatibleIds.add(id);
-            }
-          }
+  for (let i = 0; i < products.length; i += batchSize) {
+    const batch = products.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async (p) => {
+        try {
+          const ok = await isProductCompatible(bike, p, nvidia);
+          console.log(`[bike-finder] ${p.name} -> ${ok ? "YES" : "NO"}`);
+          return ok ? p.id : null;
+        } catch (err: any) {
+          console.error(`[bike-finder] Error checking ${p.name}:`, err?.message);
+          return p.id; // on error, include it
         }
-      }
-
-      return Array.from(compatibleIds);
-    } catch (err: any) {
-      console.error("[bike-finder] Perplexity failed, falling back to local matching:", err?.message || err);
+      }),
+    );
+    for (const id of results) {
+      if (id) compatibleIds.push(id);
     }
   }
 
-  // Fallback when no AI available: include everything (better than showing nothing)
-  for (const p of products) {
-    compatibleIds.add(p.id);
-  }
-
-  return Array.from(compatibleIds);
+  return compatibleIds;
 }
 
-/**
- * Main orchestrator: normalize → check cache → AI/local compatibility → done.
- */
+export async function checkCompatibilityBatch(
+  displayName: string,
+  products: ApiProduct[],
+): Promise<string[]> {
+  if (products.length === 0) return [];
+
+  const nvidia = getNvidiaClient();
+  if (!nvidia || !process.env.SERPER_API_KEY) {
+    console.log("[bike-finder] Missing SERPER_API_KEY or NVIDIA — returning all products");
+    return products.map((p) => p.id);
+  }
+
+  return checkInBatches(displayName, products, nvidia, 5);
+}
+
 export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFinderResult> {
-  // Step 1: Normalize
   const { normalizedKey, displayName } = await normalizeBikeInput(input);
 
-  // Step 2: Check cache (gracefully skip if cache table doesn't exist)
+  // Check cache
   try {
     const cached = await storage.getBikeCompatibilityCache(normalizedKey);
     if (cached) {
@@ -227,13 +205,11 @@ export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFind
           totalCompatible: compatProducts.length,
         };
       }
-      // Cache had no products (maybe stale), fall through to re-check
     }
   } catch (err) {
-    console.error("[bike-finder] Cache read failed (table may not exist):", err);
+    console.error("[bike-finder] Cache read failed:", err);
   }
 
-  // Step 3: Get all products and check compatibility
   const allProducts = await storage.listProducts();
   const compatibleIds = await checkCompatibilityBatch(displayName, allProducts);
 
@@ -242,7 +218,6 @@ export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFind
     .map((id) => productMap.get(id))
     .filter((p): p is ApiProduct => !!p);
 
-  // Only cache if we found results — don't cache empty results
   if (compatibleIds.length > 0) {
     try {
       await storage.setBikeCompatibilityCache({
@@ -252,7 +227,7 @@ export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFind
         totalProductsChecked: allProducts.length,
       });
     } catch (err) {
-      console.error("[bike-finder] Cache write failed (table may not exist):", err);
+      console.error("[bike-finder] Cache write failed:", err);
     }
   }
 
