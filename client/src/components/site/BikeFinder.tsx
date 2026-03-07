@@ -147,17 +147,10 @@ export default function BikeFinder() {
     finder.reset();
   }
 
-  function handleSearchBike(bikeName: string) {
-    setResult(null);
-    setFreeText(bikeName);
-    finder.reset();
-    doSearch({ freeText: bikeName });
-  }
-
   const canSubmit = freeText.trim().length >= 3 || (showDropdowns && Boolean(make && model));
 
   if (result) {
-    return <BikeFinderResults result={result} onClear={handleClear} onSearchBike={handleSearchBike} />;
+    return <BikeFinderResults result={result} onClear={handleClear} />;
   }
 
   return (

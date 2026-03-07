@@ -6,7 +6,6 @@ import { storage } from "./storage";
 type NormalizedBike = {
   normalizedKey: string;
   displayName: string;
-  parsedMake?: string;
 };
 
 /** Normalize a string for fuzzy comparison: lowercase, strip spaces/hyphens/dots, remove trailing "cc" */
@@ -16,40 +15,6 @@ function normalizeBikeString(s: string): string {
 
 /** Known makes extracted from BIKE_DATA for regex-based parsing */
 const KNOWN_MAKES = BIKE_DATA.map((b) => b.make);
-
-/** Categories/subcategories whose products work on any motorcycle */
-const UNIVERSAL_CATEGORIES = [
-  "Oils & Fluids",
-  "Chain Maintenance",
-  "Cleaning & Care",
-  "Cleaning Products",
-  "Lubricants",
-  "Tools",
-  "Accessories",
-  "Riding Gear",
-  "Security",
-  "Storage",
-];
-
-const UNIVERSAL_SUBCATEGORIES = [
-  "engine oil",
-  "brake fluid",
-  "chain lube",
-  "chain cleaner",
-  "chain kit",
-  "coolant",
-  "cleaning",
-  "polish",
-  "wax",
-  "tyre",
-  "tire",
-  "puncture",
-  "lock",
-  "cover",
-  "tool",
-  "grease",
-  "spray",
-];
 
 /** Parse free text into make/model/cc/year using regex when AI is unavailable */
 function parseRawBikeText(text: string): { make?: string; model?: string; cc?: string; year?: string; displayName: string } {
@@ -63,7 +28,6 @@ function parseRawBikeText(text: string): { make?: string; model?: string; cc?: s
       make = knownMake;
       break;
     }
-    // Also try with hyphen variations (e.g., "Harley Davidson" vs "Harley-Davidson")
     const normalized = normalizeBikeString(knownMake);
     if (normalizeBikeString(cleaned).startsWith(normalized)) {
       make = knownMake;
@@ -82,7 +46,6 @@ function parseRawBikeText(text: string): { make?: string; model?: string; cc?: s
   // Model = remainder after removing make, year, cc
   let remainder = cleaned;
   if (make) {
-    // Remove make from the beginning (case-insensitive)
     remainder = remainder.replace(new RegExp(`^${make.replace(/[-]/g, "[-\\s]?")}\\s*`, "i"), "");
   }
   if (year) remainder = remainder.replace(year, "").trim();
@@ -91,28 +54,6 @@ function parseRawBikeText(text: string): { make?: string; model?: string; cc?: s
 
   const displayName = cleaned;
   return { make, model, cc, year, displayName };
-}
-
-/** Get products that work on any motorcycle */
-function getUniversalProducts(products: ApiProduct[]): ApiProduct[] {
-  return products.filter((p) => {
-    const catLower = (p.category || "").toLowerCase();
-    const subLower = (p.subcategory || "").toLowerCase();
-    const nameLower = p.name.toLowerCase();
-
-    if (UNIVERSAL_CATEGORIES.some((uc) => catLower === uc.toLowerCase())) return true;
-    if (UNIVERSAL_SUBCATEGORIES.some((us) => subLower.includes(us) || nameLower.includes(us))) return true;
-    // Products explicitly marked as universal
-    if (p.compatibility?.some((c) => /universal|all\s*(bikes|motorcycles)/i.test(c))) return true;
-    return false;
-  });
-}
-
-/** Find suggested similar bikes from BIKE_DATA for a given make */
-function getSuggestedBikes(make: string, limit = 5): string[] {
-  const found = BIKE_DATA.find((b) => b.make.toLowerCase() === make.toLowerCase());
-  if (!found) return [];
-  return found.models.slice(0, limit).map((m) => `${found.make} ${m.model}`);
 }
 
 /**
@@ -131,7 +72,7 @@ export async function normalizeBikeInput(input: BikeFinderInput): Promise<Normal
     if (input.year) parts.push(input.year);
     const displayName = parts.join(" ");
     const normalizedKey = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    return { normalizedKey, displayName, parsedMake: input.make.trim() };
+    return { normalizedKey, displayName };
   }
 
   // For free text, try NVIDIA normalization with timeout
@@ -172,7 +113,7 @@ export async function normalizeBikeInput(input: BikeFinderInput): Promise<Normal
           parsed.displayName ||
           [parsed.make, parsed.model, parsed.cc ? `${parsed.cc}cc` : "", parsed.year].filter(Boolean).join(" ");
         const normalizedKey = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-        return { normalizedKey, displayName, parsedMake: parsed.make };
+        return { normalizedKey, displayName };
       }
     } catch (err) {
       console.error("[bike-finder] NVIDIA normalization failed, using fallback:", err);
@@ -183,44 +124,20 @@ export async function normalizeBikeInput(input: BikeFinderInput): Promise<Normal
   const parsed = parseRawBikeText(rawText);
   const displayName = parsed.displayName;
   const normalizedKey = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  return { normalizedKey, displayName, parsedMake: parsed.make };
+  return { normalizedKey, displayName };
 }
 
 /**
- * Step 2: Check compatibility with multi-tier matching.
- * Returns { exact, family, universal } product ID sets.
+ * Step 2: Check compatibility — AI first, local word-overlap fallback.
+ * Returns a flat list of compatible product IDs.
  */
-export async function checkCompatibilityMultiTier(
+export async function checkCompatibilityBatch(
   displayName: string,
-  parsedMake: string | undefined,
   products: ApiProduct[]
-): Promise<{ exactIds: string[]; familyIds: string[]; universalIds: string[] }> {
-  const bikeNorm = normalizeBikeString(displayName);
-  const bikeLower = displayName.toLowerCase();
-  const bikeWords = bikeLower.split(/\s+/).filter((w) => w.length > 1);
+): Promise<string[]> {
+  const compatibleIds = new Set<string>();
 
-  // Tier 1 - Exact: normalized comparison against compatibility field
-  const exactIds = new Set<string>();
-  for (const p of products) {
-    if (!p.compatibility?.length) continue;
-    for (const c of p.compatibility) {
-      const cNorm = normalizeBikeString(c);
-      // Normalized string contains the bike
-      if (cNorm.includes(bikeNorm) || bikeNorm.includes(cNorm)) {
-        exactIds.add(p.id);
-        break;
-      }
-      // Word-overlap fallback (existing logic)
-      const cLower = c.toLowerCase();
-      const matched = bikeWords.filter((w) => cLower.includes(w));
-      if (matched.length >= Math.min(2, bikeWords.length)) {
-        exactIds.add(p.id);
-        break;
-      }
-    }
-  }
-
-  // Try Perplexity for AI-powered compatibility check with timeout
+  // Try Perplexity AI first — send all products, let AI determine compatibility
   const perplexity = getPerplexityClient();
   if (perplexity && products.length > 0) {
     try {
@@ -236,7 +153,7 @@ export async function checkCompatibilityMultiTier(
         messages: [
           {
             role: "system",
-            content: `You are a motorcycle parts compatibility expert. Given a bike and a list of parts, determine which parts are compatible. Search the web for real compatibility data. Return ONLY a JSON array of compatible product IDs: ["id1","id2",...]. If unsure about a part, DO NOT include it. Be conservative — only include parts you're confident fit.`,
+            content: `You are a motorcycle parts compatibility expert. Given a bike and a list of parts, determine which parts are compatible. Search the web for real compatibility data. Return ONLY a JSON array of compatible product IDs: ["id1","id2",...]. Include all parts that are compatible with or commonly used on this bike. For generic/universal items like oils, filters, cleaning products — include them if they are a standard fit for this bike.`,
           },
           {
             role: "user",
@@ -258,46 +175,51 @@ export async function checkCompatibilityMultiTier(
         const validProductIds = new Set(products.map((p) => p.id));
         for (const id of aiIds) {
           if (validProductIds.has(id)) {
-            exactIds.add(id);
+            compatibleIds.add(id);
           }
         }
       }
+
+      // AI succeeded — return results (may be empty if AI found nothing)
+      if (compatibleIds.size > 0) {
+        return Array.from(compatibleIds);
+      }
     } catch (err) {
-      console.error("[bike-finder] Perplexity compatibility check failed, using local matches only:", err);
+      console.error("[bike-finder] Perplexity compatibility check failed, falling back to local matching:", err);
     }
   }
 
-  // Tier 2 - Family: same make, different model (exclude already exact-matched)
-  const familyIds = new Set<string>();
-  if (parsedMake) {
-    const makeNorm = normalizeBikeString(parsedMake);
-    for (const p of products) {
-      if (exactIds.has(p.id)) continue;
-      if (p.compatibility?.some((c) => normalizeBikeString(c).includes(makeNorm))) {
-        familyIds.add(p.id);
+  // Fallback: local word-overlap matching against compatibility field
+  const bikeNorm = normalizeBikeString(displayName);
+  const bikeLower = displayName.toLowerCase();
+  const bikeWords = bikeLower.split(/\s+/).filter((w) => w.length > 1);
+
+  for (const p of products) {
+    if (!p.compatibility?.length) continue;
+    for (const c of p.compatibility) {
+      const cNorm = normalizeBikeString(c);
+      if (cNorm.includes(bikeNorm) || bikeNorm.includes(cNorm)) {
+        compatibleIds.add(p.id);
+        break;
+      }
+      const cLower = c.toLowerCase();
+      const matched = bikeWords.filter((w) => cLower.includes(w));
+      if (matched.length >= Math.min(2, bikeWords.length)) {
+        compatibleIds.add(p.id);
+        break;
       }
     }
   }
 
-  // Tier 3 - Universal: products that work on any bike
-  const universalProducts = getUniversalProducts(products);
-  const universalIds = universalProducts
-    .filter((p) => !exactIds.has(p.id) && !familyIds.has(p.id))
-    .map((p) => p.id);
-
-  return {
-    exactIds: Array.from(exactIds),
-    familyIds: Array.from(familyIds),
-    universalIds,
-  };
+  return Array.from(compatibleIds);
 }
 
 /**
- * Main orchestrator: normalize → check cache → multi-tier compatibility → never return empty.
+ * Main orchestrator: normalize → check cache → AI/local compatibility → done.
  */
 export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFinderResult> {
   // Step 1: Normalize
-  const { normalizedKey, displayName, parsedMake } = await normalizeBikeInput(input);
+  const { normalizedKey, displayName } = await normalizeBikeInput(input);
 
   // Step 2: Check cache
   const cached = await storage.getBikeCompatibilityCache(normalizedKey);
@@ -308,75 +230,43 @@ export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFind
       .map((id) => productMap.get(id))
       .filter((p): p is ApiProduct => !!p);
 
-    // Even for cached results, ensure we never return empty
     if (compatProducts.length > 0) {
       return {
         normalizedBike: normalizedKey,
         displayName: cached.displayName,
         fromCache: true,
-        matchLevel: "exact",
         categories: groupByCategory(compatProducts),
         totalCompatible: compatProducts.length,
       };
     }
-    // Cache had no products (maybe products were deleted), fall through to re-check
+    // Cache had no products (maybe stale), fall through to re-check
   }
 
-  // Step 3: Get all products and check compatibility with multi-tier matching
+  // Step 3: Get all products and check compatibility
   const allProducts = await storage.listProducts();
-  const { exactIds, familyIds, universalIds } = await checkCompatibilityMultiTier(displayName, parsedMake, allProducts);
+  const compatibleIds = await checkCompatibilityBatch(displayName, allProducts);
 
   const productMap = new Map(allProducts.map((p) => [p.id, p]));
-
-  // Determine match level and build result
-  let matchLevel: BikeFinderResult["matchLevel"];
-  let compatibleIds: string[];
-
-  if (exactIds.length > 0) {
-    matchLevel = "exact";
-    compatibleIds = exactIds;
-  } else if (familyIds.length > 0) {
-    matchLevel = "family";
-    compatibleIds = familyIds;
-  } else if (universalIds.length > 0) {
-    matchLevel = "universal";
-    compatibleIds = [];
-  } else {
-    matchLevel = "none";
-    compatibleIds = [];
-  }
-
-  // Cache the exact matches (not family/universal since those are dynamic)
-  await storage.setBikeCompatibilityCache({
-    normalizedKey,
-    displayName,
-    compatibleProductIds: exactIds,
-    totalProductsChecked: allProducts.length,
-  });
-
   const compatProducts = compatibleIds
     .map((id) => productMap.get(id))
     .filter((p): p is ApiProduct => !!p);
 
-  // Build universal categories (always include for non-exact matches)
-  const universalProducts = universalIds
-    .map((id) => productMap.get(id))
-    .filter((p): p is ApiProduct => !!p);
-  const universalCategories = matchLevel !== "exact" ? groupByCategory(universalProducts) : undefined;
-
-  // Suggested bikes from the same make
-  const suggestedBikes = parsedMake ? getSuggestedBikes(parsedMake) : undefined;
+  // Only cache if we found results — don't cache empty results
+  if (compatibleIds.length > 0) {
+    await storage.setBikeCompatibilityCache({
+      normalizedKey,
+      displayName,
+      compatibleProductIds: compatibleIds,
+      totalProductsChecked: allProducts.length,
+    });
+  }
 
   return {
     normalizedBike: normalizedKey,
     displayName,
     fromCache: false,
-    matchLevel,
     categories: groupByCategory(compatProducts),
     totalCompatible: compatProducts.length,
-    universalCategories: universalCategories?.length ? universalCategories : undefined,
-    totalUniversal: universalProducts.length || undefined,
-    suggestedBikes: suggestedBikes?.length ? suggestedBikes : undefined,
   };
 }
 
