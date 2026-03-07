@@ -9,8 +9,12 @@ export type BikeFinderResult = {
   normalizedBike: string;
   displayName: string;
   fromCache: boolean;
+  matchLevel: "exact" | "family" | "universal" | "none";
   categories: BikeFinderCategory[];
   totalCompatible: number;
+  universalCategories?: BikeFinderCategory[];
+  totalUniversal?: number;
+  suggestedBikes?: string[];
 };
 
 export type BikeFinderInput = {

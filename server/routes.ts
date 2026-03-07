@@ -1292,6 +1292,18 @@ Rules:
   });
 
   // Bike Finder
+  function groupProductsByCategory(products: ApiProduct[]) {
+    const map = new Map<string, ApiProduct[]>();
+    for (const p of products) {
+      const cat = p.category || "Other";
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(p);
+    }
+    return Array.from(map.entries())
+      .map(([name, prods]) => ({ name, products: prods }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   app.post("/api/bike-finder", apiRateLimiter, async (req, res) => {
     const parsed = bikeFinderInputSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -1302,7 +1314,28 @@ Rules:
       return res.json(result);
     } catch (err) {
       console.error("[bike-finder] error:", err);
-      return res.status(500).json({ message: "Bike compatibility check failed" });
+      // Attempt degraded response instead of a 500 error
+      try {
+        const allProducts = await storage.listProducts();
+        const displayName = parsed.data.freeText?.trim() ||
+          [parsed.data.make, parsed.data.model, parsed.data.cc ? `${parsed.data.cc}cc` : "", parsed.data.year].filter(Boolean).join(" ");
+        return res.json({
+          normalizedBike: displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+          displayName,
+          fromCache: false,
+          matchLevel: "none" as const,
+          categories: [],
+          totalCompatible: 0,
+          universalCategories: groupProductsByCategory(allProducts.filter((p) => {
+            const cat = (p.category || "").toLowerCase();
+            return ["oils & fluids", "chain maintenance", "cleaning & care", "cleaning products", "lubricants", "tools", "accessories"].includes(cat);
+          })),
+          totalUniversal: 0,
+          suggestedBikes: [],
+        });
+      } catch {
+        return res.status(500).json({ message: "We're having trouble right now. Please try again in a moment." });
+      }
     }
   });
 

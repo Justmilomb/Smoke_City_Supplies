@@ -349,11 +349,18 @@ export type BikeFinderResult = {
   normalizedBike: string;
   displayName: string;
   fromCache: boolean;
+  matchLevel: "exact" | "family" | "universal" | "none";
   categories: Array<{
     name: string;
     products: ApiProduct[];
   }>;
   totalCompatible: number;
+  universalCategories?: Array<{
+    name: string;
+    products: ApiProduct[];
+  }>;
+  totalUniversal?: number;
+  suggestedBikes?: string[];
 };
 
 export type BikeCompatibilityCacheRow = typeof bikeCompatibilityCache.$inferSelect;
