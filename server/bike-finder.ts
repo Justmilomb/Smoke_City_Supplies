@@ -115,8 +115,8 @@ export async function normalizeBikeInput(input: BikeFinderInput): Promise<Normal
         const normalizedKey = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
         return { normalizedKey, displayName };
       }
-    } catch (err) {
-      console.error("[bike-finder] NVIDIA normalization failed, using fallback:", err);
+    } catch (err: any) {
+      console.error("[bike-finder] NVIDIA normalization failed, using fallback:", err?.message || err);
     }
   }
 
@@ -141,11 +141,9 @@ export async function checkCompatibilityBatch(
   const perplexity = getPerplexityClient();
   if (perplexity && products.length > 0) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
-
+      // Build a concise product list to stay within context limits
       const productList = products
-        .map((p) => `- ID:${p.id} | ${p.name} | ${p.category} | Compatible: ${(p.compatibility ?? []).join(", ") || "none listed"}`)
+        .map((p) => `- ID:${p.id} | ${p.name} | ${p.category}`)
         .join("\n");
 
       const completion = await perplexity.client.chat.completions.create({
@@ -153,7 +151,7 @@ export async function checkCompatibilityBatch(
         messages: [
           {
             role: "system",
-            content: `You are a motorcycle parts compatibility expert. Given a bike and a list of parts, determine which parts are compatible. Search the web for real compatibility data. Return ONLY a JSON array of compatible product IDs: ["id1","id2",...]. Include all parts that are compatible with or commonly used on this bike. For generic/universal items like oils, filters, cleaning products — include them if they are a standard fit for this bike.`,
+            content: `You are a motorcycle parts compatibility expert. Given a bike and a list of parts, determine which parts are compatible. Search the web for real compatibility data — look up the bike's specifications (engine oil type, oil filter, spark plug, chain size, brake pads, etc.) and match against the product list. Return ONLY a valid JSON array of compatible product IDs: ["id1","id2",...]. Include all parts that fit or are commonly used on this bike. For universal items like cleaning products, chain lube, or tools — include them. If you are unsure, include the product. Return an empty array [] only if genuinely nothing fits.`,
           },
           {
             role: "user",
@@ -162,52 +160,58 @@ export async function checkCompatibilityBatch(
         ],
         max_tokens: 2048,
         temperature: 0,
-        web_search_options: { search_context_size: "medium" },
-        signal: controller.signal,
       } as any);
 
-      clearTimeout(timeout);
-
       const content = completion.choices?.[0]?.message?.content?.trim();
+      console.log("[bike-finder] Perplexity response:", content);
       if (content) {
         const arrayMatch = content.match(/\[[\s\S]*\]/);
-        const aiIds: string[] = JSON.parse(arrayMatch ? arrayMatch[0] : content);
-        const validProductIds = new Set(products.map((p) => p.id));
-        for (const id of aiIds) {
-          if (validProductIds.has(id)) {
-            compatibleIds.add(id);
+        if (arrayMatch) {
+          const aiIds: string[] = JSON.parse(arrayMatch[0]);
+          const validProductIds = new Set(products.map((p) => p.id));
+          for (const id of aiIds) {
+            if (validProductIds.has(id)) {
+              compatibleIds.add(id);
+            }
           }
         }
       }
 
-      // AI succeeded — return results (may be empty if AI found nothing)
-      if (compatibleIds.size > 0) {
-        return Array.from(compatibleIds);
-      }
+      // Return AI results (even if empty — AI made a determination)
+      return Array.from(compatibleIds);
     } catch (err) {
       console.error("[bike-finder] Perplexity compatibility check failed, falling back to local matching:", err);
     }
   }
 
-  // Fallback: local word-overlap matching against compatibility field
+  // Fallback: local word-overlap matching against product name, category, and compatibility field
   const bikeNorm = normalizeBikeString(displayName);
   const bikeLower = displayName.toLowerCase();
   const bikeWords = bikeLower.split(/\s+/).filter((w) => w.length > 1);
 
   for (const p of products) {
-    if (!p.compatibility?.length) continue;
-    for (const c of p.compatibility) {
-      const cNorm = normalizeBikeString(c);
-      if (cNorm.includes(bikeNorm) || bikeNorm.includes(cNorm)) {
-        compatibleIds.add(p.id);
-        break;
+    // Check compatibility field
+    if (p.compatibility?.length) {
+      for (const c of p.compatibility) {
+        const cNorm = normalizeBikeString(c);
+        if (cNorm.includes(bikeNorm) || bikeNorm.includes(cNorm)) {
+          compatibleIds.add(p.id);
+          break;
+        }
+        const cLower = c.toLowerCase();
+        const matched = bikeWords.filter((w) => cLower.includes(w));
+        if (matched.length >= Math.min(2, bikeWords.length)) {
+          compatibleIds.add(p.id);
+          break;
+        }
       }
-      const cLower = c.toLowerCase();
-      const matched = bikeWords.filter((w) => cLower.includes(w));
-      if (matched.length >= Math.min(2, bikeWords.length)) {
-        compatibleIds.add(p.id);
-        break;
-      }
+    }
+
+    // Also check product name for bike-specific references
+    const nameLower = p.name.toLowerCase();
+    const nameMatched = bikeWords.filter((w) => nameLower.includes(w));
+    if (nameMatched.length >= Math.min(2, bikeWords.length)) {
+      compatibleIds.add(p.id);
     }
   }
 
@@ -221,25 +225,29 @@ export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFind
   // Step 1: Normalize
   const { normalizedKey, displayName } = await normalizeBikeInput(input);
 
-  // Step 2: Check cache
-  const cached = await storage.getBikeCompatibilityCache(normalizedKey);
-  if (cached) {
-    const allProducts = await storage.listProducts();
-    const productMap = new Map(allProducts.map((p) => [p.id, p]));
-    const compatProducts = cached.compatibleProductIds
-      .map((id) => productMap.get(id))
-      .filter((p): p is ApiProduct => !!p);
+  // Step 2: Check cache (gracefully skip if cache table doesn't exist)
+  try {
+    const cached = await storage.getBikeCompatibilityCache(normalizedKey);
+    if (cached) {
+      const allProducts = await storage.listProducts();
+      const productMap = new Map(allProducts.map((p) => [p.id, p]));
+      const compatProducts = cached.compatibleProductIds
+        .map((id) => productMap.get(id))
+        .filter((p): p is ApiProduct => !!p);
 
-    if (compatProducts.length > 0) {
-      return {
-        normalizedBike: normalizedKey,
-        displayName: cached.displayName,
-        fromCache: true,
-        categories: groupByCategory(compatProducts),
-        totalCompatible: compatProducts.length,
-      };
+      if (compatProducts.length > 0) {
+        return {
+          normalizedBike: normalizedKey,
+          displayName: cached.displayName,
+          fromCache: true,
+          categories: groupByCategory(compatProducts),
+          totalCompatible: compatProducts.length,
+        };
+      }
+      // Cache had no products (maybe stale), fall through to re-check
     }
-    // Cache had no products (maybe stale), fall through to re-check
+  } catch (err) {
+    console.error("[bike-finder] Cache read failed (table may not exist):", err);
   }
 
   // Step 3: Get all products and check compatibility
@@ -253,12 +261,16 @@ export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFind
 
   // Only cache if we found results — don't cache empty results
   if (compatibleIds.length > 0) {
-    await storage.setBikeCompatibilityCache({
-      normalizedKey,
-      displayName,
-      compatibleProductIds: compatibleIds,
-      totalProductsChecked: allProducts.length,
-    });
+    try {
+      await storage.setBikeCompatibilityCache({
+        normalizedKey,
+        displayName,
+        compatibleProductIds: compatibleIds,
+        totalProductsChecked: allProducts.length,
+      });
+    } catch (err) {
+      console.error("[bike-finder] Cache write failed (table may not exist):", err);
+    }
   }
 
   return {

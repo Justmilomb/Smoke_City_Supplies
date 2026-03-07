@@ -1300,8 +1300,8 @@ Rules:
     try {
       const result = await findPartsForBike(parsed.data);
       return res.json(result);
-    } catch (err) {
-      console.error("[bike-finder] error:", err);
+    } catch (err: any) {
+      console.error("[bike-finder] error:", err?.message || err, err?.stack);
       return res.status(500).json({ message: "We're having trouble right now. Please try again in a moment." });
     }
   });
