@@ -1,16 +1,22 @@
+import React from "react";
 import { Link } from "wouter";
-import { Edit3, Minus, Plus, ScanLine, Trash2 } from "lucide-react";
+import { Edit3, Minus, Plus, ScanLine, Trash2, Search, X, CheckSquare, Image, DollarSign, Package } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
-import { useProducts, useDeleteProduct, useUpdateProductQuantity } from "@/lib/products";
+import { useProducts, useDeleteProduct, useUpdateProductQuantity, useBulkUpdateProducts } from "@/lib/products";
 import { getProductImage } from "@/lib/mockData";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
+
+const PAGE_SIZE = 25;
 
 function stockTone(stock: string) {
   if (stock === "in-stock") return "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300";
@@ -23,7 +29,69 @@ export default function AdminParts() {
   const { data: parts = [], isLoading } = useProducts();
   const deleteProduct = useDeleteProduct();
   const updateQuantity = useUpdateProductQuantity();
+  const bulkUpdate = useBulkUpdateProducts();
   const isMobile = useIsMobile();
+
+  // Filters
+  const [search, setSearch] = React.useState("");
+  const [categoryFilter, setCategoryFilter] = React.useState("all");
+  const [stockFilter, setStockFilter] = React.useState("all");
+  const [page, setPage] = React.useState(1);
+
+  // Bulk selection
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = React.useState("");
+  const [bulkValue, setBulkValue] = React.useState("");
+
+  // Derive categories from data
+  const categories = React.useMemo(
+    () => Array.from(new Set(parts.map((p) => p.category).filter(Boolean))).sort(),
+    [parts]
+  );
+
+  // Filter + search
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = [...parts];
+
+    if (categoryFilter !== "all") list = list.filter((p) => p.category === categoryFilter);
+    if (stockFilter !== "all") list = list.filter((p) => p.stock === stockFilter);
+    if (q) {
+      list = list.filter((p) => {
+        const hay = `${p.name} ${p.partNumber ?? ""} ${p.brand ?? ""} ${p.category} ${p.vehicle} ${p.barcode ?? ""}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    return list.sort((a, b) => a.id.localeCompare(b.id));
+  }, [parts, search, categoryFilter, stockFilter]);
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset page when filters change
+  React.useEffect(() => setPage(1), [search, categoryFilter, stockFilter]);
+
+  // Clear selection when filters change
+  React.useEffect(() => setSelected(new Set()), [search, categoryFilter, stockFilter]);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === paginated.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(paginated.map((p) => p.id)));
+    }
+  };
 
   const handleQuantityChange = (id: string, value: number) => {
     if (value < 0) return;
@@ -44,8 +112,44 @@ export default function AdminParts() {
     });
   };
 
-  // Stable sort by ID so order doesn't jump when quantities change
-  const sortedParts = [...parts].sort((a, b) => a.id.localeCompare(b.id));
+  const handleBulkApply = () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) { toast.error("No products selected"); return; }
+
+    if (bulkAction === "sold-out") {
+      bulkUpdate.mutate({ ids, patch: { quantity: 0, stock: "out" } }, {
+        onSuccess: (d) => { toast.success(`${d.updated} products marked sold out`); setSelected(new Set()); setBulkAction(""); },
+        onError: (err) => toast.error(err.message),
+      });
+    } else if (bulkAction === "set-quantity") {
+      const qty = parseInt(bulkValue, 10);
+      if (isNaN(qty) || qty < 0) { toast.error("Enter a valid quantity"); return; }
+      bulkUpdate.mutate({ ids, patch: { quantity: qty } }, {
+        onSuccess: (d) => { toast.success(`${d.updated} products updated to qty ${qty}`); setSelected(new Set()); setBulkAction(""); setBulkValue(""); },
+        onError: (err) => toast.error(err.message),
+      });
+    } else if (bulkAction === "set-price") {
+      const price = parseFloat(bulkValue);
+      if (isNaN(price) || price < 0) { toast.error("Enter a valid price"); return; }
+      bulkUpdate.mutate({ ids, patch: { price } }, {
+        onSuccess: (d) => { toast.success(`${d.updated} products price updated`); setSelected(new Set()); setBulkAction(""); setBulkValue(""); },
+        onError: (err) => toast.error(err.message),
+      });
+    } else if (bulkAction === "set-image") {
+      if (!bulkValue.trim()) { toast.error("Enter an image URL"); return; }
+      bulkUpdate.mutate({ ids, patch: { image: bulkValue.trim() } }, {
+        onSuccess: (d) => { toast.success(`${d.updated} products image updated`); setSelected(new Set()); setBulkAction(""); setBulkValue(""); },
+        onError: (err) => toast.error(err.message),
+      });
+    } else if (bulkAction === "delete") {
+      if (!confirm(`Delete ${ids.length} products? This cannot be undone.`)) return;
+      Promise.all(ids.map((id) => deleteProduct.mutateAsync(id)))
+        .then(() => { toast.success(`${ids.length} products deleted`); setSelected(new Set()); setBulkAction(""); })
+        .catch((err) => toast.error(err.message));
+    } else {
+      toast.error("Select a bulk action first");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -57,15 +161,16 @@ export default function AdminParts() {
 
   return (
     <SiteLayout>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
+        {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-start gap-4 flex-1">
             <div className="flex-1">
               <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
                 Products
               </h1>
-              <p className="mt-2 text-muted-foreground">
-                Manage your catalog and track inventory
+              <p className="mt-1 text-sm text-muted-foreground">
+                {parts.length} total — {filtered.length} shown
               </p>
             </div>
             <BackButton fallback="/admin" />
@@ -90,16 +195,107 @@ export default function AdminParts() {
           </div>
         </div>
 
+        {/* Filters bar */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="All categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={stockFilter} onValueChange={setStockFilter}>
+            <SelectTrigger className="w-full sm:w-36">
+              <SelectValue placeholder="All stock" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All stock</SelectItem>
+              <SelectItem value="in-stock">In Stock</SelectItem>
+              <SelectItem value="low">Low Stock</SelectItem>
+              <SelectItem value="out">Sold Out</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Bulk actions bar */}
+        {selected.size > 0 && (
+          <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center">
+            <span className="text-sm font-medium">
+              <CheckSquare className="mr-1.5 inline h-4 w-4" />
+              {selected.size} selected
+            </span>
+            <Select value={bulkAction} onValueChange={(v) => { setBulkAction(v); setBulkValue(""); }}>
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue placeholder="Bulk action..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sold-out">Mark Sold Out</SelectItem>
+                <SelectItem value="set-quantity">Set Quantity</SelectItem>
+                <SelectItem value="set-price">Set Price</SelectItem>
+                <SelectItem value="set-image">Set Image URL</SelectItem>
+                <SelectItem value="delete">Delete</SelectItem>
+              </SelectContent>
+            </Select>
+            {(bulkAction === "set-quantity" || bulkAction === "set-price" || bulkAction === "set-image") && (
+              <Input
+                placeholder={bulkAction === "set-quantity" ? "Quantity" : bulkAction === "set-price" ? "Price (£)" : "Image URL"}
+                type={bulkAction === "set-image" ? "text" : "number"}
+                value={bulkValue}
+                onChange={(e) => setBulkValue(e.target.value)}
+                className="w-full sm:w-36"
+              />
+            )}
+            <Button
+              size="sm"
+              onClick={handleBulkApply}
+              disabled={!bulkAction || bulkUpdate.isPending}
+            >
+              Apply
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { setSelected(new Set()); setBulkAction(""); setBulkValue(""); }}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+
+        {/* Products table/list */}
         <Card className="border-border/50 overflow-hidden">
           {isMobile ? (
             <div className="divide-y divide-border/60">
-              {sortedParts.map((p) => (
+              {paginated.map((p) => (
                 <div
                   key={p.id}
                   data-testid={`row-admin-part-${p.id}`}
                   className="flex flex-col gap-4 p-5"
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={selected.has(p.id)}
+                      onCheckedChange={() => toggleSelect(p.id)}
+                      className="mt-1"
+                    />
                     <img
                       data-testid={`img-admin-part-${p.id}`}
                       src={getProductImage(p)}
@@ -121,40 +317,31 @@ export default function AdminParts() {
                         <Badge data-testid={`badge-admin-stock-${p.id}`} variant="outline" className={`rounded-md text-xs ${stockTone(p.stock)}`}>
                           {p.stock}
                         </Badge>
-                        {p.barcode ? (
-                          <Badge variant="outline" className="rounded-md text-xs">
-                            Barcode linked
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="rounded-md text-xs text-amber-700">
-                            No barcode
-                          </Badge>
-                        )}
                       </div>
                       <div className="mt-2 text-sm font-medium tabular-nums">£{p.price.toFixed(2)}</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-11 min-h-[44px] w-11 min-w-[44px] rounded-lg touch-manipulation"
-                          onClick={() => handleQuantityChange(p.id, Math.max(0, (p.quantity ?? 0) - 1))}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="min-w-[2rem] text-center text-sm font-medium tabular-nums">
-                          {p.quantity ?? 0}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-11 min-h-[44px] w-11 min-w-[44px] rounded-lg touch-manipulation"
-                          onClick={() => handleQuantityChange(p.id, (p.quantity ?? 0) + 1)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-11 min-h-[44px] w-11 min-w-[44px] rounded-lg touch-manipulation"
+                        onClick={() => handleQuantityChange(p.id, Math.max(0, (p.quantity ?? 0) - 1))}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="min-w-[2rem] text-center text-sm font-medium tabular-nums">
+                        {p.quantity ?? 0}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-11 min-h-[44px] w-11 min-w-[44px] rounded-lg touch-manipulation"
+                        onClick={() => handleQuantityChange(p.id, (p.quantity ?? 0) + 1)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <Link href={`/admin/edit/${p.id}`}>
@@ -190,6 +377,12 @@ export default function AdminParts() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={paginated.length > 0 && selected.size === paginated.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Part</TableHead>
                   <TableHead>Vehicle</TableHead>
                   <TableHead>Category</TableHead>
@@ -201,8 +394,14 @@ export default function AdminParts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedParts.map((p) => (
-                  <TableRow key={p.id} data-testid={`row-admin-part-${p.id}`}>
+                {paginated.map((p) => (
+                  <TableRow key={p.id} data-testid={`row-admin-part-${p.id}`} className={selected.has(p.id) ? "bg-primary/5" : ""}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(p.id)}
+                        onCheckedChange={() => toggleSelect(p.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <img
@@ -290,7 +489,40 @@ export default function AdminParts() {
               </TableBody>
             </Table>
           )}
+
+          {filtered.length === 0 && (
+            <div className="px-8 py-12 text-center text-muted-foreground">
+              No products match your filters.
+            </div>
+          )}
         </Card>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </SiteLayout>
   );

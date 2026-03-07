@@ -321,6 +321,43 @@ export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type CheckoutPrepareInput = z.infer<typeof checkoutPrepareSchema>;
 export type ShippingRatesQuoteInput = z.infer<typeof shippingRatesQuoteSchema>;
 
+// Bike compatibility cache for bike finder feature
+export const bikeCompatibilityCache = pgTable("bike_compatibility_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  normalizedKey: text("normalized_key").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  compatibleProductIds: jsonb("compatible_product_ids").$type<string[]>().notNull(),
+  totalProductsChecked: integer("total_products_checked").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const bikeFinderInputSchema = z.object({
+  make: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+  cc: z.string().optional(),
+  year: z.string().optional(),
+  freeText: z.string().min(3).optional(),
+}).refine((v) => Boolean((v.make && v.model) || v.freeText), {
+  message: "Either select a bike or enter details in free text",
+  path: ["freeText"],
+});
+
+export type BikeFinderInput = z.infer<typeof bikeFinderInputSchema>;
+
+export type BikeFinderResult = {
+  normalizedBike: string;
+  displayName: string;
+  fromCache: boolean;
+  categories: Array<{
+    name: string;
+    products: ApiProduct[];
+  }>;
+  totalCompatible: number;
+};
+
+export type BikeCompatibilityCacheRow = typeof bikeCompatibilityCache.$inferSelect;
+
 export type ApiStoredFile = {
   id: string;
   kind: string;

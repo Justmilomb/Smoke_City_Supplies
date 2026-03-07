@@ -7,6 +7,7 @@ import { useProducts } from "@/lib/products";
 import FiltersBar, { type CatalogFilters } from "@/components/site/FiltersBar";
 import ProductCard from "@/components/site/ProductCard";
 import ProductCardSkeleton from "@/components/site/ProductCardSkeleton";
+import BikeFinder from "@/components/site/BikeFinder";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import type { Part, PartCategory } from "@/lib/mockData";
 
@@ -91,6 +92,9 @@ export default function StoreHome() {
   return (
     <SiteLayout>
       <div className="flex flex-col gap-6">
+        {/* Bike compatibility finder — hero feature */}
+        <BikeFinder />
+
         {/* Local shop banner + trust badges */}
         <div className="rounded-lg border border-border/50 bg-primary/5 px-4 py-3 md:px-6 md:py-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

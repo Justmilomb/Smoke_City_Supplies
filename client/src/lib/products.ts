@@ -143,6 +143,25 @@ export function useUpdateProductQuantity() {
   });
 }
 
+export function useBulkUpdateProducts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, patch }: { ids: string[]; patch: Partial<Part> }) => {
+      const res = await fetch(`${API}/products/bulk`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, patch }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to bulk update");
+      }
+      return res.json() as Promise<{ updated: number; products: Part[] }>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
+  });
+}
+
 export function useDeleteProduct() {
   const qc = useQueryClient();
   return useMutation({

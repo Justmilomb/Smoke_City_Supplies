@@ -22,6 +22,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+function stockFromQuantity(qty: number): "in-stock" | "low" | "out" {
+  if (qty <= 0) return "out";
+  if (qty <= 5) return "low";
+  return "in-stock";
+}
+
 const schema = z.object({
   name: z.string().min(3, "Name is too short"),
   vehicle: z.enum(["motorcycle", "scooter"]),
@@ -29,17 +35,13 @@ const schema = z.object({
   brand: z.string().min(1, "Pick or add a company"),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
   deliveryEta: z.string().min(2, "Add a delivery time"),
-  stock: z.enum(["in-stock", "low", "out"]),
+  quantity: z.coerce.number().int().min(0, "Quantity must be 0 or more"),
   compatibility: z.string().optional(),
   tags: z.string().optional(),
   description: z.string().min(10, "Add a short description"),
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
   metaKeywords: z.string().optional(),
-  shippingWeightGrams: z.coerce.number().int().min(1).optional(),
-  shippingLengthCm: z.coerce.number().int().min(1).optional(),
-  shippingWidthCm: z.coerce.number().int().min(1).optional(),
-  shippingHeightCm: z.coerce.number().int().min(1).optional(),
   barcode: z.string().optional(),
   barcodeFormat: z.string().optional(),
 });
@@ -85,9 +87,6 @@ export default function AdminEditPart() {
     [products, product?.brand, extraBrands]
   );
 
-  // Derive form values from product data — react-hook-form's `values` option
-  // auto-resets the form whenever this changes (e.g. product loads or ID changes).
-  // `keepDirtyValues` preserves any fields the user has already edited.
   const productValues = React.useMemo<FormValues | undefined>(() => {
     if (!product) return undefined;
     return {
@@ -97,19 +96,13 @@ export default function AdminEditPart() {
       brand: product.brand ?? "",
       price: product.price,
       deliveryEta: product.deliveryEta,
-      stock: (["in-stock", "low", "out"].includes(product.stock ?? "")
-        ? product.stock
-        : "in-stock") as "in-stock" | "low" | "out",
+      quantity: product.quantity ?? 0,
       compatibility: product.compatibility?.join(", ") ?? "",
       tags: product.tags?.join(", ") ?? "",
       description: product.description,
       metaTitle: product.metaTitle ?? "",
       metaDescription: product.metaDescription ?? "",
       metaKeywords: product.metaKeywords ?? "",
-      shippingWeightGrams: product.shippingWeightGrams ?? 1000,
-      shippingLengthCm: product.shippingLengthCm ?? 20,
-      shippingWidthCm: product.shippingWidthCm ?? 15,
-      shippingHeightCm: product.shippingHeightCm ?? 10,
       barcode: product.barcode ?? "",
       barcodeFormat: product.barcodeFormat ?? "",
     };
@@ -120,21 +113,17 @@ export default function AdminEditPart() {
     defaultValues: {
       name: "",
       vehicle: "motorcycle",
-      category: cats[0] ?? "Brakes",
+      category: "",
       brand: "",
       price: 0,
       deliveryEta: "Next-day delivery",
-      stock: "in-stock",
+      quantity: 1,
       compatibility: "",
       tags: "",
       description: "",
       metaTitle: "",
       metaDescription: "",
       metaKeywords: "",
-      shippingWeightGrams: 1000,
-      shippingLengthCm: 20,
-      shippingWidthCm: 15,
-      shippingHeightCm: 10,
       barcode: "",
       barcodeFormat: "",
     },
@@ -146,7 +135,6 @@ export default function AdminEditPart() {
     () => Array.from(new Set([...(cats ?? []), product?.category, selectedCategory].filter((v): v is string => Boolean(v)))),
     [cats, product?.category, selectedCategory]
   );
-
 
   React.useEffect(() => {
     if (product) {
@@ -213,10 +201,13 @@ export default function AdminEditPart() {
     }
   };
 
+  const watchedQuantity = form.watch("quantity");
+
   const onSubmit = (v: FormValues) => {
     if (!id) return;
     const vehicle = v.vehicle as VehicleType;
     const category = v.category as PartCategory;
+    const stock = stockFromQuantity(v.quantity);
     updateProduct.mutate(
       {
         id,
@@ -227,7 +218,8 @@ export default function AdminEditPart() {
           brand: v.brand,
           price: v.price,
           deliveryEta: v.deliveryEta,
-          stock: v.stock,
+          stock,
+          quantity: v.quantity,
           compatibility: (v.compatibility ?? "")
             .split(",")
             .map((s) => s.trim())
@@ -242,10 +234,6 @@ export default function AdminEditPart() {
           metaTitle: v.metaTitle || undefined,
           metaDescription: v.metaDescription || undefined,
           metaKeywords: v.metaKeywords || undefined,
-          shippingWeightGrams: v.shippingWeightGrams || undefined,
-          shippingLengthCm: v.shippingLengthCm || undefined,
-          shippingWidthCm: v.shippingWidthCm || undefined,
-          shippingHeightCm: v.shippingHeightCm || undefined,
           barcode: v.barcode || undefined,
           barcodeFormat: v.barcodeFormat || undefined,
         },
@@ -271,7 +259,7 @@ export default function AdminEditPart() {
   if (isLoading) {
     return (
       <SiteLayout>
-        <div className="text-muted-foreground">Loading part…</div>
+        <div className="text-muted-foreground">Loading part...</div>
       </SiteLayout>
     );
   }
@@ -328,7 +316,7 @@ export default function AdminEditPart() {
                     <FormItem>
                       <FormLabel>Part name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., 10×2.5 tire" {...field} className="h-11 rounded-lg" />
+                        <Input placeholder="e.g., 10x2.5 tire" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -407,7 +395,7 @@ export default function AdminEditPart() {
                         disabled={createCategory.isPending}
                         onClick={addCategoryInline}
                       >
-                        {createCategory.isPending ? "Adding…" : "Save category"}
+                        {createCategory.isPending ? "Adding..." : "Save category"}
                       </Button>
                     </div>
                   </div>
@@ -481,60 +469,6 @@ export default function AdminEditPart() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <FormField
                     control={form.control}
-                    name="shippingWeightGrams"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Shipping weight (g)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} step={1} placeholder="1000" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shippingLengthCm"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Parcel length (cm)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} step={1} placeholder="20" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shippingWidthCm"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Parcel width (cm)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} step={1} placeholder="15" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shippingHeightCm"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Parcel height (cm)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} step={1} placeholder="10" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
                     name="barcode"
                     render={({ field }) => (
                       <FormItem>
@@ -574,22 +508,22 @@ export default function AdminEditPart() {
                   />
                   <FormField
                     control={form.control}
-                    name="stock"
+                    name="quantity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Stock</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger className="h-11 rounded-lg">
-                              <SelectValue placeholder="Stock" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="in-stock">In stock</SelectItem>
-                            <SelectItem value="low">Low stock</SelectItem>
-                            <SelectItem value="out">Out of stock</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>
+                          Stock quantity
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            ({stockFromQuantity(watchedQuantity) === "in-stock"
+                              ? "In stock"
+                              : stockFromQuantity(watchedQuantity) === "low"
+                                ? "Low stock"
+                                : "Out of stock"})
+                          </span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input type="number" min={0} step={1} placeholder="1" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -641,7 +575,7 @@ export default function AdminEditPart() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Short, clear description…" {...field} className="min-h-[120px] rounded-lg" />
+                        <Textarea placeholder="Short, clear description..." {...field} className="min-h-[120px] rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -660,7 +594,7 @@ export default function AdminEditPart() {
                       disabled={seoGenerating}
                       className="h-8 text-xs"
                     >
-                      {seoGenerating ? "Generating…" : "Complete SEO"}
+                      {seoGenerating ? "Generating..." : "Complete SEO"}
                     </Button>
                   </div>
                   <FormField
@@ -707,7 +641,7 @@ export default function AdminEditPart() {
                     className="h-11 rounded-lg"
                     disabled={updateProduct.isPending}
                   >
-                    {updateProduct.isPending ? "Saving…" : "Save changes"}
+                    {updateProduct.isPending ? "Saving..." : "Save changes"}
                   </Button>
                   <Button
                     type="button"

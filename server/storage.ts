@@ -5,6 +5,7 @@ import type {
   ApiOrderItem,
   ApiProduct,
   ApiStoredFile,
+  BikeCompatibilityCacheRow,
   Category,
   CheckoutPrepareInput,
   CreateOrderInput,
@@ -15,6 +16,7 @@ import type {
 } from "@shared/schema";
 import {
   barcodes,
+  bikeCompatibilityCache,
   categories as categoriesTable,
   checkoutPrepareSchema,
   createOrderSchema,
@@ -106,6 +108,14 @@ export interface IStorage {
   createCategory(input: InsertCategory): Promise<Category>;
   updateCategory(id: string, patch: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: string): Promise<boolean>;
+
+  getBikeCompatibilityCache(normalizedKey: string): Promise<BikeCompatibilityCacheRow | undefined>;
+  setBikeCompatibilityCache(data: {
+    normalizedKey: string;
+    displayName: string;
+    compatibleProductIds: string[];
+    totalProductsChecked: number;
+  }): Promise<BikeCompatibilityCacheRow>;
 }
 
 function stockFromQuantity(quantity: number): "in-stock" | "low" | "out" {
@@ -1068,6 +1078,43 @@ export class DbStorage implements IStorage {
     await this.getDb().delete(categoriesTable).where(eq(categoriesTable.id, id));
     return true;
   }
+
+  async getBikeCompatibilityCache(normalizedKey: string): Promise<BikeCompatibilityCacheRow | undefined> {
+    const [row] = await this.getDb()
+      .select()
+      .from(bikeCompatibilityCache)
+      .where(eq(bikeCompatibilityCache.normalizedKey, normalizedKey))
+      .limit(1);
+    return row;
+  }
+
+  async setBikeCompatibilityCache(data: {
+    normalizedKey: string;
+    displayName: string;
+    compatibleProductIds: string[];
+    totalProductsChecked: number;
+  }): Promise<BikeCompatibilityCacheRow> {
+    const [row] = await this.getDb()
+      .insert(bikeCompatibilityCache)
+      .values({
+        normalizedKey: data.normalizedKey,
+        displayName: data.displayName,
+        compatibleProductIds: data.compatibleProductIds,
+        totalProductsChecked: data.totalProductsChecked,
+      })
+      .onConflictDoUpdate({
+        target: bikeCompatibilityCache.normalizedKey,
+        set: {
+          displayName: data.displayName,
+          compatibleProductIds: data.compatibleProductIds,
+          totalProductsChecked: data.totalProductsChecked,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    if (!row) throw new Error("Failed to cache bike compatibility");
+    return row;
+  }
 }
 
 // In-memory storage for local dev when DATABASE_URL is not set
@@ -1079,6 +1126,7 @@ export class MemStorage implements IStorage {
   private files = new Map<string, ApiStoredFile>();
   private barcodeMap = new Map<string, ApiBarcode>(); // code -> barcode
   private inventoryTx = new Map<string, ApiInventoryTransaction>();
+  private bikeCache = new Map<string, BikeCompatibilityCacheRow>();
   private fulfillmentScans = new Map<string, Array<{ productId: string; quantity: number; barcodeId?: string; actor: string; createdAt: string }>>();
 
   constructor() {
@@ -1671,6 +1719,30 @@ export class MemStorage implements IStorage {
 
   async deleteCategory(id: string): Promise<boolean> {
     return this.categories.delete(id);
+  }
+
+  async getBikeCompatibilityCache(normalizedKey: string): Promise<BikeCompatibilityCacheRow | undefined> {
+    return this.bikeCache.get(normalizedKey);
+  }
+
+  async setBikeCompatibilityCache(data: {
+    normalizedKey: string;
+    displayName: string;
+    compatibleProductIds: string[];
+    totalProductsChecked: number;
+  }): Promise<BikeCompatibilityCacheRow> {
+    const now = new Date();
+    const row: BikeCompatibilityCacheRow = {
+      id: randomUUID(),
+      normalizedKey: data.normalizedKey,
+      displayName: data.displayName,
+      compatibleProductIds: data.compatibleProductIds,
+      totalProductsChecked: data.totalProductsChecked,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.bikeCache.set(data.normalizedKey, row);
+    return row;
   }
 }
 

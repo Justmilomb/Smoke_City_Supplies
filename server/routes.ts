@@ -37,6 +37,9 @@ import {
 } from "./rateLimit";
 import { stripe, STRIPE_PUBLISHABLE_KEY } from "./stripe";
 import { getAIClient } from "./ai";
+import { findPartsForBike } from "./bike-finder";
+import { bikeFinderInputSchema } from "@shared/schema";
+import { BIKE_DATA } from "@shared/bike-data";
 import { generateProductSeo } from "./seo";
 import {
   buildGoogleMerchantFeedXml,
@@ -394,6 +397,30 @@ ${urls
     writeGoogleMerchantFeedFile("create-product").catch(() => {});
     pingIndexNow(req, [`/product/${product.id}`, "/store", "/sitemap.xml"]);
     return res.status(201).json(product);
+  });
+
+  app.patch("/api/products/bulk", requireAuth, apiRateLimiter, async (req, res) => {
+    const { ids, patch } = req.body as { ids: string[]; patch: Partial<ApiProduct> };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "ids must be a non-empty array" });
+    }
+    if (!patch || typeof patch !== "object") {
+      return res.status(400).json({ message: "patch must be an object" });
+    }
+    const results: ApiProduct[] = [];
+    for (const id of ids) {
+      const existing = await storage.getProduct(id);
+      if (!existing) continue;
+      if (typeof patch.quantity === "number") {
+        const updated = await storage.updateProductQuantity(id, patch.quantity);
+        if (updated) results.push(updated);
+      } else {
+        const updated = await storage.updateProduct(id, patch);
+        if (updated) results.push(updated);
+      }
+    }
+    writeGoogleMerchantFeedFile("bulk-update").catch(() => {});
+    return res.json({ updated: results.length, products: results });
   });
 
   app.patch("/api/products/:id", requireAuth, apiRateLimiter, async (req, res) => {
@@ -1262,6 +1289,25 @@ Rules:
     const html = buildPackingSlipHtml(order);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.send(html);
+  });
+
+  // Bike Finder
+  app.post("/api/bike-finder", apiRateLimiter, async (req, res) => {
+    const parsed = bikeFinderInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid bike input", errors: parsed.error.flatten().fieldErrors });
+    }
+    try {
+      const result = await findPartsForBike(parsed.data);
+      return res.json(result);
+    } catch (err) {
+      console.error("[bike-finder] error:", err);
+      return res.status(500).json({ message: "Bike compatibility check failed" });
+    }
+  });
+
+  app.get("/api/bike-data", (_req, res) => {
+    return res.json(BIKE_DATA);
   });
 
   // Categories

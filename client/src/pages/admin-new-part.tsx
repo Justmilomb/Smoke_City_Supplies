@@ -22,6 +22,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+function stockFromQuantity(qty: number): "in-stock" | "low" | "out" {
+  if (qty <= 0) return "out";
+  if (qty <= 5) return "low";
+  return "in-stock";
+}
+
 const schema = z.object({
   name: z.string().min(3, "Name is too short"),
   vehicle: z.enum(["motorcycle", "scooter"]),
@@ -29,17 +35,13 @@ const schema = z.object({
   brand: z.string().min(1, "Pick or add a company"),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
   deliveryEta: z.string().min(2, "Add a delivery time"),
-  stock: z.enum(["in-stock", "low", "out"]),
+  quantity: z.coerce.number().int().min(0, "Quantity must be 0 or more"),
   compatibility: z.string().optional(),
   tags: z.string().optional(),
   description: z.string().min(10, "Add a short description"),
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
   metaKeywords: z.string().optional(),
-  shippingWeightGrams: z.coerce.number().int().min(1).optional(),
-  shippingLengthCm: z.coerce.number().int().min(1).optional(),
-  shippingWidthCm: z.coerce.number().int().min(1).optional(),
-  shippingHeightCm: z.coerce.number().int().min(1).optional(),
   barcode: z.string().optional(),
   barcodeFormat: z.string().optional(),
 });
@@ -88,21 +90,17 @@ export default function AdminNewPart() {
     defaultValues: {
       name: "",
       vehicle: "motorcycle",
-      category: cats[0] ?? "Brakes",
+      category: "",
       brand: "",
       price: 0,
       deliveryEta: "Next-day delivery",
-      stock: "in-stock",
+      quantity: 1,
       compatibility: "",
       tags: "",
       description: "",
       metaTitle: "",
       metaDescription: "",
       metaKeywords: "",
-      shippingWeightGrams: 1000,
-      shippingLengthCm: 20,
-      shippingWidthCm: 15,
-      shippingHeightCm: 10,
       barcode: "",
       barcodeFormat: "",
     },
@@ -181,9 +179,12 @@ export default function AdminNewPart() {
     }
   };
 
+  const watchedQuantity = form.watch("quantity");
+
   const onSubmit = (v: FormValues) => {
     const vehicle = v.vehicle as VehicleType;
     const category = v.category as PartCategory;
+    const stock = stockFromQuantity(v.quantity);
 
     createProduct.mutate(
       {
@@ -193,9 +194,9 @@ export default function AdminNewPart() {
         brand: v.brand,
         price: v.price,
         rating: 4.6,
-        reviewCount: 12,
-        stock: v.stock,
-        quantity: v.stock === "out" ? 0 : v.stock === "low" ? 3 : 10,
+        reviewCount: 0,
+        stock,
+        quantity: v.quantity,
         deliveryEta: v.deliveryEta,
         compatibility: (v.compatibility ?? "")
           .split(",")
@@ -216,10 +217,6 @@ export default function AdminNewPart() {
         metaTitle: v.metaTitle || undefined,
         metaDescription: v.metaDescription || undefined,
         metaKeywords: v.metaKeywords || undefined,
-        shippingWeightGrams: v.shippingWeightGrams || undefined,
-        shippingLengthCm: v.shippingLengthCm || undefined,
-        shippingWidthCm: v.shippingWidthCm || undefined,
-        shippingHeightCm: v.shippingHeightCm || undefined,
         barcode: v.barcode || undefined,
         barcodeFormat: v.barcodeFormat || undefined,
       },
@@ -238,7 +235,7 @@ export default function AdminNewPart() {
       <SiteLayout>
         <div className="flex flex-col gap-6 max-w-md mx-auto py-12">
           <div className="text-center">
-            <div className="text-4xl mb-4">✓</div>
+            <div className="text-4xl mb-4">&#10003;</div>
             <h1 className="text-2xl font-bold tracking-tight">Product Created!</h1>
             <p className="mt-2 text-muted-foreground">What would you like to do next?</p>
           </div>
@@ -306,7 +303,7 @@ export default function AdminNewPart() {
                     <FormItem>
                       <FormLabel>Part name</FormLabel>
                       <FormControl>
-                        <Input data-testid="input-part-name" placeholder="e.g., 10×2.5 tire, 160mm rotor" {...field} className="h-11 rounded-lg" />
+                        <Input data-testid="input-part-name" placeholder="e.g., 10x2.5 tire, 160mm rotor" {...field} className="h-11 rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -387,7 +384,7 @@ export default function AdminNewPart() {
                         disabled={createCategory.isPending}
                         onClick={addCategoryInline}
                       >
-                        {createCategory.isPending ? "Adding…" : "Save category"}
+                        {createCategory.isPending ? "Adding..." : "Save category"}
                       </Button>
                     </div>
                   </div>
@@ -461,61 +458,6 @@ export default function AdminNewPart() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <FormField
                     control={form.control}
-                    name="shippingWeightGrams"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Shipping weight (g)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} step={1} placeholder="1000" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shippingLengthCm"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Parcel length (cm)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} step={1} placeholder="20" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shippingWidthCm"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Parcel width (cm)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} step={1} placeholder="15" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shippingHeightCm"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Parcel height (cm)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} step={1} placeholder="10" {...field} className="h-11 rounded-lg" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
                     name="barcode"
                     render={({ field }) => (
                       <FormItem>
@@ -558,22 +500,22 @@ export default function AdminNewPart() {
 
                   <FormField
                     control={form.control}
-                    name="stock"
+                    name="quantity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Stock</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-part-stock" className="h-11 rounded-lg">
-                              <SelectValue placeholder="Stock" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem data-testid="option-part-stock-in" value="in-stock">In stock</SelectItem>
-                            <SelectItem data-testid="option-part-stock-low" value="low">Low stock</SelectItem>
-                            <SelectItem data-testid="option-part-stock-out" value="out">Out of stock</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>
+                          Stock quantity
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            ({stockFromQuantity(watchedQuantity) === "in-stock"
+                              ? "In stock"
+                              : stockFromQuantity(watchedQuantity) === "low"
+                                ? "Low stock"
+                                : "Out of stock"})
+                          </span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input data-testid="input-part-quantity" type="number" min={0} step={1} placeholder="1" {...field} className="h-11 rounded-lg" />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -629,7 +571,7 @@ export default function AdminNewPart() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea data-testid="textarea-part-description" placeholder="Short, clear description…" {...field} className="min-h-[120px] rounded-lg" />
+                        <Textarea data-testid="textarea-part-description" placeholder="Short, clear description..." {...field} className="min-h-[120px] rounded-lg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -648,7 +590,7 @@ export default function AdminNewPart() {
                       disabled={seoGenerating}
                       className="h-8 text-xs"
                     >
-                      {seoGenerating ? "Generating…" : "Complete SEO"}
+                      {seoGenerating ? "Generating..." : "Complete SEO"}
                     </Button>
                   </div>
                   <FormField
@@ -696,7 +638,7 @@ export default function AdminNewPart() {
                     className="h-11 rounded-lg"
                     disabled={createProduct.isPending}
                   >
-                    {createProduct.isPending ? "Saving…" : "Save part"}
+                    {createProduct.isPending ? "Saving..." : "Save part"}
                   </Button>
                   <Button
                     data-testid="button-admin-cancel"
