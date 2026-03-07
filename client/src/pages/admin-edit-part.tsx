@@ -73,20 +73,6 @@ export default function AdminEditPart() {
   const [extraBrands, setExtraBrands] = React.useState<string[]>([]);
   const [seoGenerating, setSeoGenerating] = React.useState(false);
 
-  const brandOptions = React.useMemo(
-    () =>
-      Array.from(
-        new Set(
-          [
-            ...products.map((p) => (p.brand || "").trim()),
-            (product?.brand || "").trim(),
-            ...extraBrands,
-          ].filter(Boolean)
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [products, product?.brand, extraBrands]
-  );
-
   const productValues = React.useMemo<FormValues | undefined>(() => {
     if (!product) return undefined;
     return {
@@ -131,9 +117,24 @@ export default function AdminEditPart() {
     resetOptions: { keepDirtyValues: true },
   });
   const selectedCategory = form.watch("category");
+  const selectedBrand = form.watch("brand");
   const categoryOptions = React.useMemo(
-    () => Array.from(new Set([...(cats ?? []), product?.category, selectedCategory].filter((v): v is string => Boolean(v)))),
+    () => Array.from(new Set([...(cats ?? []), product?.category, selectedCategory].filter((v): v is string => Boolean(v)))).sort(),
     [cats, product?.category, selectedCategory]
+  );
+  const brandOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            ...products.map((p) => (p.brand || "").trim()),
+            (product?.brand || "").trim(),
+            ...extraBrands,
+            (selectedBrand || "").trim(),
+          ].filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [products, product?.brand, extraBrands, selectedBrand]
   );
 
   React.useEffect(() => {

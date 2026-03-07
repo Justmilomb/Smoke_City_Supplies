@@ -72,19 +72,6 @@ export default function AdminNewPart() {
   const [extraBrands, setExtraBrands] = React.useState<string[]>([]);
   const [seoGenerating, setSeoGenerating] = React.useState(false);
 
-  const brandOptions = React.useMemo(
-    () =>
-      Array.from(
-        new Set(
-          [
-            ...products.map((p) => (p.brand || "").trim()),
-            ...extraBrands,
-          ].filter(Boolean)
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [products, extraBrands]
-  );
-
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -106,9 +93,23 @@ export default function AdminNewPart() {
     },
   });
   const selectedCategory = form.watch("category");
+  const selectedBrand = form.watch("brand");
   const categoryOptions = React.useMemo(
-    () => Array.from(new Set([...(cats ?? []), selectedCategory].filter(Boolean))),
+    () => Array.from(new Set([...(cats ?? []), selectedCategory].filter(Boolean))).sort(),
     [cats, selectedCategory]
+  );
+  const brandOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            ...products.map((p) => (p.brand || "").trim()),
+            ...extraBrands,
+            (selectedBrand || "").trim(),
+          ].filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [products, extraBrands, selectedBrand]
   );
 
   React.useEffect(() => {
