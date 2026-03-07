@@ -137,13 +137,12 @@ export async function checkCompatibilityBatch(
 ): Promise<string[]> {
   const compatibleIds = new Set<string>();
 
-  // Try Perplexity AI first — send all products, let AI determine compatibility
+  // Ask Perplexity: does each product work with this bike?
   const perplexity = getPerplexityClient();
   if (perplexity && products.length > 0) {
     try {
-      // Build a concise product list to stay within context limits
       const productList = products
-        .map((p) => `- ID:${p.id} | ${p.name} | ${p.category}`)
+        .map((p) => `${p.id}: ${p.name} (${p.category})`)
         .join("\n");
 
       const completion = await perplexity.client.chat.completions.create({
@@ -151,19 +150,30 @@ export async function checkCompatibilityBatch(
         messages: [
           {
             role: "system",
-            content: `You are a motorcycle parts compatibility expert. Given a bike and a list of parts, determine which parts are compatible. Search the web for real compatibility data — look up the bike's specifications (engine oil type, oil filter, spark plug, chain size, brake pads, etc.) and match against the product list. Return ONLY a valid JSON array of compatible product IDs: ["id1","id2",...]. Include all parts that fit or are commonly used on this bike. For universal items like cleaning products, chain lube, or tools — include them. If you are unsure, include the product. Return an empty array [] only if genuinely nothing fits.`,
+            content: `You help match motorcycle parts to bikes. The user will give you a bike and a list of products from a store. For each product, decide: would this product work on / be useful for this bike? Search the web for the bike's specs if needed.
+
+Say YES to:
+- Parts that directly fit (correct oil weight, filter size, tyre size, etc.)
+- Universal parts any bike can use (chain lube, brake fluid, tools, cleaning products, luggage, phone mounts, covers, locks, grips, etc.)
+- Generic consumables (brake pads, oil filters, spark plugs) — these are generic fitments sold to suit many bikes
+
+Only say NO if a part is clearly wrong for this bike (e.g. wrong tyre size, wrong battery voltage).
+
+When in doubt, say YES.
+
+Return ONLY a JSON array of the compatible product IDs. Example: ["id1","id2","id3"]`,
           },
           {
             role: "user",
-            content: `Bike: ${displayName}\n\nProducts:\n${productList}\n\nWhich product IDs are compatible with this bike? Return JSON array only.`,
+            content: `Bike: ${displayName}\n\nProducts:\n${productList}`,
           },
         ],
-        max_tokens: 2048,
+        max_tokens: 4096,
         temperature: 0,
       } as any);
 
       const content = completion.choices?.[0]?.message?.content?.trim();
-      console.log("[bike-finder] Perplexity response:", content);
+      console.log("[bike-finder] Perplexity response:", content?.substring(0, 300));
       if (content) {
         const arrayMatch = content.match(/\[[\s\S]*\]/);
         if (arrayMatch) {
@@ -177,42 +187,15 @@ export async function checkCompatibilityBatch(
         }
       }
 
-      // Return AI results (even if empty — AI made a determination)
       return Array.from(compatibleIds);
-    } catch (err) {
-      console.error("[bike-finder] Perplexity compatibility check failed, falling back to local matching:", err);
+    } catch (err: any) {
+      console.error("[bike-finder] Perplexity failed, falling back to local matching:", err?.message || err);
     }
   }
 
-  // Fallback: local word-overlap matching against product name, category, and compatibility field
-  const bikeNorm = normalizeBikeString(displayName);
-  const bikeLower = displayName.toLowerCase();
-  const bikeWords = bikeLower.split(/\s+/).filter((w) => w.length > 1);
-
+  // Fallback when no AI available: include everything (better than showing nothing)
   for (const p of products) {
-    // Check compatibility field
-    if (p.compatibility?.length) {
-      for (const c of p.compatibility) {
-        const cNorm = normalizeBikeString(c);
-        if (cNorm.includes(bikeNorm) || bikeNorm.includes(cNorm)) {
-          compatibleIds.add(p.id);
-          break;
-        }
-        const cLower = c.toLowerCase();
-        const matched = bikeWords.filter((w) => cLower.includes(w));
-        if (matched.length >= Math.min(2, bikeWords.length)) {
-          compatibleIds.add(p.id);
-          break;
-        }
-      }
-    }
-
-    // Also check product name for bike-specific references
-    const nameLower = p.name.toLowerCase();
-    const nameMatched = bikeWords.filter((w) => nameLower.includes(w));
-    if (nameMatched.length >= Math.min(2, bikeWords.length)) {
-      compatibleIds.add(p.id);
-    }
+    compatibleIds.add(p.id);
   }
 
   return Array.from(compatibleIds);
