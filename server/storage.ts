@@ -116,6 +116,7 @@ export interface IStorage {
     compatibleProductIds: string[];
     totalProductsChecked: number;
   }): Promise<BikeCompatibilityCacheRow>;
+  clearBikeCompatibilityCache(): Promise<void>;
 }
 
 function stockFromQuantity(quantity: number): "in-stock" | "low" | "out" {
@@ -1130,6 +1131,10 @@ export class DbStorage implements IStorage {
     if (!row) throw new Error("Failed to cache bike compatibility");
     return row;
   }
+
+  async clearBikeCompatibilityCache(): Promise<void> {
+    await this.getDb().delete(bikeCompatibilityCache);
+  }
 }
 
 // In-memory storage for local dev when DATABASE_URL is not set
@@ -1758,6 +1763,10 @@ export class MemStorage implements IStorage {
     };
     this.bikeCache.set(data.normalizedKey, row);
     return row;
+  }
+
+  async clearBikeCompatibilityCache(): Promise<void> {
+    this.bikeCache.clear();
   }
 }
 

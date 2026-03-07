@@ -1414,6 +1414,11 @@ Rules:
     }
   });
 
+  app.post("/api/admin/bike-finder/clear-cache", requireAuth, async (_req, res) => {
+    await storage.clearBikeCompatibilityCache();
+    return res.json({ success: true });
+  });
+
   app.get("/api/bike-data", (_req, res) => {
     return res.json(BIKE_DATA);
   });
