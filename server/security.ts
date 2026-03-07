@@ -19,11 +19,11 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   // Content Security Policy - allow Google Fonts, Stripe, and WebSockets
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://unpkg.com https://cdn.jsdelivr.net",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://unpkg.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.google-analytics.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
     "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com",
-    "connect-src 'self' ws: wss: https://api.stripe.com",
+    "connect-src 'self' ws: wss: https://api.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://region1.google-analytics.com",
     "frame-src https://js.stripe.com",
     process.env.NODE_ENV === "production" ? "frame-ancestors 'none'" : "frame-ancestors *",
   ].join("; ");

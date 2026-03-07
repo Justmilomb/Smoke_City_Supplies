@@ -46,7 +46,11 @@ const PROGRESS_STEPS = [
   "Loading results...",
 ];
 
-export default function BikeFinder() {
+type BikeFinderProps = {
+  onResultChange?: (result: BikeFinderResult | null) => void;
+};
+
+export default function BikeFinder({ onResultChange }: BikeFinderProps) {
   const [make, setMake] = React.useState("");
   const [model, setModel] = React.useState("");
   const [cc, setCc] = React.useState("");
@@ -121,7 +125,10 @@ export default function BikeFinder() {
 
   function doSearch(input: BikeFinderInput) {
     finder.mutate(input, {
-      onSuccess: (data) => setResult(data),
+      onSuccess: (data) => {
+        setResult(data);
+        onResultChange?.(data);
+      },
     });
   }
 
@@ -139,6 +146,7 @@ export default function BikeFinder() {
 
   function handleClear() {
     setResult(null);
+    onResultChange?.(null);
     setMake("");
     setModel("");
     setCc("");

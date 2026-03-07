@@ -10,6 +10,7 @@ import ProductCardSkeleton from "@/components/site/ProductCardSkeleton";
 import BikeFinder from "@/components/site/BikeFinder";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import type { Part, PartCategory } from "@/lib/mockData";
+import type { BikeFinderResult } from "@/lib/bike-finder";
 
 const PARTS_PER_PAGE = 24;
 
@@ -60,6 +61,7 @@ export default function StoreHome() {
     inStockOnly: false,
   });
   const [page, setPage] = React.useState(1);
+  const [bikeResult, setBikeResult] = React.useState<BikeFinderResult | null>(null);
 
   const defaultCategories: PartCategory[] = [
     "Brakes", "Engine", "Suspension", "Exhaust", "Electrical",
@@ -93,7 +95,7 @@ export default function StoreHome() {
     <SiteLayout>
       <div className="flex flex-col gap-6">
         {/* Bike compatibility finder — hero feature */}
-        <BikeFinder />
+        <BikeFinder onResultChange={setBikeResult} />
 
         {/* Local shop banner + trust badges */}
         <div className="rounded-lg border border-border/50 bg-primary/5 px-4 py-3 md:px-6 md:py-4">
@@ -123,48 +125,52 @@ export default function StoreHome() {
           </div>
         </div>
 
-        <FiltersBar
-          categories={categoriesList}
-          brands={derivedBrands}
-          compatibilityOptions={compatibilityOptions}
-          value={filters}
-          onChange={setFilters}
-        />
-
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{displayed.length}</span> of {visible.length} parts
-          </p>
-        </div>
-
-        {isLoading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <ProductCardSkeleton key={i} />
-            ))}
-          </div>
-        ) : visible.length === 0 ? (
-          <div className="rounded-lg border border-border/50 bg-muted/30 px-8 py-16 text-center">
-            <p className="text-muted-foreground">No parts found. Try adjusting your filters or search.</p>
-            <p className="mt-2 text-sm text-muted-foreground">Clear filters or try a different search term.</p>
-          </div>
-        ) : (
+        {!bikeResult && (
           <>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {displayed.map((p) => (
-                <ProductCard key={p.id} part={p} />
-              ))}
+            <FiltersBar
+              categories={categoriesList}
+              brands={derivedBrands}
+              compatibilityOptions={compatibilityOptions}
+              value={filters}
+              onChange={setFilters}
+            />
+
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{displayed.length}</span> of {visible.length} parts
+              </p>
             </div>
-            {hasMore && (
-              <div className="flex justify-center pt-4">
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => p + 1)}
-                  className="rounded-lg border border-border bg-background px-6 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                >
-                  Load more
-                </button>
+
+            {isLoading ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
               </div>
+            ) : visible.length === 0 ? (
+              <div className="rounded-lg border border-border/50 bg-muted/30 px-8 py-16 text-center">
+                <p className="text-muted-foreground">No parts found. Try adjusting your filters or search.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Clear filters or try a different search term.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {displayed.map((p) => (
+                    <ProductCard key={p.id} part={p} />
+                  ))}
+                </div>
+                {hasMore && (
+                  <div className="flex justify-center pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => p + 1)}
+                      className="rounded-lg border border-border bg-background px-6 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    >
+                      Load more
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

@@ -27,10 +27,15 @@ export default function BikeFinderResults({ result, onClear }: Props) {
             We couldn't find parts for <span className="font-medium">{result.displayName}</span> in
             our current inventory.
           </p>
-          <Button variant="outline" onClick={onClear} className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Search for another bike
-          </Button>
+          <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+            <Button variant="outline" onClick={onClear} className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Search for another bike
+            </Button>
+            <Button onClick={onClear} className="gap-2">
+              View All Products
+            </Button>
+          </div>
         </div>
       </div>
     );
