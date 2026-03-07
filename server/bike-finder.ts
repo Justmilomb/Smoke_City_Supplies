@@ -1,16 +1,12 @@
 import type { ApiProduct, BikeFinderInput, BikeFinderResult } from "@shared/schema";
 import { BIKE_DATA } from "@shared/bike-data";
-import { getNvidiaClient } from "./ai";
+import { getNvidiaClient, getPerplexityClient } from "./ai";
 import { storage } from "./storage";
 
 type NormalizedBike = {
   normalizedKey: string;
   displayName: string;
 };
-
-function normalizeBikeString(s: string): string {
-  return s.toLowerCase().replace(/[-\s.]/g, "").replace(/cc$/, "");
-}
 
 const KNOWN_MAKES = BIKE_DATA.map((b) => b.make);
 
@@ -68,105 +64,60 @@ export async function normalizeBikeInput(input: BikeFinderInput): Promise<Normal
 }
 
 /**
- * Check each product against the bike using Serper (web search) + NVIDIA (reasoning).
- * For each product, search the web to see if it's compatible, then ask NVIDIA yes/no.
+ * Check a small batch of products against a bike using Perplexity.
+ * Perplexity searches the web for real compatibility data and returns which ones fit.
  */
-
-async function serperSearch(query: string): Promise<string> {
-  const apiKey = process.env.SERPER_API_KEY;
-  if (!apiKey) return "";
-
-  try {
-    const res = await fetch("https://google.serper.dev/search", {
-      method: "POST",
-      headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ q: query, num: 3 }),
-    });
-    if (!res.ok) return "";
-    const data = await res.json() as {
-      organic?: Array<{ title?: string; snippet?: string }>;
-      answerBox?: { answer?: string; snippet?: string };
-    };
-
-    const parts: string[] = [];
-    if (data.answerBox?.answer) parts.push(data.answerBox.answer);
-    if (data.answerBox?.snippet) parts.push(data.answerBox.snippet);
-    for (const r of data.organic ?? []) {
-      if (r.snippet) parts.push(r.snippet);
-    }
-    return parts.join(" ").substring(0, 1500);
-  } catch {
-    return "";
-  }
-}
-
-async function isProductCompatible(
+async function checkBatch(
   bike: string,
-  product: ApiProduct,
-  nvidia: { client: any; model: string },
-): Promise<boolean> {
-  // Search: "Is [product] compatible with [bike]?"
-  const searchQuery = `${product.name} ${product.brand || ""} compatible ${bike}`;
-  const webData = await serperSearch(searchQuery);
+  batch: ApiProduct[],
+  perplexity: { client: any; model: string },
+): Promise<string[]> {
+  const productLines = batch
+    .map((p, i) => `${i + 1}. [${p.id}] ${p.name} — ${p.brand || "generic"} (${p.category})`)
+    .join("\n");
 
-  const completion = await nvidia.client.chat.completions.create({
-    model: nvidia.model,
+  const completion = await perplexity.client.chat.completions.create({
+    model: perplexity.model,
     messages: [
       {
         role: "system",
-        content: `You decide if a motorcycle part is compatible with a bike. You will get the bike name, the product, and web search results. Answer ONLY "yes" or "no".
+        content: `You are a motorcycle parts compatibility checker. The user gives you a bike and a short list of products. For EACH product, search the web and decide: does this product work with this bike?
 
-Say "yes" if:
-- The web results confirm it fits this bike
-- It's a universal part (chain lube, brake fluid, tools, grips, luggage, phone mounts, covers, cleaning products, etc.)
-- It's a generic consumable that could reasonably fit (oil, brake pads, spark plugs, filters)
-- You're not sure — default to "yes"
+Answer "yes" if:
+- Web results confirm it fits or is commonly used on this bike
+- It's a universal part any motorcycle can use (chain lube, brake fluid, tools, grips, luggage, phone mounts, covers, cleaning products, cable ties, etc.)
+- It's a generic consumable in the right category (e.g. organic brake pads fit most bikes, 10W-40 oil suits most engines, DOT 4 brake fluid is universal)
+- You can't find evidence it DOESN'T fit — default to yes
 
-Say "no" ONLY if the web results clearly say it does NOT fit this bike.`,
+Answer "no" ONLY if you find clear evidence it's incompatible (wrong tyre size, wrong battery spec, etc.)
+
+Return ONLY a JSON array of the compatible product IDs. Example: ["abc123","def456"]`,
       },
       {
         role: "user",
-        content: `Bike: ${bike}\nProduct: ${product.name} (${product.category}, ${product.brand || "generic"})\n\nWeb search results:\n${webData || "No results found"}\n\nIs this product compatible? Answer yes or no only.`,
+        content: `Bike: ${bike}\n\nProducts to check:\n${productLines}\n\nWhich product IDs are compatible? JSON array only.`,
       },
     ],
-    max_tokens: 10,
+    max_tokens: 1024,
     temperature: 0,
   } as any);
 
-  const answer = completion.choices?.[0]?.message?.content?.trim().toLowerCase() || "";
-  return answer.startsWith("yes");
-}
+  const content = completion.choices?.[0]?.message?.content?.trim();
+  if (!content) return [];
 
-// Process products in batches to avoid hammering APIs
-async function checkInBatches(
-  bike: string,
-  products: ApiProduct[],
-  nvidia: { client: any; model: string },
-  batchSize: number,
-): Promise<string[]> {
-  const compatibleIds: string[] = [];
+  const arrayMatch = content.match(/\[[\s\S]*\]/);
+  if (!arrayMatch) return [];
 
-  for (let i = 0; i < products.length; i += batchSize) {
-    const batch = products.slice(i, i + batchSize);
-    const results = await Promise.all(
-      batch.map(async (p) => {
-        try {
-          const ok = await isProductCompatible(bike, p, nvidia);
-          console.log(`[bike-finder] ${p.name} -> ${ok ? "YES" : "NO"}`);
-          return ok ? p.id : null;
-        } catch (err: any) {
-          console.error(`[bike-finder] Error checking ${p.name}:`, err?.message);
-          return p.id; // on error, include it
-        }
-      }),
-    );
-    for (const id of results) {
-      if (id) compatibleIds.push(id);
-    }
+  try {
+    const ids: string[] = JSON.parse(arrayMatch[0]);
+    const validIds = new Set(batch.map((p) => p.id));
+    return ids.filter((id) => validIds.has(id));
+  } catch {
+    return [];
   }
-
-  return compatibleIds;
 }
+
+const BATCH_SIZE = 10;
 
 export async function checkCompatibilityBatch(
   displayName: string,
@@ -174,13 +125,29 @@ export async function checkCompatibilityBatch(
 ): Promise<string[]> {
   if (products.length === 0) return [];
 
-  const nvidia = getNvidiaClient();
-  if (!nvidia || !process.env.SERPER_API_KEY) {
-    console.log("[bike-finder] Missing SERPER_API_KEY or NVIDIA — returning all products");
+  const perplexity = getPerplexityClient();
+  if (!perplexity) {
+    console.log("[bike-finder] No Perplexity key — returning all products");
     return products.map((p) => p.id);
   }
 
-  return checkInBatches(displayName, products, nvidia, 5);
+  const compatibleIds: string[] = [];
+
+  // Split products into small batches so Perplexity can properly check each one
+  for (let i = 0; i < products.length; i += BATCH_SIZE) {
+    const batch = products.slice(i, i + BATCH_SIZE);
+    try {
+      const ids = await checkBatch(displayName, batch, perplexity);
+      console.log(`[bike-finder] Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${ids.length}/${batch.length} compatible`);
+      compatibleIds.push(...ids);
+    } catch (err: any) {
+      console.error(`[bike-finder] Batch failed, including all:`, err?.message || err);
+      // On error, include all from this batch rather than losing them
+      compatibleIds.push(...batch.map((p) => p.id));
+    }
+  }
+
+  return compatibleIds;
 }
 
 export async function findPartsForBike(input: BikeFinderInput): Promise<BikeFinderResult> {
