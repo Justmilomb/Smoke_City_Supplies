@@ -320,6 +320,10 @@ export default function BikeFinder({ onResultChange }: BikeFinderProps) {
             {finder.error?.message || "Something went wrong. Please try again."}
           </p>
         )}
+
+        <p className="mt-3 text-xs text-muted-foreground">
+          Results are AI-generated and may not always be accurate. Please verify fitment before purchasing.
+        </p>
       </form>
     </Card>
   );
