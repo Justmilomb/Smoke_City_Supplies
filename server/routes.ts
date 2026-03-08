@@ -566,6 +566,33 @@ ${urls
     }
   });
 
+  // ── eBay Marketplace Account Deletion (compliance) ──────────────────
+  // eBay requires this endpoint to validate your app. It handles both
+  // the GET challenge (verification) and POST notification (account deletion).
+  const EBAY_VERIFICATION_TOKEN = process.env.EBAY_VERIFICATION_TOKEN ?? "";
+
+  app.get("/api/ebay/account-deletion", (req, res) => {
+    const challengeCode = req.query.challenge_code as string | undefined;
+    if (!challengeCode) {
+      return res.status(400).json({ message: "Missing challenge_code" });
+    }
+    // eBay expects SHA-256 hash of: challengeCode + verificationToken + endpoint
+    const crypto = require("crypto") as typeof import("crypto");
+    const endpoint = `${process.env.PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/ebay/account-deletion`;
+    const hash = crypto
+      .createHash("sha256")
+      .update(challengeCode + EBAY_VERIFICATION_TOKEN + endpoint)
+      .digest("hex");
+    return res.status(200).json({ challengeResponse: hash });
+  });
+
+  app.post("/api/ebay/account-deletion", (req, res) => {
+    // Log the deletion notification — no user data to delete since we don't
+    // store eBay buyer accounts, but we acknowledge receipt.
+    console.log("[ebay] Marketplace account deletion notification received:", JSON.stringify(req.body));
+    return res.sendStatus(200);
+  });
+
   // Barcode + inventory admin workflows
   app.post("/api/admin/barcodes/resolve", requireAuth, apiRateLimiter, async (req, res) => {
     const parsed = barcodeResolveSchema.safeParse(req.body);
