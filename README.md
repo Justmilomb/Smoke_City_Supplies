@@ -1,175 +1,164 @@
 # Smoke City Supplies
 
-E-commerce site for motorcycle and scooter parts, run by Karl. Bringing back old-fashioned service with real human care and expertise.
+Smoke City Supplies is an e-commerce site for motorcycle and scooter parts, built to support a real family-run bike shop with practical tools for day-to-day sales and operations.
 
-## Features
+## Project Story
 
-- **Stripe Payment Integration** - Secure checkout with credit/debit cards
-- **Webhook-Confirmed Orders** - Orders are finalized by Stripe webhooks for safer stock handling
-- **Product Catalog** - Comprehensive filtering and search
-- **Admin Panel** - Full CRUD for products, orders, categories
-- **Barcode Inventory Tools** - Admin can link/scan barcodes for stock-in workflows (mobile-first)
-- **Invoice + Shipping Ops** - Automatic invoice email pipeline and manual shipping label generation
-- **Live UK Shipping Rates** - Checkout uses fixed Royal Mail rates and includes shipping in Stripe total
-- **Security** - Rate limiting, input sanitization, CSRF protection
-- **Brand Story** - Personal touch throughout the customer journey
+Hey, I'm Milo. I built this website to help my grandad sell parts from his bike shop online.
 
-## Local development (Mac)
+At the same time, I was also building my social media giveaway tool, [Giveaway Engine](https://github.com/Justmilomb/Giveaway-Engine), so this project became a hands-on learning experience in parallel.
 
-You can run the app locally **without** PostgreSQL. The server uses in-memory storage and in-memory sessions when `DATABASE_URL` is not set.
+This site is less "vibe-coded" than my other project and not as visually polished, but it taught me a lot. My workflow was using Codex for smaller, focused tasks and Claude Code for larger chunks of work. The most rewarding part was vibe-coding this with my grandad while still trying to keep the site safe, reliable, and usable for a real business.
 
-**Quick start (no database):**
+## Overview
+
+The platform combines a customer-facing storefront with an admin panel for catalog and order management.
+
+- Stripe checkout with webhook-confirmed payment state
+- Product catalog with filtering and search
+- Admin CRUD for products, orders, and categories
+- Barcode-assisted inventory workflows (mobile-first)
+- Invoice emailing and manual shipping label workflow
+- Royal Mail manual shipping mode with fixed service rates
+- SEO and feed endpoints (`sitemap.xml`, `robots.txt`, `llms.txt`, Google Merchant feed)
+- Security middleware (headers, CSRF, rate limiting, input hardening)
+
+## Tech Stack
+
+- Frontend: React + Vite + TypeScript
+- Backend: Express + TypeScript
+- Database ORM: Drizzle
+- Payments: Stripe
+- Email: Resend
+- Runtime: Node.js 20+
+
+## Repository Layout
+
+- `client/` - React application (Vite root)
+- `server/` - Express API, auth, checkout, admin routes
+- `shared/` - Shared TypeScript modules (including schema)
+- `script/` - Build tooling
+- `dist/` - Production build output (generated)
+- `uploads/` - Local upload storage (ephemeral in many environments)
+- `docs/ARCHITECTURE.md` - Request flow and codebase architecture
+
+## Local Development
+
+You can run locally without PostgreSQL. If `DATABASE_URL` is not set, the app uses in-memory storage and sessions.
+
+### Quick Start (No Database)
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open **http://localhost:3000** in your browser. The dev server serves both the API and the frontend with hot reload.
+Open `http://localhost:3000`.
 
-- **Port:** 3000 by default locally. If the port is in use, run `PORT=3001 npm run dev` (or another free port).
-- **Replit:** defaults to port 5000 (Replit sets `REPL_ID`).
-- **Admin login:** username `admin`, password `admin` (change in production)
-- **Data:** In-memory (resets when you stop the server). Set `DATABASE_URL` if you want a local PostgreSQL database.
-- **Seed behavior:** In development, startup seeding runs automatically to ensure sample catalog data exists.
+Port behavior:
+- Local default: `3000`
+- Replit default (when `REPL_ID` is present): `5000`
+- Override: set `PORT`
 
-**With a local PostgreSQL database (optional):**
+Default local admin credentials:
+- Username: `admin`
+- Password: `admin`
 
-1. Set `DATABASE_URL` (e.g. `postgresql://user:pass@localhost:5432/smoke_city`) and optionally `SESSION_SECRET`, `ADMIN_PASSWORD`.
-2. `npm install && npm run db:push && npm run dev`
+### Optional: Run With Local PostgreSQL
 
-## Render Deployment
-
-This project is configured for deployment on Render.
-
-### Quick Deploy
-
-1. Push this repository to GitHub
-2. In Render dashboard, create a new **Web Service**
-3. Connect your GitHub repository
-4. Render will detect `render.yaml` and configure automatically
-
-### Manual Configuration (if not using render.yaml)
-
-**Build Command:**
 ```bash
-npm install && npm run build && npm run db:push
+npm install
+npm run db:push
+npm run dev
 ```
 
-**Start Command:**
-```bash
-npm run start
-```
+Required for this mode:
+- `DATABASE_URL` (for example: `postgresql://user:pass@localhost:5432/smoke_city`)
 
-**Environment Variables:**
-- `DATABASE_URL` - Optional for temporary/free deployments. Recommended for persistent PostgreSQL storage.
-- `SESSION_SECRET` - Generate with: `openssl rand -base64 32`
-- `NODE_ENV` - Set to `production` (auto-set by Render)
-- `ADMIN_PASSWORD` - (Optional) Override default admin password
-- `SEED_PARTS_ON_STARTUP` - Optional. Set to `true` only if you want to auto-seed products on every boot
-- `STRIPE_SECRET_KEY` - Your Stripe secret key (required for payments)
-- `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key (required for payments)
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (required for payment confirmation)
-- `RESEND_API_KEY` - API key for invoice emails (optional locally, recommended production)
-- `INVOICE_FROM_EMAIL` - Sender address for invoices (e.g. billing@yourdomain.com)
-- `INVOICE_REPLY_TO` - Reply address customers use when replying to invoice emails (defaults to `smokecitycycles@gmail.com`)
-- `ADMIN_ORDER_ALERT_EMAIL` - Admin alert recipient for new paid orders (default `support@smokecitysupplies.com`)
-- `ROYAL_MAIL_LABEL_URL` - Royal Mail business portal URL for manual label purchase/printing
-- `ROYAL_MAIL_NEXT_DAY_GUARANTEED_PENCE` - Flat shipping price for Next Day Guaranteed (default `1000`)
-- `ROYAL_MAIL_NEXT_DAY_AIM_PENCE` - Flat shipping price for Next Day Aim (default `500`)
-- `SHIP_FROM_NAME` - Sender name for shipping labels
-- `SHIP_FROM_ADDRESS_LINE1` - Sender street for shipping labels
-- `SHIP_FROM_ADDRESS_LINE2` - Sender address line 2
-- `SHIP_FROM_CITY` - Sender city for shipping labels
-- `SHIP_FROM_COUNTY` - Sender county for shipping labels
-- `SHIP_FROM_POSTCODE` - Sender postcode for shipping labels
-- `SHIP_FROM_COUNTRY` - Sender country code (default `GB`)
-- `PUBLIC_BASE_URL` - Public site URL used when generating product links in the Merchant feed file
-
-**PostgreSQL Database:**
-- Create a PostgreSQL database in Render
-- The connection string will be automatically set as `DATABASE_URL`
-- SSL is automatically configured for production
-
-**Important Notes:**
-- The server binds to `0.0.0.0` and uses the `PORT` environment variable (set by Render)
-- If `DATABASE_URL` is not set, the app uses in-memory storage in production. Admin/products/orders will reset on restart/redeploy.
-- Product auto-seeding is disabled by default in production. Use `SEED_PARTS_ON_STARTUP=true` only when you intentionally want to seed.
-- Uploaded images/invoices/labels are stored in PostgreSQL and served via `/api/files/:id`.
+Recommended:
+- `SESSION_SECRET`
+- `ADMIN_PASSWORD`
 
 ## Scripts
 
-- `npm run dev` — development server (port 3000)
-- `npm run build` — build client and server
-- `npm run start` — production server
-- `npm run db:push` — push schema to database (skips if DATABASE_URL not set)
+- `npm run dev` - Start dev server
+- `npm run dev:client` - Start Vite client dev server on port `3000`
+- `npm run build` - Build client and server into `dist/`
+- `npm run start` - Run production server from `dist/index.cjs`
+- `npm run check` - TypeScript check
+- `npm run db:push` - Push Drizzle schema (skips if `DATABASE_URL` is not set)
+- `npm run seed:parts` - Seed parts data
 
-## Checkout + Order Lifecycle
+## Environment Variables
 
-- Frontend calls `POST /api/checkout/prepare` to create the pending order + Stripe PaymentIntent.
-- Frontend fetches live shipping options from `POST /api/shipping/rates`, then submits selected rate to `POST /api/checkout/prepare`.
-- Stripe webhook `POST /api/stripe/webhook` is the source of truth for marking payment success/failure.
-- On `payment_intent.succeeded`, stock is deducted once, and invoice dispatch is triggered.
-- On successful payment, customer confirmation and admin order-alert emails are sent (Resend).
-- Admin order actions include:
-  - resend invoice (`/api/admin/orders/:id/invoice/resend`)
-  - generate shipping label (`/api/admin/orders/:id/shipping-label`)
-  - print packing slip (`/api/admin/orders/:id/packing-slip`)
+Core:
+- `DATABASE_URL` - PostgreSQL connection string (optional locally, recommended for persistent production data)
+- `SESSION_SECRET` - Session signing secret
+- `ADMIN_PASSWORD` - Override default admin password
+- `NODE_ENV` - `development` or `production`
+- `PORT` - Server port (set externally on most platforms)
+- `PUBLIC_BASE_URL` - Canonical public URL used for URL generation and SEO consistency
 
-## Royal Mail Manual Mode
+Payments:
+- `STRIPE_SECRET_KEY`
+- `STRIPE_PUBLISHABLE_KEY`
+- `STRIPE_WEBHOOK_SECRET`
 
-- Shipping is Royal Mail manual mode with two fixed checkout services:
-  - Tracked 48 (Two Day Delivery Aim) (`£4`)
-  - Next Day Guaranteed (`£10`)
-  - Next Day Aim (`£5`)
-- Admin can run `POST /api/admin/test/shipping` (or click **Test Shipping**) to verify the manual Royal Mail payload flow.
-- Admin uses the Royal Mail website to buy/print labels from the order details.
-- Delivery commitments are subject to Royal Mail terms and conditions.
+Email and order ops:
+- `RESEND_API_KEY`
+- `INVOICE_FROM_EMAIL`
+- `INVOICE_REPLY_TO`
+- `ADMIN_ORDER_ALERT_EMAIL`
 
-## Google Merchant File Feed (Automatic Updates)
+Shipping (Royal Mail manual mode):
+- `ROYAL_MAIL_LABEL_URL`
+- `ROYAL_MAIL_NEXT_DAY_GUARANTEED_PENCE`
+- `ROYAL_MAIL_NEXT_DAY_AIM_PENCE`
+- `SHIP_FROM_NAME`
+- `SHIP_FROM_ADDRESS_LINE1`
+- `SHIP_FROM_ADDRESS_LINE2`
+- `SHIP_FROM_CITY`
+- `SHIP_FROM_COUNTY`
+- `SHIP_FROM_POSTCODE`
+- `SHIP_FROM_COUNTRY`
 
-Use Merchant Center's **Add products from a file** and provide this feed URL:
+Seeding:
+- `SEED_PARTS_ON_STARTUP` - Use with care in production
 
-- `https://<your-domain>/uploads/google-merchant.xml`
-- Local test URL: `http://localhost:3000/uploads/google-merchant.xml`
+## Checkout and Order Lifecycle
 
-Recommended Merchant Center setup:
-1. Products -> Data sources -> **Add products from file**
-2. Choose **Enter a link to your file**
-3. Paste your feed URL
-4. Set schedule to **every 24 hours at 00:00**
+- Client creates checkout intent via `POST /api/checkout/prepare`
+- Client fetches shipping options via `POST /api/shipping/rates`
+- Stripe webhook `POST /api/stripe/webhook` is the source of truth for payment success/failure
+- On successful payment: stock is deducted once, invoices and notifications are triggered
+- Admin can resend invoices and generate shipping/packing documents from order actions
 
-How updates work:
-- Feed file is written automatically at server startup.
-- Feed file rewrites every 24 hours automatically.
-- Feed file is also rewritten when admin creates/updates/deletes a product.
-- Fallback live endpoint is available at `https://<your-domain>/feeds/google-merchant.xml`.
+## SEO and Feeds
 
-If your live feed has only a few products, your production database currently has only those products. Seeded demo products in this repo are not automatically enabled in production unless `SEED_PARTS_ON_STARTUP=true`.
+The app exposes:
+- `GET /sitemap.xml`
+- `GET /robots.txt`
+- `GET /llms.txt`
+- Google Merchant feed at `/uploads/google-merchant.xml`
+- Fallback merchant endpoint at `/feeds/google-merchant.xml`
 
-## Search Indexing + SEO (Google, Bing, AI Crawlers)
+## Deployment (Render)
 
-The app exposes SEO crawl files and endpoints:
+This repo includes `render.yaml` for Render deployment.
 
-- `GET /sitemap.xml` - includes all public pages plus every product page from the database
-- `GET /robots.txt` - allows crawling, blocks admin/cart/internal API, allows product images at `/api/files/`
-- `GET /llms.txt` - high-level map for AI crawlers and tools
+Typical commands:
 
-Automatic refresh behavior:
+```bash
+npm install && npm run build && npm run db:push
+npm run start
+```
 
-- Product create/update/delete triggers:
-  - Google Merchant feed rewrite
-  - IndexNow ping (Bing and supporting engines)
-- Search engines still recrawl on their own schedules.
+Notes:
+- Server binds to `0.0.0.0` and uses `PORT`
+- Without `DATABASE_URL`, production data is in-memory and resets on restart
+- Uploaded assets and generated docs are stored and served by backend storage routes
 
-Recommended manual submission (best results):
+## Additional Documentation
 
-1. Google Search Console
-2. Bing Webmaster Tools
-3. Submit `https://<your-domain>/sitemap.xml`
-4. Re-submit sitemap after large catalog imports/migrations
-
-Note on AI-generated product SEO:
-
-- Admin "Generate SEO" writes `metaTitle`, `metaDescription`, `metaKeywords` to each product.
-- Product pages use these values in page `<title>`, meta tags, OpenGraph/Twitter tags, and Product JSON-LD.
+- [Architecture](docs/ARCHITECTURE.md)
+- [Replit Notes](replit.md)
