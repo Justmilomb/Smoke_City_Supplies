@@ -500,6 +500,39 @@ ${urls
     }
   });
 
+  // Fetch eBay business policy IDs (so you can put them in .env)
+  app.get("/api/admin/ebay/policies", requireAuth, async (_req, res) => {
+    if (!isEbayConfigured()) {
+      return res.status(400).json({ message: "eBay not configured" });
+    }
+    try {
+      const token = await getEbayAccessToken();
+      const types = ["PAYMENT", "RETURN_POLICY", "FULFILLMENT"] as const;
+      const results: Record<string, Array<{ id: string; name: string }>> = {};
+      for (const type of types) {
+        const r = await fetch(
+          `https://api.ebay.com/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_GB`.replace(
+            "fulfillment_policy",
+            type === "PAYMENT" ? "payment_policy" : type === "RETURN_POLICY" ? "return_policy" : "fulfillment_policy"
+          ),
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (r.ok) {
+          const data = (await r.json()) as { [key: string]: Array<{ [key: string]: string; name: string }> };
+          const key = Object.keys(data).find((k) => Array.isArray(data[k])) ?? "";
+          results[type] = (data[key] || []).map((p: Record<string, string>) => ({
+            id: p.paymentPolicyId || p.returnPolicyId || p.fulfillmentPolicyId || "",
+            name: p.name || "",
+          }));
+        }
+      }
+      return res.json(results);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ message: msg });
+    }
+  });
+
   app.post("/api/admin/ebay/sync/:id", requireAuth, apiRateLimiter, async (req, res) => {
     if (!isEbayConfigured()) {
       return res.status(400).json({ message: "eBay not configured" });
