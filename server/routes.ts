@@ -485,6 +485,52 @@ ${urls
     return res.status(204).send();
   });
 
+  // ── Admin Dashboard Stats ─────────────────────────────────────────────
+
+  app.get("/api/admin/dashboard-stats", requireAuth, async (_req, res) => {
+    try {
+      const products = await storage.listProducts();
+      const orders = await storage.listOrders();
+
+      const totalProducts = products.length;
+      const lowStockCount = products.filter((p) => p.stock === "low").length;
+      const outOfStockCount = products.filter((p) => p.stock === "out").length;
+
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const paidOrders = orders.filter((o) => o.paymentStatus === "paid");
+      const recentOrderCount = paidOrders.filter(
+        (o) => o.createdAt && new Date(o.createdAt) >= sevenDaysAgo
+      ).length;
+      const monthOrders = paidOrders.filter(
+        (o) => o.createdAt && new Date(o.createdAt) >= startOfMonth
+      );
+      const revenueThisMonth = monthOrders.reduce(
+        (sum, o) => sum + (o.totalPence ?? 0),
+        0
+      ) / 100;
+
+      const ebayListedCount = products.filter((p) => p.ebayListingId).length;
+      const ebaySyncErrors = products.filter((p) => p.ebaySyncStatus === "error").length;
+
+      return res.json({
+        totalProducts,
+        lowStockCount,
+        outOfStockCount,
+        totalOrders: paidOrders.length,
+        recentOrderCount,
+        revenueThisMonth,
+        ebayListedCount,
+        ebaySyncErrors,
+      });
+    } catch (err) {
+      console.error("[dashboard-stats] error:", err);
+      return res.status(500).json({ message: "Failed to load dashboard stats" });
+    }
+  });
+
   // ── eBay Sync Routes ──────────────────────────────────────────────────
 
   app.get("/api/admin/ebay/status", requireAuth, async (_req, res) => {
@@ -830,6 +876,72 @@ Rules:
     } catch (err) {
       console.error("[generate-seo] error:", err);
       const message = err instanceof Error ? err.message : "SEO generation failed";
+      return res.status(500).json({ message });
+    }
+  });
+
+  // AI product detail generation — fills description, tags, compatibility in one shot
+  app.post("/api/generate-product-details", requireAuth, apiRateLimiter, async (req, res) => {
+    const { name, brand, category, vehicle } = req.body as {
+      name?: string;
+      brand?: string;
+      category?: string;
+      vehicle?: string;
+    };
+    if (!name || typeof name !== "string" || name.trim().length < 2) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    try {
+      const { client, model } = getAIClient();
+
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: `You are a product copywriter for Smoke City Supplies, a UK motorcycle and scooter parts shop run by Karl. Write in a friendly, knowledgeable tone. Respond ONLY with valid JSON in this exact format, nothing else:
+{"description":"...","tags":"...","compatibility":"..."}
+
+Rules:
+- description: 2-3 sentences, practical and helpful, mention key benefits. UK English.
+- tags: 4-6 comma-separated tags relevant to the product (e.g. "Popular, Fast shipping, OEM quality")
+- compatibility: 3-5 compatible bike models with year ranges, comma-separated (e.g. "Honda CBR600RR (2007-2024), Yamaha R6 (2006-2020)"). If you cannot determine compatibility from the product name, return an empty string.`,
+          },
+          {
+            role: "user",
+            content: [
+              `Product: ${name.trim()}`,
+              brand ? `Brand: ${brand}` : "",
+              category ? `Category: ${category}` : "",
+              vehicle ? `Vehicle type: ${vehicle}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
+
+      const content = completion.choices?.[0]?.message?.content ?? "";
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content) as {
+        description?: string;
+        tags?: string;
+        compatibility?: string;
+      };
+
+      return res.json({
+        description: (parsed.description ?? "").slice(0, 1000),
+        tags: (parsed.tags ?? "").slice(0, 500),
+        compatibility: (parsed.compatibility ?? "").slice(0, 500),
+      });
+    } catch (err) {
+      console.error("[generate-product-details] error:", err);
+      const message = err instanceof Error ? err.message : "Product detail generation failed";
       return res.status(500).json({ message });
     }
   });
