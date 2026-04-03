@@ -49,18 +49,18 @@ export async function getEbayAccessToken(): Promise<string> {
     `${EBAY_CLIENT_ID()}:${EBAY_CLIENT_SECRET()}`
   ).toString("base64");
 
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: EBAY_REFRESH_TOKEN(),
+  });
+
   const res = await fetch(`${authBaseUrl()}/identity/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: EBAY_REFRESH_TOKEN(),
-      scope:
-        "https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment",
-    }),
+    body,
   });
 
   if (!res.ok) {
