@@ -102,8 +102,18 @@ export default function AdminEbay() {
                     <p>Environment: <strong>{status.environment}</strong></p>
                     <p>Auth URL: <strong>{status.authUrl}</strong></p>
                     <p>Client ID: <strong>{status.clientIdPrefix}</strong></p>
-                    <p>Refresh Token Length: <strong>{status.refreshTokenLength}</strong></p>
-                    <p>Refresh Token Start: <strong>{status.refreshTokenPrefix}</strong></p>
+                    <p>Client Secret: <strong>{status.clientSecretPrefix}</strong> ({status.clientSecretLength} chars)</p>
+                    <p>Refresh Token: <strong>{status.refreshTokenPrefix}</strong> ({status.refreshTokenLength} chars)</p>
+                    {status.clientCredentialsTest && (
+                      <p className={String(status.clientCredentialsTest).startsWith("PASS") ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}>
+                        Credentials Test: <strong>{String(status.clientCredentialsTest)}</strong>
+                      </p>
+                    )}
+                    {status.refreshTokenTest && (
+                      <p className="text-rose-700 dark:text-rose-400">
+                        Refresh Token Test: <strong>{String(status.refreshTokenTest)}</strong>
+                      </p>
+                    )}
                   </div>
                 )}
                 <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2">

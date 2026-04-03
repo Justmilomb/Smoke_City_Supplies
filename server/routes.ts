@@ -536,22 +536,56 @@ ${urls
   app.get("/api/admin/ebay/status", requireAuth, async (_req, res) => {
     const env = process.env.EBAY_ENVIRONMENT ?? "production";
     const clientId = (process.env.EBAY_CLIENT_ID ?? "").trim();
+    const clientSecret = (process.env.EBAY_CLIENT_SECRET ?? "").trim();
     const refreshToken = (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
-    const debug = {
+    const authUrl = env === "production" ? "https://api.ebay.com" : "https://api.sandbox.ebay.com";
+
+    const debug: Record<string, unknown> = {
       environment: env,
-      clientIdPrefix: clientId.slice(0, 12) + "...",
+      clientIdPrefix: clientId.slice(0, 24) + "...",
+      clientSecretPrefix: clientSecret.slice(0, 8) + "...",
+      clientSecretLength: clientSecret.length,
       refreshTokenLength: refreshToken.length,
       refreshTokenPrefix: refreshToken.slice(0, 8) + "...",
-      authUrl: env === "production" ? "api.ebay.com" : "api.sandbox.ebay.com",
+      authUrl,
     };
+
     if (!isEbayConfigured()) {
       return res.json({ connected: false, reason: "eBay credentials not configured", ...debug });
     }
+
+    // Step 1: Test client credentials alone (no refresh token needed)
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    try {
+      const ccRes = await fetch(`${authUrl}/identity/v1/oauth2/token`, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${credentials}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          grant_type: "client_credentials",
+          scope: "https://api.ebay.com/oauth/api_scope",
+        }),
+      });
+      if (ccRes.ok) {
+        debug.clientCredentialsTest = "PASS — Client ID + Secret are valid";
+      } else {
+        const text = await ccRes.text();
+        debug.clientCredentialsTest = `FAIL (${ccRes.status}): ${text}`;
+        return res.json({ connected: false, reason: "Client ID or Secret is invalid", ...debug });
+      }
+    } catch (err) {
+      debug.clientCredentialsTest = `ERROR: ${err instanceof Error ? err.message : String(err)}`;
+    }
+
+    // Step 2: Test refresh token
     try {
       await getEbayAccessToken();
       return res.json({ connected: true, ...debug });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      debug.refreshTokenTest = `FAIL: ${msg}`;
       return res.json({ connected: false, reason: msg, ...debug });
     }
   });

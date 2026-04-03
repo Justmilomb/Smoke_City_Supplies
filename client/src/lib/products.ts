@@ -208,9 +208,13 @@ export function useEbayStatus() {
         reason?: string;
         environment?: string;
         clientIdPrefix?: string;
+        clientSecretPrefix?: string;
+        clientSecretLength?: number;
         refreshTokenLength?: number;
         refreshTokenPrefix?: string;
         authUrl?: string;
+        clientCredentialsTest?: string;
+        refreshTokenTest?: string;
       }>;
     },
     staleTime: 60_000,
