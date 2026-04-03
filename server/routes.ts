@@ -534,15 +534,16 @@ ${urls
   // ── eBay Sync Routes ──────────────────────────────────────────────────
 
   app.get("/api/admin/ebay/status", requireAuth, async (_req, res) => {
+    const env = process.env.EBAY_ENVIRONMENT ?? "production";
     if (!isEbayConfigured()) {
-      return res.json({ connected: false, reason: "eBay credentials not configured" });
+      return res.json({ connected: false, reason: "eBay credentials not configured", environment: env });
     }
     try {
       await getEbayAccessToken();
-      return res.json({ connected: true });
+      return res.json({ connected: true, environment: env });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return res.json({ connected: false, reason: msg });
+      return res.json({ connected: false, reason: msg, environment: env });
     }
   });
 
