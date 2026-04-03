@@ -535,15 +535,24 @@ ${urls
 
   app.get("/api/admin/ebay/status", requireAuth, async (_req, res) => {
     const env = process.env.EBAY_ENVIRONMENT ?? "production";
+    const clientId = (process.env.EBAY_CLIENT_ID ?? "").trim();
+    const refreshToken = (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
+    const debug = {
+      environment: env,
+      clientIdPrefix: clientId.slice(0, 12) + "...",
+      refreshTokenLength: refreshToken.length,
+      refreshTokenPrefix: refreshToken.slice(0, 8) + "...",
+      authUrl: env === "production" ? "api.ebay.com" : "api.sandbox.ebay.com",
+    };
     if (!isEbayConfigured()) {
-      return res.json({ connected: false, reason: "eBay credentials not configured", environment: env });
+      return res.json({ connected: false, reason: "eBay credentials not configured", ...debug });
     }
     try {
       await getEbayAccessToken();
-      return res.json({ connected: true, environment: env });
+      return res.json({ connected: true, ...debug });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return res.json({ connected: false, reason: msg, environment: env });
+      return res.json({ connected: false, reason: msg, ...debug });
     }
   });
 

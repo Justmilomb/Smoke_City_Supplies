@@ -3,9 +3,9 @@ import { storage } from "./storage";
 
 // ── Environment ──────────────────────────────────────────────────────────
 
-const EBAY_CLIENT_ID = () => process.env.EBAY_CLIENT_ID ?? "";
-const EBAY_CLIENT_SECRET = () => process.env.EBAY_CLIENT_SECRET ?? "";
-const EBAY_REFRESH_TOKEN = () => process.env.EBAY_REFRESH_TOKEN ?? "";
+const EBAY_CLIENT_ID = () => (process.env.EBAY_CLIENT_ID ?? "").trim();
+const EBAY_CLIENT_SECRET = () => (process.env.EBAY_CLIENT_SECRET ?? "").trim();
+const EBAY_REFRESH_TOKEN = () => (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
 const EBAY_ENVIRONMENT = () =>
   (process.env.EBAY_ENVIRONMENT ?? "production") as "sandbox" | "production";
 const EBAY_CATEGORY_ID = () => process.env.EBAY_CATEGORY_ID ?? "6028";

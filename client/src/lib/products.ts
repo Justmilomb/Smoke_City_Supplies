@@ -203,7 +203,15 @@ export function useEbayStatus() {
     queryFn: async () => {
       const res = await fetch(`${API}/admin/ebay/status`);
       if (!res.ok) throw new Error("Failed to check eBay status");
-      return res.json() as Promise<{ connected: boolean; reason?: string }>;
+      return res.json() as Promise<{
+        connected: boolean;
+        reason?: string;
+        environment?: string;
+        clientIdPrefix?: string;
+        refreshTokenLength?: number;
+        refreshTokenPrefix?: string;
+        authUrl?: string;
+      }>;
     },
     staleTime: 60_000,
   });

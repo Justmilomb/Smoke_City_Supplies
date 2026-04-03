@@ -96,6 +96,16 @@ export default function AdminEbay() {
                     <p className="text-sm text-muted-foreground">{status?.reason}</p>
                   </div>
                 </div>
+                {(status?.clientIdPrefix || status?.environment) && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 text-xs font-mono space-y-1">
+                    <p className="font-semibold text-amber-700 dark:text-amber-300 font-sans text-sm">Debug Info</p>
+                    <p>Environment: <strong>{status.environment}</strong></p>
+                    <p>Auth URL: <strong>{status.authUrl}</strong></p>
+                    <p>Client ID: <strong>{status.clientIdPrefix}</strong></p>
+                    <p>Refresh Token Length: <strong>{status.refreshTokenLength}</strong></p>
+                    <p>Refresh Token Start: <strong>{status.refreshTokenPrefix}</strong></p>
+                  </div>
+                )}
                 <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2">
                   <p className="font-medium">Required environment variables:</p>
                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
