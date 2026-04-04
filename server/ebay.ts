@@ -176,11 +176,14 @@ async function ebayFetch(
   const token = await getEbayAccessToken();
   const url = `${apiBaseUrl()}${path}`;
 
-  const headers: Record<string, string> = {
+  const headers = new Headers({
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
     "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB",
-  };
+  });
+  // Prevent Node.js from adding default Accept-Language
+  headers.delete("Accept-Language");
+  headers.delete("Content-Language");
 
   const res = await fetch(url, {
     method: options.method ?? "GET",
