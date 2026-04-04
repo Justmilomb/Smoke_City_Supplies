@@ -602,11 +602,33 @@ ${urls
     return res.redirect(url);
   });
 
-  // OAuth callback: eBay redirects here with ?code=...
+  // OAuth callback: eBay redirects here with ?code=... or ?error=...
   app.get("/api/admin/ebay/callback", async (req, res) => {
+    const error = req.query.error as string | undefined;
+    if (error) {
+      const desc = req.query.error_description as string || "Unknown error";
+      return res.status(400).send(`<!DOCTYPE html>
+<html><head><title>eBay Error</title>
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:0 20px}
+.err{color:#dc2626}a{color:#2563eb}pre{background:#f3f4f6;padding:12px;border-radius:6px;overflow-x:auto}</style></head>
+<body>
+<h2 class="err">eBay Authorization Failed</h2>
+<pre>Error: ${error}\n${desc}</pre>
+<p><a href="/admin/ebay">&larr; Back to eBay Settings</a></p>
+</body></html>`);
+    }
     const code = req.query.code as string | undefined;
     if (!code) {
-      return res.status(400).send("Missing authorization code from eBay");
+      return res.status(400).send(`<!DOCTYPE html>
+<html><head><title>eBay Error</title>
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:0 20px}
+.err{color:#dc2626}a{color:#2563eb}</style></head>
+<body>
+<h2 class="err">Missing Authorization Code</h2>
+<p>eBay did not return an authorization code. Query params received:</p>
+<pre>${JSON.stringify(req.query, null, 2)}</pre>
+<p><a href="/admin/ebay">&larr; Back to eBay Settings</a></p>
+</body></html>`);
     }
     try {
       const tokens = await exchangeEbayAuthCode(code);
