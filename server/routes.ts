@@ -52,6 +52,7 @@ import {
   getEbayAccessToken,
   getEbayAuthUrl,
   exchangeEbayAuthCode,
+  saveRefreshToken,
   syncProductToEbay,
   unsyncProductFromEbay,
   syncProductQuantityToEbay,
@@ -601,9 +602,12 @@ ${urls
     if (!code) return res.status(400).json({ message: "Missing authorization code" });
     try {
       const tokens = await exchangeEbayAuthCode(code);
+      // Save to database so it persists across deploys without env var updates
+      await saveRefreshToken(tokens.refresh_token);
       return res.json({
         refresh_token: tokens.refresh_token,
         expires_in: tokens.refresh_token_expires_in,
+        saved: true,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Token exchange failed";

@@ -5,7 +5,26 @@ import { storage } from "./storage";
 
 const EBAY_CLIENT_ID = () => (process.env.EBAY_CLIENT_ID ?? "").trim();
 const EBAY_CLIENT_SECRET = () => (process.env.EBAY_CLIENT_SECRET ?? "").trim();
-const EBAY_REFRESH_TOKEN = () => (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
+const EBAY_REFRESH_TOKEN_ENV = () => (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
+
+// Check DB first (saved via OAuth flow), fall back to env var
+let dbRefreshTokenCache: string | null = null;
+async function getRefreshToken(): Promise<string> {
+  if (dbRefreshTokenCache) return dbRefreshTokenCache;
+  try {
+    const dbToken = await storage.getSetting("ebay_refresh_token");
+    if (dbToken) {
+      dbRefreshTokenCache = dbToken;
+      return dbToken;
+    }
+  } catch {}
+  return EBAY_REFRESH_TOKEN_ENV();
+}
+
+export async function saveRefreshToken(token: string): Promise<void> {
+  dbRefreshTokenCache = token;
+  await storage.setSetting("ebay_refresh_token", token);
+}
 const EBAY_RUNAME = () => (process.env.EBAY_RUNAME ?? "").trim();
 const EBAY_ENVIRONMENT = () =>
   (process.env.EBAY_ENVIRONMENT ?? "production") as "sandbox" | "production";
@@ -34,7 +53,13 @@ function resolvePublicBaseUrl(): string {
 }
 
 export function isEbayConfigured(): boolean {
-  return !!(EBAY_CLIENT_ID() && EBAY_CLIENT_SECRET() && EBAY_REFRESH_TOKEN());
+  return !!(EBAY_CLIENT_ID() && EBAY_CLIENT_SECRET() && (EBAY_REFRESH_TOKEN_ENV() || dbRefreshTokenCache));
+}
+
+export async function isEbayFullyConfigured(): Promise<boolean> {
+  if (!EBAY_CLIENT_ID() || !EBAY_CLIENT_SECRET()) return false;
+  const token = await getRefreshToken();
+  return !!token;
 }
 
 // ── OAuth Connect Flow ──────────────────────────────────────────────────
@@ -109,9 +134,10 @@ export async function getEbayAccessToken(): Promise<string> {
     `${EBAY_CLIENT_ID()}:${EBAY_CLIENT_SECRET()}`
   ).toString("base64");
 
+  const refreshToken = await getRefreshToken();
   const body = new URLSearchParams({
     grant_type: "refresh_token",
-    refresh_token: EBAY_REFRESH_TOKEN(),
+    refresh_token: refreshToken,
   });
 
   const res = await fetch(`${authBaseUrl()}/identity/v1/oauth2/token`, {

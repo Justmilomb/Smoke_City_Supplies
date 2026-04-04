@@ -25,6 +25,7 @@ import {
   orderFulfillmentScans,
   orders,
   products,
+  settings,
   storedFiles,
   users,
 } from "@shared/schema";
@@ -117,6 +118,9 @@ export interface IStorage {
     totalProductsChecked: number;
   }): Promise<BikeCompatibilityCacheRow>;
   clearBikeCompatibilityCache(): Promise<void>;
+
+  getSetting(key: string): Promise<string | undefined>;
+  setSetting(key: string, value: string): Promise<void>;
 }
 
 function stockFromQuantity(quantity: number): "in-stock" | "low" | "out" {
@@ -1135,6 +1139,18 @@ export class DbStorage implements IStorage {
   async clearBikeCompatibilityCache(): Promise<void> {
     await this.getDb().delete(bikeCompatibilityCache);
   }
+
+  async getSetting(key: string): Promise<string | undefined> {
+    const [row] = await this.getDb().select().from(settings).where(eq(settings.key, key)).limit(1);
+    return row?.value;
+  }
+
+  async setSetting(key: string, value: string): Promise<void> {
+    await this.getDb()
+      .insert(settings)
+      .values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: settings.key, set: { value, updatedAt: new Date() } });
+  }
 }
 
 // In-memory storage for local dev when DATABASE_URL is not set
@@ -1767,6 +1783,14 @@ export class MemStorage implements IStorage {
 
   async clearBikeCompatibilityCache(): Promise<void> {
     this.bikeCache.clear();
+  }
+
+  private settingsMap = new Map<string, string>();
+  async getSetting(key: string): Promise<string | undefined> {
+    return this.settingsMap.get(key);
+  }
+  async setSetting(key: string, value: string): Promise<void> {
+    this.settingsMap.set(key, value);
   }
 }
 
