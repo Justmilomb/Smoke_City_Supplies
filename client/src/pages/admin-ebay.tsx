@@ -117,13 +117,20 @@ export default function AdminEbay() {
                   </div>
                 )}
                 {status?.oauthConnectUrl ? (
-                  <Button
-                    className="gap-2 w-full"
-                    onClick={() => { window.open(status.oauthConnectUrl as string, "_blank"); }}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Connect to eBay (opens new tab)
-                  </Button>
+                  <div className="space-y-2">
+                    <a
+                      href={status.oauthConnectUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 w-full justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Connect to eBay
+                    </a>
+                    <p className="text-xs text-muted-foreground break-all">
+                      Link: {status.oauthConnectUrl}
+                    </p>
+                  </div>
                 ) : (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 text-sm">
                     <p className="font-medium text-amber-700 dark:text-amber-300">Set <code className="text-xs">EBAY_RUNAME</code> to enable the Connect button</p>
