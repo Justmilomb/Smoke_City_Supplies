@@ -53,12 +53,14 @@ export default function AdminEbay() {
       credentials: "include",
     })
       .then(async (res) => {
-        const data = await res.json();
+        const text = await res.text();
+        let data: Record<string, unknown>;
+        try { data = JSON.parse(text); } catch { data = { message: `Server returned non-JSON: ${text.slice(0, 100)}` }; }
         if (res.ok && data.refresh_token) {
-          setNewRefreshToken(data.refresh_token);
+          setNewRefreshToken(data.refresh_token as string);
           toast.success("eBay authorized! Copy the refresh token below.");
         } else {
-          toast.error(data.message || "Token exchange failed");
+          toast.error((data.message as string) || "Token exchange failed");
         }
       })
       .catch((err) => toast.error(err.message || "Token exchange failed"))

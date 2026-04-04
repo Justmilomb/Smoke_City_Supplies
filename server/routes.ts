@@ -596,7 +596,7 @@ ${urls
 
   // ── eBay OAuth Connect Flow ────────────────────────────────────────────
   // Exchange auth code for tokens (called from frontend when eBay redirects back)
-  app.post("/api/admin/ebay/exchange-code", requireAuth, async (req, res) => {
+  app.post("/api/admin/ebay/exchange-code", async (req, res) => {
     const { code } = req.body;
     if (!code) return res.status(400).json({ message: "Missing authorization code" });
     try {
