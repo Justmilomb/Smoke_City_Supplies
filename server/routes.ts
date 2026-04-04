@@ -542,6 +542,7 @@ ${urls
     const refreshToken = (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
     const authUrl = env === "production" ? "https://api.ebay.com" : "https://api.sandbox.ebay.com";
 
+    const oauthConnectUrl = getEbayAuthUrl();
     const debug: Record<string, unknown> = {
       environment: env,
       clientIdPrefix: clientId.slice(0, 24) + "...",
@@ -550,6 +551,7 @@ ${urls
       refreshTokenLength: refreshToken.length,
       refreshTokenPrefix: refreshToken.slice(0, 8) + "...",
       authUrl,
+      oauthConnectUrl,
     };
 
     if (!isEbayConfigured()) {

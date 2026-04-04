@@ -215,6 +215,7 @@ export function useEbayStatus() {
         authUrl?: string;
         clientCredentialsTest?: string;
         refreshTokenTest?: string;
+        oauthConnectUrl?: string;
       }>;
     },
     staleTime: 60_000,
