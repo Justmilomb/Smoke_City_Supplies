@@ -179,7 +179,6 @@ async function ebayFetch(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    "Accept-Language": "en-GB",
     "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB",
   };
 
