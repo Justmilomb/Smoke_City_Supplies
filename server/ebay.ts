@@ -176,18 +176,19 @@ async function ebayFetch(
   const token = await getEbayAccessToken();
   const url = `${apiBaseUrl()}${path}`;
 
-  const headers = new Headers({
+  const method = options.method ?? "GET";
+  const headerObj: Record<string, string> = {
     Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
     "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB",
-  });
-  // Prevent Node.js from adding default Accept-Language
-  headers.delete("Accept-Language");
-  headers.delete("Content-Language");
+  };
+  if (options.body) {
+    headerObj["Content-Type"] = "application/json";
+    headerObj["Content-Language"] = "en-US";
+  }
 
   const res = await fetch(url, {
-    method: options.method ?? "GET",
-    headers,
+    method,
+    headers: headerObj,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
