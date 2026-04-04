@@ -36,6 +36,34 @@ export default function AdminEbay() {
   const [policies, setPolicies] = React.useState<PoliciesResponse | null>(null);
   const [policiesLoading, setPoliciesLoading] = React.useState(false);
   const [policiesError, setPoliciesError] = React.useState<string | null>(null);
+  const [newRefreshToken, setNewRefreshToken] = React.useState<string | null>(null);
+  const [tokenExchanging, setTokenExchanging] = React.useState(false);
+
+  // Detect OAuth callback code in URL and exchange it
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+    window.history.replaceState({}, "", "/admin/ebay");
+    setTokenExchanging(true);
+    fetch("/api/admin/ebay/exchange-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+      credentials: "include",
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok && data.refresh_token) {
+          setNewRefreshToken(data.refresh_token);
+          toast.success("eBay authorized! Copy the refresh token below.");
+        } else {
+          toast.error(data.message || "Token exchange failed");
+        }
+      })
+      .catch((err) => toast.error(err.message || "Token exchange failed"))
+      .finally(() => setTokenExchanging(false));
+  }, []);
 
   const ebayProducts = products.filter((p) => p.ebayListingId);
   const syncErrors = products.filter((p) => p.ebaySyncStatus === "error");
@@ -72,6 +100,44 @@ export default function AdminEbay() {
           </div>
           <BackButton fallback="/admin" />
         </div>
+
+        {/* Token exchange result */}
+        {tokenExchanging && (
+          <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-6">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="h-5 w-5 animate-spin text-amber-600" />
+              <p className="font-medium text-amber-700 dark:text-amber-300">Exchanging authorization code with eBay...</p>
+            </div>
+          </Card>
+        )}
+        {newRefreshToken && (
+          <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 p-6 space-y-3">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              <p className="font-medium text-emerald-700 dark:text-emerald-300">eBay Authorized Successfully!</p>
+            </div>
+            <p className="text-sm">Copy this refresh token and paste it into your Render environment variable <code className="text-xs font-mono bg-muted px-1 py-0.5 rounded">EBAY_REFRESH_TOKEN</code>, then redeploy:</p>
+            <textarea
+              readOnly
+              value={newRefreshToken}
+              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+              className="w-full h-32 text-xs font-mono p-3 rounded-md border border-border bg-background"
+            />
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                navigator.clipboard.writeText(newRefreshToken).then(
+                  () => toast.success("Copied to clipboard"),
+                  () => toast.error("Failed to copy")
+                );
+              }}
+            >
+              <Copy className="h-4 w-4" />
+              Copy Refresh Token
+            </Button>
+          </Card>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Connection Status */}

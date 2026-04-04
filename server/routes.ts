@@ -595,6 +595,22 @@ ${urls
   });
 
   // ── eBay OAuth Connect Flow ────────────────────────────────────────────
+  // Exchange auth code for tokens (called from frontend when eBay redirects back)
+  app.post("/api/admin/ebay/exchange-code", requireAuth, async (req, res) => {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ message: "Missing authorization code" });
+    try {
+      const tokens = await exchangeEbayAuthCode(code);
+      return res.json({
+        refresh_token: tokens.refresh_token,
+        expires_in: tokens.refresh_token_expires_in,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Token exchange failed";
+      return res.status(400).json({ message: msg });
+    }
+  });
+
   // Start OAuth: redirects admin to eBay consent page
   app.get("/api/admin/ebay/connect", requireAuth, (_req, res) => {
     const url = getEbayAuthUrl();
