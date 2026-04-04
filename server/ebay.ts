@@ -6,6 +6,7 @@ import { storage } from "./storage";
 const EBAY_CLIENT_ID = () => (process.env.EBAY_CLIENT_ID ?? "").trim();
 const EBAY_CLIENT_SECRET = () => (process.env.EBAY_CLIENT_SECRET ?? "").trim();
 const EBAY_REFRESH_TOKEN = () => (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
+const EBAY_RUNAME = () => (process.env.EBAY_RUNAME ?? "").trim();
 const EBAY_ENVIRONMENT = () =>
   (process.env.EBAY_ENVIRONMENT ?? "production") as "sandbox" | "production";
 const EBAY_CATEGORY_ID = () => process.env.EBAY_CATEGORY_ID ?? "6028";
@@ -34,6 +35,65 @@ function resolvePublicBaseUrl(): string {
 
 export function isEbayConfigured(): boolean {
   return !!(EBAY_CLIENT_ID() && EBAY_CLIENT_SECRET() && EBAY_REFRESH_TOKEN());
+}
+
+// ── OAuth Connect Flow ──────────────────────────────────────────────────
+
+function consentBaseUrl(): string {
+  return EBAY_ENVIRONMENT() === "production"
+    ? "https://auth.ebay.com"
+    : "https://auth.sandbox.ebay.com";
+}
+
+export function getEbayAuthUrl(): string | null {
+  const clientId = EBAY_CLIENT_ID();
+  const ruName = EBAY_RUNAME();
+  if (!clientId || !ruName) return null;
+
+  const scopes = [
+    "https://api.ebay.com/oauth/api_scope",
+    "https://api.ebay.com/oauth/api_scope/sell.inventory",
+    "https://api.ebay.com/oauth/api_scope/sell.account",
+    "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
+  ].join(" ");
+
+  return `${consentBaseUrl()}/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(ruName)}&response_type=code&scope=${encodeURIComponent(scopes)}`;
+}
+
+export async function exchangeEbayAuthCode(code: string): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  refresh_token_expires_in: number;
+}> {
+  const credentials = Buffer.from(
+    `${EBAY_CLIENT_ID()}:${EBAY_CLIENT_SECRET()}`
+  ).toString("base64");
+
+  const res = await fetch(`${authBaseUrl()}/identity/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: EBAY_RUNAME(),
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`eBay token exchange failed (${res.status}): ${text}`);
+  }
+
+  return res.json() as Promise<{
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    refresh_token_expires_in: number;
+  }>;
 }
 
 // ── OAuth Token Management ───────────────────────────────────────────────

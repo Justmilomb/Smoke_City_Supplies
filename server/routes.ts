@@ -50,6 +50,8 @@ import {
 import {
   isEbayConfigured,
   getEbayAccessToken,
+  getEbayAuthUrl,
+  exchangeEbayAuthCode,
   syncProductToEbay,
   unsyncProductFromEbay,
   syncProductQuantityToEbay,
@@ -587,6 +589,54 @@ ${urls
       const msg = err instanceof Error ? err.message : String(err);
       debug.refreshTokenTest = `FAIL: ${msg}`;
       return res.json({ connected: false, reason: msg, ...debug });
+    }
+  });
+
+  // ── eBay OAuth Connect Flow ────────────────────────────────────────────
+  // Start OAuth: redirects admin to eBay consent page
+  app.get("/api/admin/ebay/connect", requireAuth, (_req, res) => {
+    const url = getEbayAuthUrl();
+    if (!url) {
+      return res.status(400).json({ message: "Set EBAY_CLIENT_ID and EBAY_RUNAME first" });
+    }
+    return res.redirect(url);
+  });
+
+  // OAuth callback: eBay redirects here with ?code=...
+  app.get("/api/admin/ebay/callback", async (req, res) => {
+    const code = req.query.code as string | undefined;
+    if (!code) {
+      return res.status(400).send("Missing authorization code from eBay");
+    }
+    try {
+      const tokens = await exchangeEbayAuthCode(code);
+      const expiryDays = Math.floor(tokens.refresh_token_expires_in / 86400);
+      return res.send(`<!DOCTYPE html>
+<html><head><title>eBay Connected</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:0 20px}
+textarea{width:100%;height:180px;font:12px monospace;margin:12px 0;padding:8px;border:1px solid #ccc;border-radius:6px}
+.ok{color:#16a34a;font-size:1.5rem;font-weight:bold}
+a{color:#2563eb}</style></head>
+<body>
+<p class="ok">eBay Connected Successfully!</p>
+<p>Copy the refresh token below and paste it into your Render environment variable <code>EBAY_REFRESH_TOKEN</code>, then redeploy:</p>
+<textarea id="tok" readonly onclick="this.select()">${tokens.refresh_token}</textarea>
+<button onclick="navigator.clipboard.writeText(document.getElementById('tok').value).then(()=>this.textContent='Copied!')">Copy to Clipboard</button>
+<p>This token is valid for <strong>${expiryDays} days</strong>.</p>
+<p><a href="/admin/ebay">&larr; Back to eBay Settings</a></p>
+</body></html>`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(400).send(`<!DOCTYPE html>
+<html><head><title>eBay Error</title>
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:0 20px}
+.err{color:#dc2626}a{color:#2563eb}</style></head>
+<body>
+<h2 class="err">eBay Connection Failed</h2>
+<pre>${msg}</pre>
+<p><a href="/admin/ebay">&larr; Back to eBay Settings</a></p>
+</body></html>`);
     }
   });
 

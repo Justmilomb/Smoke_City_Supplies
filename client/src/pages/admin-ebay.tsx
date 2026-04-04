@@ -1,5 +1,5 @@
 import React from "react";
-import { RefreshCw, Package, CheckCircle2, XCircle, Copy, AlertTriangle } from "lucide-react";
+import { RefreshCw, Package, CheckCircle2, XCircle, Copy, AlertTriangle, ExternalLink } from "lucide-react";
 import SiteLayout from "@/components/site/SiteLayout";
 import BackButton from "@/components/site/BackButton";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -116,16 +116,21 @@ export default function AdminEbay() {
                     )}
                   </div>
                 )}
+                <Button
+                  className="gap-2 w-full"
+                  onClick={() => { window.location.href = "/api/admin/ebay/connect"; }}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Connect to eBay
+                </Button>
                 <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2">
                   <p className="font-medium">Required environment variables:</p>
                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                    <li><code className="text-xs">EBAY_CLIENT_ID</code> — eBay developer app client ID</li>
-                    <li><code className="text-xs">EBAY_CLIENT_SECRET</code> — eBay developer app secret</li>
-                    <li><code className="text-xs">EBAY_REFRESH_TOKEN</code> — OAuth refresh token</li>
+                    <li><code className="text-xs">EBAY_CLIENT_ID</code> — App ID from eBay Developer Portal</li>
+                    <li><code className="text-xs">EBAY_CLIENT_SECRET</code> — Cert ID from eBay Developer Portal</li>
+                    <li><code className="text-xs">EBAY_RUNAME</code> — RuName from eBay Developer Portal (under OAuth redirect settings)</li>
+                    <li><code className="text-xs">EBAY_REFRESH_TOKEN</code> — generated via "Connect to eBay" button above</li>
                   </ul>
-                  <p className="text-muted-foreground">
-                    Set these in your <code className="text-xs">.env</code> file or Render environment variables, then restart the server.
-                  </p>
                 </div>
               </div>
             )}
