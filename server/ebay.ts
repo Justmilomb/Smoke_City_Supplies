@@ -3,11 +3,31 @@ import { storage } from "./storage";
 
 // ── Environment ──────────────────────────────────────────────────────────
 
-const EBAY_CLIENT_ID = () => process.env.EBAY_CLIENT_ID ?? "";
-const EBAY_CLIENT_SECRET = () => process.env.EBAY_CLIENT_SECRET ?? "";
-const EBAY_REFRESH_TOKEN = () => process.env.EBAY_REFRESH_TOKEN ?? "";
+const EBAY_CLIENT_ID = () => (process.env.EBAY_CLIENT_ID ?? "").trim();
+const EBAY_CLIENT_SECRET = () => (process.env.EBAY_CLIENT_SECRET ?? "").trim();
+const EBAY_REFRESH_TOKEN_ENV = () => (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
+
+// Check DB first (saved via OAuth flow), fall back to env var
+let dbRefreshTokenCache: string | null = null;
+async function getRefreshToken(): Promise<string> {
+  if (dbRefreshTokenCache) return dbRefreshTokenCache;
+  try {
+    const dbToken = await storage.getSetting("ebay_refresh_token");
+    if (dbToken) {
+      dbRefreshTokenCache = dbToken;
+      return dbToken;
+    }
+  } catch {}
+  return EBAY_REFRESH_TOKEN_ENV();
+}
+
+export async function saveRefreshToken(token: string): Promise<void> {
+  dbRefreshTokenCache = token;
+  await storage.setSetting("ebay_refresh_token", token);
+}
+const EBAY_RUNAME = () => (process.env.EBAY_RUNAME ?? "").trim();
 const EBAY_ENVIRONMENT = () =>
-  (process.env.EBAY_ENVIRONMENT ?? "sandbox") as "sandbox" | "production";
+  (process.env.EBAY_ENVIRONMENT ?? "production") as "sandbox" | "production";
 const EBAY_CATEGORY_ID = () => process.env.EBAY_CATEGORY_ID ?? "6028";
 const EBAY_PAYMENT_POLICY_ID = () => process.env.EBAY_PAYMENT_POLICY_ID ?? "";
 const EBAY_RETURN_POLICY_ID = () => process.env.EBAY_RETURN_POLICY_ID ?? "";
@@ -33,7 +53,72 @@ function resolvePublicBaseUrl(): string {
 }
 
 export function isEbayConfigured(): boolean {
-  return !!(EBAY_CLIENT_ID() && EBAY_CLIENT_SECRET() && EBAY_REFRESH_TOKEN());
+  return !!(EBAY_CLIENT_ID() && EBAY_CLIENT_SECRET() && (EBAY_REFRESH_TOKEN_ENV() || dbRefreshTokenCache));
+}
+
+export async function isEbayFullyConfigured(): Promise<boolean> {
+  if (!EBAY_CLIENT_ID() || !EBAY_CLIENT_SECRET()) return false;
+  const token = await getRefreshToken();
+  return !!token;
+}
+
+// ── OAuth Connect Flow ──────────────────────────────────────────────────
+
+function consentBaseUrl(): string {
+  return EBAY_ENVIRONMENT() === "production"
+    ? "https://auth.ebay.com"
+    : "https://auth.sandbox.ebay.com";
+}
+
+export function getEbayAuthUrl(): string | null {
+  const clientId = EBAY_CLIENT_ID();
+  const ruName = EBAY_RUNAME();
+  if (!clientId || !ruName) return null;
+
+  const scopes = [
+    "https://api.ebay.com/oauth/api_scope",
+    "https://api.ebay.com/oauth/api_scope/sell.inventory",
+    "https://api.ebay.com/oauth/api_scope/sell.account",
+    "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
+  ].join(" ");
+
+  return `${consentBaseUrl()}/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(ruName)}&response_type=code&scope=${encodeURIComponent(scopes)}`;
+}
+
+export async function exchangeEbayAuthCode(code: string): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  refresh_token_expires_in: number;
+}> {
+  const credentials = Buffer.from(
+    `${EBAY_CLIENT_ID()}:${EBAY_CLIENT_SECRET()}`
+  ).toString("base64");
+
+  const res = await fetch(`${authBaseUrl()}/identity/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: EBAY_RUNAME(),
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`eBay token exchange failed (${res.status}): ${text}`);
+  }
+
+  return res.json() as Promise<{
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    refresh_token_expires_in: number;
+  }>;
 }
 
 // ── OAuth Token Management ───────────────────────────────────────────────
@@ -49,18 +134,19 @@ export async function getEbayAccessToken(): Promise<string> {
     `${EBAY_CLIENT_ID()}:${EBAY_CLIENT_SECRET()}`
   ).toString("base64");
 
+  const refreshToken = await getRefreshToken();
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
   const res = await fetch(`${authBaseUrl()}/identity/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: EBAY_REFRESH_TOKEN(),
-      scope:
-        "https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment",
-    }),
+    body,
   });
 
   if (!res.ok) {
@@ -90,16 +176,19 @@ async function ebayFetch(
   const token = await getEbayAccessToken();
   const url = `${apiBaseUrl()}${path}`;
 
-  const headers: Record<string, string> = {
+  const method = options.method ?? "GET";
+  const headerObj: Record<string, string> = {
     Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-    "Content-Language": "en-GB",
     "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB",
   };
+  if (options.body) {
+    headerObj["Content-Type"] = "application/json";
+    headerObj["Content-Language"] = "en-US";
+  }
 
   const res = await fetch(url, {
-    method: options.method ?? "GET",
-    headers,
+    method,
+    headers: headerObj,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 

@@ -366,6 +366,13 @@ export type BikeFinderResult = {
 
 export type BikeCompatibilityCacheRow = typeof bikeCompatibilityCache.$inferSelect;
 
+// Simple key-value settings store (e.g. eBay refresh token)
+export const settings = pgTable("settings", {
+  key: varchar("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export type ApiStoredFile = {
   id: string;
   kind: string;

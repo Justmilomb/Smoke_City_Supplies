@@ -26,6 +26,7 @@ import AdminOrders from "@/pages/admin-orders";
 import AdminCategories from "@/pages/admin-categories";
 import AdminEditPart from "@/pages/admin-edit-part";
 import AdminInventory from "@/pages/admin-inventory";
+import AdminEbay from "@/pages/admin-ebay";
 import CookieConsent from "@/components/site/CookieConsent";
 import NavigationScrollManager from "@/components/site/NavigationScrollManager";
 
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/admin/new" component={withAdminGuard(AdminNewPart)} />
       <Route path="/admin/edit/:id" component={withAdminGuard(AdminEditPart)} />
       <Route path="/admin/inventory" component={withAdminGuard(AdminInventory)} />
+      <Route path="/admin/ebay" component={withAdminGuard(AdminEbay)} />
 
       <Route component={NotFound} />
     </Switch>

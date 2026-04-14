@@ -50,6 +50,9 @@ import {
 import {
   isEbayConfigured,
   getEbayAccessToken,
+  getEbayAuthUrl,
+  exchangeEbayAuthCode,
+  saveRefreshToken,
   syncProductToEbay,
   unsyncProductFromEbay,
   syncProductQuantityToEbay,
@@ -485,18 +488,232 @@ ${urls
     return res.status(204).send();
   });
 
+  // ── Admin Dashboard Stats ─────────────────────────────────────────────
+
+  app.get("/api/admin/dashboard-stats", requireAuth, async (_req, res) => {
+    try {
+      const products = await storage.listProducts();
+      const orders = await storage.listOrders();
+
+      const totalProducts = products.length;
+      const lowStockCount = products.filter((p) => p.stock === "low").length;
+      const outOfStockCount = products.filter((p) => p.stock === "out").length;
+
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const paidOrders = orders.filter((o) => o.paymentStatus === "paid");
+      const recentOrderCount = paidOrders.filter(
+        (o) => o.createdAt && new Date(o.createdAt) >= sevenDaysAgo
+      ).length;
+      const monthOrders = paidOrders.filter(
+        (o) => o.createdAt && new Date(o.createdAt) >= startOfMonth
+      );
+      const revenueThisMonth = monthOrders.reduce(
+        (sum, o) => sum + (o.totalPence ?? 0),
+        0
+      ) / 100;
+
+      const ebayListedCount = products.filter((p) => p.ebayListingId).length;
+      const ebaySyncErrors = products.filter((p) => p.ebaySyncStatus === "error").length;
+
+      return res.json({
+        totalProducts,
+        lowStockCount,
+        outOfStockCount,
+        totalOrders: paidOrders.length,
+        recentOrderCount,
+        revenueThisMonth,
+        ebayListedCount,
+        ebaySyncErrors,
+      });
+    } catch (err) {
+      console.error("[dashboard-stats] error:", err);
+      return res.status(500).json({ message: "Failed to load dashboard stats" });
+    }
+  });
+
   // ── eBay Sync Routes ──────────────────────────────────────────────────
 
   app.get("/api/admin/ebay/status", requireAuth, async (_req, res) => {
+    const env = process.env.EBAY_ENVIRONMENT ?? "production";
+    const clientId = (process.env.EBAY_CLIENT_ID ?? "").trim();
+    const clientSecret = (process.env.EBAY_CLIENT_SECRET ?? "").trim();
+    const refreshToken = (process.env.EBAY_REFRESH_TOKEN ?? "").trim();
+    const authUrl = env === "production" ? "https://api.ebay.com" : "https://api.sandbox.ebay.com";
+
+    const oauthConnectUrl = getEbayAuthUrl();
+    const debug: Record<string, unknown> = {
+      environment: env,
+      clientIdPrefix: clientId.slice(0, 24) + "...",
+      clientSecretPrefix: clientSecret.slice(0, 8) + "...",
+      clientSecretLength: clientSecret.length,
+      refreshTokenLength: refreshToken.length,
+      refreshTokenPrefix: refreshToken.slice(0, 8) + "...",
+      authUrl,
+      oauthConnectUrl,
+    };
+
     if (!isEbayConfigured()) {
-      return res.json({ connected: false, reason: "eBay credentials not configured" });
+      return res.json({ connected: false, reason: "eBay credentials not configured", ...debug });
     }
+
+    // Step 1: Test client credentials alone (no refresh token needed)
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    try {
+      const ccRes = await fetch(`${authUrl}/identity/v1/oauth2/token`, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${credentials}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          grant_type: "client_credentials",
+          scope: "https://api.ebay.com/oauth/api_scope",
+        }),
+      });
+      if (ccRes.ok) {
+        debug.clientCredentialsTest = "PASS — Client ID + Secret are valid";
+      } else {
+        const text = await ccRes.text();
+        debug.clientCredentialsTest = `FAIL (${ccRes.status}): ${text}`;
+        return res.json({ connected: false, reason: "Client ID or Secret is invalid", ...debug });
+      }
+    } catch (err) {
+      debug.clientCredentialsTest = `ERROR: ${err instanceof Error ? err.message : String(err)}`;
+    }
+
+    // Step 2: Test refresh token
     try {
       await getEbayAccessToken();
-      return res.json({ connected: true });
+      return res.json({ connected: true, ...debug });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return res.json({ connected: false, reason: msg });
+      debug.refreshTokenTest = `FAIL: ${msg}`;
+      return res.json({ connected: false, reason: msg, ...debug });
+    }
+  });
+
+  // ── eBay OAuth Connect Flow ────────────────────────────────────────────
+  // Exchange auth code for tokens (called from frontend when eBay redirects back)
+  app.post("/api/admin/ebay/exchange-code", async (req, res) => {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ message: "Missing authorization code" });
+    try {
+      const tokens = await exchangeEbayAuthCode(code);
+      // Save to database so it persists across deploys without env var updates
+      await saveRefreshToken(tokens.refresh_token);
+      return res.json({
+        refresh_token: tokens.refresh_token,
+        expires_in: tokens.refresh_token_expires_in,
+        saved: true,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Token exchange failed";
+      return res.status(400).json({ message: msg });
+    }
+  });
+
+  // Start OAuth: redirects admin to eBay consent page
+  app.get("/api/admin/ebay/connect", requireAuth, (_req, res) => {
+    const url = getEbayAuthUrl();
+    if (!url) {
+      return res.status(400).json({ message: "Set EBAY_CLIENT_ID and EBAY_RUNAME first" });
+    }
+    return res.redirect(url);
+  });
+
+  // OAuth callback: eBay redirects here with ?code=... or ?error=...
+  app.get("/api/admin/ebay/callback", async (req, res) => {
+    const error = req.query.error as string | undefined;
+    if (error) {
+      const desc = req.query.error_description as string || "Unknown error";
+      return res.status(400).send(`<!DOCTYPE html>
+<html><head><title>eBay Error</title>
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:0 20px}
+.err{color:#dc2626}a{color:#2563eb}pre{background:#f3f4f6;padding:12px;border-radius:6px;overflow-x:auto}</style></head>
+<body>
+<h2 class="err">eBay Authorization Failed</h2>
+<pre>Error: ${error}\n${desc}</pre>
+<p><a href="/admin/ebay">&larr; Back to eBay Settings</a></p>
+</body></html>`);
+    }
+    const code = req.query.code as string | undefined;
+    if (!code) {
+      return res.status(400).send(`<!DOCTYPE html>
+<html><head><title>eBay Error</title>
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:0 20px}
+.err{color:#dc2626}a{color:#2563eb}</style></head>
+<body>
+<h2 class="err">Missing Authorization Code</h2>
+<p>eBay did not return an authorization code. Query params received:</p>
+<pre>${JSON.stringify(req.query, null, 2)}</pre>
+<p><a href="/admin/ebay">&larr; Back to eBay Settings</a></p>
+</body></html>`);
+    }
+    try {
+      const tokens = await exchangeEbayAuthCode(code);
+      const expiryDays = Math.floor(tokens.refresh_token_expires_in / 86400);
+      return res.send(`<!DOCTYPE html>
+<html><head><title>eBay Connected</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:0 20px}
+textarea{width:100%;height:180px;font:12px monospace;margin:12px 0;padding:8px;border:1px solid #ccc;border-radius:6px}
+.ok{color:#16a34a;font-size:1.5rem;font-weight:bold}
+a{color:#2563eb}</style></head>
+<body>
+<p class="ok">eBay Connected Successfully!</p>
+<p>Copy the refresh token below and paste it into your Render environment variable <code>EBAY_REFRESH_TOKEN</code>, then redeploy:</p>
+<textarea id="tok" readonly onclick="this.select()">${tokens.refresh_token}</textarea>
+<button onclick="navigator.clipboard.writeText(document.getElementById('tok').value).then(()=>this.textContent='Copied!')">Copy to Clipboard</button>
+<p>This token is valid for <strong>${expiryDays} days</strong>.</p>
+<p><a href="/admin/ebay">&larr; Back to eBay Settings</a></p>
+</body></html>`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(400).send(`<!DOCTYPE html>
+<html><head><title>eBay Error</title>
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:0 20px}
+.err{color:#dc2626}a{color:#2563eb}</style></head>
+<body>
+<h2 class="err">eBay Connection Failed</h2>
+<pre>${msg}</pre>
+<p><a href="/admin/ebay">&larr; Back to eBay Settings</a></p>
+</body></html>`);
+    }
+  });
+
+  // Fetch eBay business policy IDs (so you can put them in .env)
+  app.get("/api/admin/ebay/policies", requireAuth, async (_req, res) => {
+    if (!isEbayConfigured()) {
+      return res.status(400).json({ message: "eBay not configured" });
+    }
+    try {
+      const token = await getEbayAccessToken();
+      const types = ["PAYMENT", "RETURN_POLICY", "FULFILLMENT"] as const;
+      const results: Record<string, Array<{ id: string; name: string }>> = {};
+      for (const type of types) {
+        const r = await fetch(
+          `https://api.ebay.com/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_GB`.replace(
+            "fulfillment_policy",
+            type === "PAYMENT" ? "payment_policy" : type === "RETURN_POLICY" ? "return_policy" : "fulfillment_policy"
+          ),
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (r.ok) {
+          const data = (await r.json()) as { [key: string]: Array<{ [key: string]: string; name: string }> };
+          const key = Object.keys(data).find((k) => Array.isArray(data[k])) ?? "";
+          results[type] = (data[key] || []).map((p: Record<string, string>) => ({
+            id: p.paymentPolicyId || p.returnPolicyId || p.fulfillmentPolicyId || "",
+            name: p.name || "",
+          }));
+        }
+      }
+      return res.json(results);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ message: msg });
     }
   });
 
@@ -797,6 +1014,72 @@ Rules:
     } catch (err) {
       console.error("[generate-seo] error:", err);
       const message = err instanceof Error ? err.message : "SEO generation failed";
+      return res.status(500).json({ message });
+    }
+  });
+
+  // AI product detail generation — fills description, tags, compatibility in one shot
+  app.post("/api/generate-product-details", requireAuth, apiRateLimiter, async (req, res) => {
+    const { name, brand, category, vehicle } = req.body as {
+      name?: string;
+      brand?: string;
+      category?: string;
+      vehicle?: string;
+    };
+    if (!name || typeof name !== "string" || name.trim().length < 2) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    try {
+      const { client, model } = getAIClient();
+
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: `You are a product copywriter for Smoke City Supplies, a UK motorcycle and scooter parts shop run by Karl. Write in a friendly, knowledgeable tone. Respond ONLY with valid JSON in this exact format, nothing else:
+{"description":"...","tags":"...","compatibility":"..."}
+
+Rules:
+- description: 2-3 sentences, practical and helpful, mention key benefits. UK English.
+- tags: 4-6 comma-separated tags relevant to the product (e.g. "Popular, Fast shipping, OEM quality")
+- compatibility: 3-5 compatible bike models with year ranges, comma-separated (e.g. "Honda CBR600RR (2007-2024), Yamaha R6 (2006-2020)"). If you cannot determine compatibility from the product name, return an empty string.`,
+          },
+          {
+            role: "user",
+            content: [
+              `Product: ${name.trim()}`,
+              brand ? `Brand: ${brand}` : "",
+              category ? `Category: ${category}` : "",
+              vehicle ? `Vehicle type: ${vehicle}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
+
+      const content = completion.choices?.[0]?.message?.content ?? "";
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content) as {
+        description?: string;
+        tags?: string;
+        compatibility?: string;
+      };
+
+      return res.json({
+        description: (parsed.description ?? "").slice(0, 1000),
+        tags: (parsed.tags ?? "").slice(0, 500),
+        compatibility: (parsed.compatibility ?? "").slice(0, 500),
+      });
+    } catch (err) {
+      console.error("[generate-product-details] error:", err);
+      const message = err instanceof Error ? err.message : "Product detail generation failed";
       return res.status(500).json({ message });
     }
   });

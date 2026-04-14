@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ImagePlus, ScanLine } from "lucide-react";
+import { ImagePlus, ScanLine, Sparkles } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -73,6 +73,7 @@ export default function AdminNewPart() {
   const [newBrandName, setNewBrandName] = React.useState("");
   const [extraBrands, setExtraBrands] = React.useState<string[]>([]);
   const [seoGenerating, setSeoGenerating] = React.useState(false);
+  const [autoFilling, setAutoFilling] = React.useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -156,6 +157,65 @@ export default function AdminNewPart() {
       toast.error(err instanceof Error ? err.message : "SEO generation failed");
     } finally {
       setSeoGenerating(false);
+    }
+  };
+
+  const handleAutoFill = async () => {
+    const v = form.getValues();
+    if (!v.name || v.name.trim().length < 2) {
+      toast.error("Enter a product name first");
+      return;
+    }
+    setAutoFilling(true);
+    try {
+      // Step 1: Generate description, tags, compatibility
+      const detailRes = await fetch("/api/generate-product-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: v.name,
+          brand: v.brand,
+          category: v.category,
+          vehicle: v.vehicle,
+        }),
+        credentials: "include",
+      });
+      const details = await detailRes.json();
+      if (!detailRes.ok) throw new Error(details.message || "Auto-fill failed");
+
+      if (details.description) form.setValue("description", details.description);
+      if (details.tags) form.setValue("tags", details.tags);
+      if (details.compatibility) form.setValue("compatibility", details.compatibility);
+
+      // Step 2: Generate SEO using the new description
+      const updatedValues = form.getValues();
+      const productInfo = [
+        updatedValues.name && `Product: ${updatedValues.name}`,
+        updatedValues.brand && `Brand: ${updatedValues.brand}`,
+        updatedValues.category && `Category: ${updatedValues.category}`,
+        updatedValues.description && `Description: ${updatedValues.description}`,
+        updatedValues.compatibility && `Compatibility: ${updatedValues.compatibility}`,
+        updatedValues.tags && `Tags: ${updatedValues.tags}`,
+      ].filter(Boolean).join(". ");
+
+      const seoRes = await fetch("/api/generate-seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productInfo }),
+        credentials: "include",
+      });
+      const seo = await seoRes.json();
+      if (seoRes.ok) {
+        if (seo.metaTitle) form.setValue("metaTitle", seo.metaTitle);
+        if (seo.metaDescription) form.setValue("metaDescription", seo.metaDescription);
+        if (seo.metaKeywords) form.setValue("metaKeywords", seo.metaKeywords);
+      }
+
+      toast.success("Product details auto-filled");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Auto-fill failed");
+    } finally {
+      setAutoFilling(false);
     }
   };
 
@@ -291,7 +351,19 @@ export default function AdminNewPart() {
               Upload an image and fill in product details
             </p>
           </div>
-          <BackButton fallback="/admin" />
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              disabled={autoFilling}
+              onClick={handleAutoFill}
+            >
+              <Sparkles className="h-4 w-4" />
+              {autoFilling ? "Generating..." : "Auto-Fill with AI"}
+            </Button>
+            <BackButton fallback="/admin" />
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-12">

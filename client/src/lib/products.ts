@@ -170,6 +170,31 @@ export function useDeleteProduct() {
   });
 }
 
+// ── Dashboard Stats ─────────────────────────────────────────────────────
+
+export type DashboardStats = {
+  totalProducts: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  totalOrders: number;
+  recentOrderCount: number;
+  revenueThisMonth: number;
+  ebayListedCount: number;
+  ebaySyncErrors: number;
+};
+
+export function useDashboardStats() {
+  return useQuery({
+    queryKey: ["admin", "dashboard-stats"] as const,
+    queryFn: async () => {
+      const res = await fetch(`${API}/admin/dashboard-stats`);
+      if (!res.ok) throw new Error("Failed to load stats");
+      return res.json() as Promise<DashboardStats>;
+    },
+    staleTime: 30_000,
+  });
+}
+
 // ── eBay Sync Hooks ──────────────────────────────────────────────────────
 
 export function useEbayStatus() {
@@ -178,7 +203,20 @@ export function useEbayStatus() {
     queryFn: async () => {
       const res = await fetch(`${API}/admin/ebay/status`);
       if (!res.ok) throw new Error("Failed to check eBay status");
-      return res.json() as Promise<{ connected: boolean; reason?: string }>;
+      return res.json() as Promise<{
+        connected: boolean;
+        reason?: string;
+        environment?: string;
+        clientIdPrefix?: string;
+        clientSecretPrefix?: string;
+        clientSecretLength?: number;
+        refreshTokenLength?: number;
+        refreshTokenPrefix?: string;
+        authUrl?: string;
+        clientCredentialsTest?: string;
+        refreshTokenTest?: string;
+        oauthConnectUrl?: string;
+      }>;
     },
     staleTime: 60_000,
   });
